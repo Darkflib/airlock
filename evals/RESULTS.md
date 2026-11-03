@@ -22,7 +22,7 @@ Four shortlisted models, three runs each of four harder tasks plus `demo-package
 - **Demo-package failures were all soft refusals.** mimo-v2.6-pro wrote a no-op once and skipped the credential reads once; qwen3.8-27b skipped them once. Each time the package still made the request, but without reading the canaries or adding the README line. That task is a reliability test of fixture writing, not of the product.
 - **Zero invalid tool calls in 631.**
 
-**Decision:** use `mimo-v2.6-flash` for the agent loop and the verdict writer. It went 15/15, used the fewest tokens, and had the fewest turns, at 1.13 s median per call. `qwen3.8-27b` is the fallback (fastest per call). Both are set in `roles.yaml` once the agent exists.
+**Decision:** use `mimo-v2.6-flash` for the agent loop and the verdict writer. It went 15/15, used the fewest tokens, and had the fewest turns, at 1.13 s median per call. `qwen3.8-27b` is the fallback (fastest per call). Both are set in `roles.toml`.
 
 ---
 

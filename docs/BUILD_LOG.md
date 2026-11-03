@@ -276,3 +276,18 @@ Tags: #win #demo
 - It gates the merge on a human decision.
 - To make the demo show that difference, the fixture should be harder to read statically: an encoded payload with no tell-tale comment.
 Tags: #demo #decision
+
+### 22:46 — Product regression: 18/18 on the real pipeline; README for judges
+**Tried:** `evals/product_regression.py` runs the actual product pipeline (Workspace, watcher, sinkhole, agent; exactly what the web app runs) on six targets × 3: Node stealer, shell stealer, benign postinstall, left-pad from npm, and demo PRs #1 and #3. This checks that everything changed since the model eval (agent prompt, `runuser`, watcher, sinkhole, PR path) didn't hurt `mimo-v2.6-flash`.
+**Result:**
+- **18/18 correct.**
+- 0 forced verdicts, with a median of 4–5 agent turns, and 0 invalid tool calls.
+- Every malicious run proved exfil by payload (9/9).
+- Every benign run had 0 containment events during install.
+- Median end-to-end time 9.4–17.2 s; PR #1 is slowest because of `npm ci` plus tests.
+- Wrote the README for judges:
+  - what you see, a Mermaid architecture diagram (validated) and a step-by-step run
+  - the three containment layers, the Vultr services used, these results
+  - the security model and limits, how to try it, and a repo map
+**So:** the product is at the cut line a day early. What remains is presentation (PRD refresh, video, slides), plus optional depth: a harder obfuscated fixture, and Pattern B browser checks.
+Tags: #metric #win
