@@ -157,3 +157,13 @@ Tags: #demo
 **Result:** the cause was what the agent was told. It got the list of earlier events with every command row filtered out, so the install step (E5) was never in it, and it cited the nearest ids it had. It also never learned the ids of events its own commands produced.
 **So:** the agent now sees every event, including Airlock's own install command, plus an explicit "no traced activity during install [E5]" line when that's true. Each tool result ends with the Airlock events that call produced. The prompt says to cite only ids that directly support the point. Re-run on the host: every citation in a benign and a hostile verdict maps to the right event, and the hostile one cites both the detonation (E6–E9) and the agent's reproduction (E16–E19). 3 new tests, 28 in total.
 Tags: #fail #demo
+
+### 19:45 — What the guest kernel lets us watch (spikes/fs_watch_probe.py)
+**Tried:** probed a live sandbox. Filesystem, atime, inotify, fanotify, and eBPF/tracing support.
+**Result:**
+- Root is **overlayfs on virtiofs** (a host directory shared into the VM, at `/.msb`), not a block device. Mounted `relatime`: setting atime to 2000 and then `cat`-ing the file updated it, so the atime backstop works.
+- **inotify works** on the overlay (OPEN and ACCESS on the canary) but gives no pid.
+- **fanotify works and gives pids.** A file mark on the canary reported `/root/.aws/credentials` opened and read by pid 472, and a mount-wide `FAN_OPEN_EXEC` mark reported every program run, for example pid 472 = `/usr/bin/cat`, plus `dash`, `env` and `true`. That's language-agnostic process and file visibility with no extra packages, since python3 is already in the node image.
+- **eBPF tracing is not viable.** The `bpf()` syscall exists, but the libkrunfw guest kernel has no kprobes, no tracefs and no BTF, so there's nothing to attach tracing programs to. It would need a custom guest kernel.
+**So:** use a root fanotify watcher in the guest for exec and canary reads, instead of strace. fanotify has no network events, so outbound attempts need another source.
+Tags: #decision #metric
