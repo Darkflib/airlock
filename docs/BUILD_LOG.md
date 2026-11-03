@@ -260,3 +260,19 @@ Tags: #win #demo
 - Both are left undecided, so the first bot comment and status get posted when a human clicks.
 **So:** the whole loop now runs end to end: PR → detonate → verdict → human gate → (on click) a comment and status from `airlocksandbox[bot]`.
 Tags: #win #demo
+
+### 22:40 — First real bot posts, and an honest comparison with other AI reviewers
+**Result:**
+- The human decisions posted as `airlocksandbox[bot]`.
+  - #3: an `airlock` **failure** status ("rejected by @Darkflib (verdict: malicious)"), plus a 2.4k-char comment with the containment list, the captured request (collapsed, labelled as canaries) and the evidence.
+  - #1: a **success** status with a short comment.
+  - The rendering on GitHub is clean.
+- The same PRs were also reviewed by two other bots installed on the account:
+  - **CodeRabbit** didn't review at all: it hit a free-plan rate limit and excludes `package-lock.json` by default.
+  - **Codex** *did* flag #3 (P1). It statically unpacked the vendored tarball, read `setup.sh`, and noticed the credential reads and the POST. It also spotted that it's an Airlock fixture, because the script's header comment literally says so.
+**So:** don't claim "other AI reviewers miss this". The honest pitch:
+- Static review *can* catch an obvious payload. Airlock **runs** it, and proves what was taken and where it went, with the payload as evidence.
+- Airlock works when the code isn't readable: obfuscated, minified, compiled, or a second stage fetched at install time.
+- It gates the merge on a human decision.
+- To make the demo show that difference, the fixture should be harder to read statically: an encoded payload with no tell-tale comment.
+Tags: #demo #decision
