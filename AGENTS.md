@@ -24,7 +24,7 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - microsandbox 0.7.x: Python SDK (`uv add microsandbox`), no daemon. Its storage root (`~/.microsandbox`) must not be group-writable.
 - Python with `uv`. Keep dependencies minimal.
 - Run anything that needs KVM or the inference key on the host via `scripts/remote.sh "<cmd>"`. It rsyncs the tree to `~/airlock` and pipes the key from 1Password. Example: `scripts/remote.sh "uv run airlock analyse evals/fixtures/left-padder-hostile.tgz"`.
-- Web UI: live at https://airlock.darkflib.dev (basic auth; user `airlock`, password in 1Password as "Airlock web - hackathon"). Deploy the working tree with `scripts/deploy.sh`. It rsyncs, writes secrets to mode-600 files on the host from 1Password via SSH stdin, installs `infra/Caddyfile` and the `airlock-web` systemd unit, and restarts both. Logs: `journalctl -u airlock-web -f`.
+- Web UI: live at https://airlock.darkflib.dev. Sign-in is GitHub OAuth (1Password "Airlock OAuth") with an allowlist: `Darkflib` is always allowed, and judges and others go in `~/.config/airlock/allowed_users` on the host. Manage it with `scripts/allow.sh [list | add <login> | rm <login>]`; changes take effect immediately, including revoking. Deploy the working tree with `scripts/deploy.sh`. It pipes secrets from 1Password over SSH stdin into a mode-600 env file and restarts the `airlock-web` unit and Caddy. Logs: `journalctl -u airlock-web -f`.
 - Unit tests run locally: `uv run pytest`. Evals: `evals/run.sh`; results go in `evals/RESULTS.md`.
 - Model per role lives in `roles.toml`. Change it only with eval evidence.
 
@@ -38,6 +38,7 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - `airlock/pipeline.py`: acquire → unpack → detonate under the tracer → agent triage → report.
 - `airlock/cli.py`: `airlock analyse <file.tgz | npm-spec>`.
 - `airlock/store.py`: SQLite for runs and events (`$AIRLOCK_DATA`, default `~/.local/share/airlock`).
+- `airlock/web/auth.py`: GitHub OAuth, HMAC-signed session cookie, allowlist re-checked on every request. The app refuses to start without OAuth config (it fails closed).
 - `airlock/web/`: FastAPI app (submit, SSE event stream, approval decision) and the static UI. Event text is untrusted: insert it with `textContent` only.
 
 ## Build log (required)

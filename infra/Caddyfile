@@ -1,11 +1,6 @@
-# Airlock public front door: automatic HTTPS, basic auth, proxy to the app on
-# localhost. User and bcrypt hash come from /etc/caddy/airlock.env (written by
-# scripts/install-web.sh, never committed).
+# Airlock public front door: automatic HTTPS, proxy to the app on localhost.
+# Sign-in (GitHub OAuth + allowlist) is enforced by the app itself.
 {$AIRLOCK_DOMAIN:airlock.darkflib.dev} {
-	basic_auth {
-		{$AIRLOCK_WEB_USER} {$AIRLOCK_WEB_HASH}
-	}
-
 	# No `encode`: compression would buffer the Server-Sent Events stream.
 	reverse_proxy 127.0.0.1:8000
 

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from ..events import EventLog
 from ..store import Store, data_dir
+from . import auth as authmod
 
 STATIC = Path(__file__).parent / "static"
 SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~<>=*|-]+)?$", re.I)
@@ -35,9 +36,9 @@ class Runner:
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
 
-    def start(self, target: str, label: str) -> str:
+    def start(self, target: str, label: str, user: str | None = None) -> str:
         run_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-        self.store.create_run(run_id, label)
+        self.store.create_run(run_id, label, submitted_by=user)
         log = EventLog(on_emit=lambda ev: self.store.add_event(run_id, ev))
         self.live[run_id] = log
         task = asyncio.create_task(self._run(run_id, target, log))
@@ -66,7 +67,9 @@ class Decision(BaseModel):
     note: str = ""
 
 
-def create_app(store: Store | None = None, analyse: Analyse | None = None) -> FastAPI:
+def create_app(store: Store | None = None, analyse: Analyse | None = None,
+               auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None) -> FastAPI:
+    """auth=None disables sign-in (tests only); app_factory always passes a config."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
@@ -78,6 +81,20 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
     app = FastAPI(title="Airlock")
     app.state.runner = runner
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    if auth:
+        authmod.install(app, auth, exchange or authmod.github_login)
+
+    @app.get("/login")
+    async def login_page():
+        return FileResponse(STATIC / "login.html")
+
+    @app.get("/healthz")
+    async def healthz():
+        return {"ok": True}
+
+    @app.get("/api/me")
+    async def me(request: Request):
+        return {"login": authmod.current_user(request), "auth": bool(auth)}
 
     @app.get("/")
     async def index():
@@ -90,7 +107,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
         return FileResponse(STATIC / "run.html")
 
     @app.post("/api/runs")
-    async def submit(spec: str = Form(""), file: UploadFile | None = File(None)):
+    async def submit(request: Request, spec: str = Form(""), file: UploadFile | None = File(None)):
+        user = authmod.current_user(request)
         if file and file.filename:
             data = await file.read(MAX_UPLOAD + 1)
             if len(data) > MAX_UPLOAD:
@@ -102,12 +120,12 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
             if not path.name.endswith(".tgz"):
                 path = path.with_name(path.name + ".tgz")
             path.write_bytes(data)
-            run_id = runner.start(str(path), name)
+            run_id = runner.start(str(path), name, user)
         else:
             spec = spec.strip()
             if not SPEC.match(spec):
                 raise HTTPException(400, "give an npm spec like left-pad@1.3.0, or upload a .tgz")
-            run_id = runner.start(spec, spec)
+            run_id = runner.start(spec, spec, user)
         return {"id": run_id, "url": f"/runs/{run_id}"}
 
     @app.get("/api/runs")
@@ -156,7 +174,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.post("/api/runs/{run_id}/decision")
-    async def decide(run_id: str, body: Decision):
+    async def decide(run_id: str, body: Decision, request: Request):
         run = store.get_run(run_id)
         if not run:
             raise HTTPException(404)
@@ -166,7 +184,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
             raise HTTPException(409, f"already {run['decision']}")
         if body.decision not in {"approved", "rejected"}:
             raise HTTPException(400, "decision must be approved or rejected")
-        store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time())
+        store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
+                         decided_by=authmod.current_user(request))
         # Outward action (PR comment / commit status) goes here once PR targets exist.
         return store.get_run(run_id)
 
@@ -174,4 +193,5 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None) -> Fa
 
 
 def app_factory() -> FastAPI:
-    return create_app()
+    # Fails closed: refuses to start without OAuth config.
+    return create_app(auth=authmod.AuthConfig.from_env())

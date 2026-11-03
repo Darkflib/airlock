@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS runs (
   evidence TEXT,                   -- JSON list
   model TEXT,
   error TEXT,
+  submitted_by TEXT,
   decision TEXT,                   -- approved | rejected
+  decided_by TEXT,
   decision_note TEXT,
   created REAL NOT NULL,
   finished REAL,
@@ -50,10 +52,15 @@ class Store:
         self.db = sqlite3.connect(path or data_dir() / "airlock.db", check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(runs)")}
+        for col in ("submitted_by", "decided_by"):
+            if col not in cols:  # databases created before auth existed
+                self.db.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
+        self.db.commit()
 
-    def create_run(self, run_id: str, target: str) -> None:
-        self.db.execute("INSERT INTO runs (id, target, status, created) VALUES (?, ?, 'queued', ?)",
-                        (run_id, target, time.time()))
+    def create_run(self, run_id: str, target: str, submitted_by: str | None = None) -> None:
+        self.db.execute("INSERT INTO runs (id, target, status, created, submitted_by) VALUES (?, ?, 'queued', ?, ?)",
+                        (run_id, target, time.time(), submitted_by))
         self.db.commit()
 
     def update_run(self, run_id: str, **fields) -> None:

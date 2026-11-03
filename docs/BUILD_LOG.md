@@ -139,3 +139,9 @@ Tags: #win #decision
 - Caddy refused to start because `/var/log/caddy` had been created by a root `caddy validate`, so the caddy user couldn't open the log file. Dropped the file log; the journal is enough.
 - Also noticed: the packaged caddy.service runs `caddy run --environ`, which prints its environment to the journal at startup. Only the bcrypt hash is in there, never the password, but don't put real secrets in Caddy's environment.
 Tags: #fail
+
+### 19:15 — GitHub OAuth with an allowlist replaces basic auth
+**Tried:** sign-in moved from Caddy into the app. GitHub OAuth with no scopes (public profile only) and a state cookie. The session is a stateless HMAC-signed cookie (HttpOnly, Secure, SameSite=Lax, 7 days). The allowlist is `Darkflib` plus a file on the host that's re-read on every request, so `scripts/allow.sh rm <login>` ends a session immediately. Runs now record `submitted_by` and `decided_by`. The app refuses to start without OAuth config.
+**Result:** 9 new auth tests, including forged state, a tampered cookie, open redirect via `next`, an unlisted user, revocation, and failing closed; 25/25 pass. Deployed: signed-out `/` → `/login`, `/api/*` → 401, and the button reaches GitHub's "Sign in to continue to Airlock dev" page.
+**So:** judges can be let in by GitHub login, one line each, with no shared password. The basic-auth hash and Caddy env override were removed from the host.
+Tags: #win #decision #demo

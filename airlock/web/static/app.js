@@ -16,6 +16,18 @@ const Airlock = (() => {
   };
   const pill = (text, cls) => el('span', `pill ${cls || text}`, text);
 
+  async function user() {
+    const nav = $('user');
+    if (!nav) return;
+    const me = await (await fetch('/api/me')).json();
+    if (!me.login) return;
+    nav.append(el('span', 'mono', `@${me.login}`));
+    const form = el('form'); form.method = 'post'; form.action = '/auth/logout';
+    form.append(el('button', 'ghost', 'Sign out'));
+    nav.append(form);
+  }
+  user();
+
   // ---------------------------------------------------------------- index
   function index() {
     const form = $('submit'), spec = $('spec'), file = $('file'), drop = $('drop'), err = $('err'), go = $('go');
@@ -164,7 +176,7 @@ const Airlock = (() => {
       const st = $('status');
       st.className = `pill ${r.status}`;
       st.textContent = r.status;
-      $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}`;
+      $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}${r.submitted_by ? ' · by @' + r.submitted_by : ''}`;
       $('live').hidden = !(r.status === 'running' || r.status === 'queued');
       renderGate(r);
     }
@@ -174,7 +186,8 @@ const Airlock = (() => {
       g.replaceChildren();
       if (r.decision) {
         const d = el('div', 'done');
-        d.append(pill(r.decision), document.createTextNode(` ${new Date(r.decided * 1000).toLocaleString()}`));
+        d.append(pill(r.decision), document.createTextNode(
+          ` ${r.decided_by ? 'by @' + r.decided_by + ' · ' : ''}${new Date(r.decided * 1000).toLocaleString()}`));
         g.append(d);
         if (r.decision_note) g.append(el('p', '', r.decision_note));
         return;

@@ -12,6 +12,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "microsandbox" },
     { name = "openai" },
     { name = "python-multipart" },
@@ -27,6 +28,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.162.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "microsandbox", specifier = ">=0.7" },
     { name = "openai", specifier = ">=1.40" },
     { name = "python-multipart", specifier = ">=0.0.33" },
