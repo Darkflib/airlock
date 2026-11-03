@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import secrets
 import time
@@ -17,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..events import EventLog
+from ..github import GitHubApp, parse_pr_url
+from ..prcomment import build_comment
 from ..store import Store, data_dir
 from . import auth as authmod
 
@@ -52,7 +55,7 @@ class Runner:
             try:
                 report = await self.analyse(target, events=log)
                 self.store.update_run(run_id, status="done", verdict=report.verdict, evidence=report.evidence,
-                                      model=report.model, finished=time.time())
+                                      model=report.model, finished=time.time(), meta=getattr(report, "meta", {}) or {})
             except Exception as e:  # noqa: BLE001 - recorded on the run
                 log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
                 self.store.update_run(run_id, status="error", error=f"{type(e).__name__}: {e}"[:500],
@@ -68,12 +71,15 @@ class Decision(BaseModel):
 
 
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
-               auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None) -> FastAPI:
+               auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
+               github: GitHubApp | None = None) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
     store = store or Store()
+    github = github or GitHubApp.from_env()
+    public_url = os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
     runner = Runner(store, analyse)
     uploads = data_dir() / "uploads"
     uploads.mkdir(exist_ok=True)
@@ -121,10 +127,15 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                 path = path.with_name(path.name + ".tgz")
             path.write_bytes(data)
             run_id = runner.start(str(path), name, user)
+        elif parse_pr_url(spec):
+            if github is None:
+                raise HTTPException(400, "GitHub App not configured on this server")
+            owner, repo, number = parse_pr_url(spec)
+            run_id = runner.start(spec.strip(), f"{owner}/{repo}#{number}", user)
         else:
             spec = spec.strip()
             if not SPEC.match(spec):
-                raise HTTPException(400, "give an npm spec like left-pad@1.3.0, or upload a .tgz")
+                raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, or upload a .tgz")
             run_id = runner.start(spec, spec, user)
         return {"id": run_id, "url": f"/runs/{run_id}"}
 
@@ -186,8 +197,26 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(400, "decision must be approved or rejected")
         store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
                          decided_by=authmod.current_user(request))
-        # Outward action (PR comment / commit status) goes here once PR targets exist.
+        run = store.get_run(run_id)
+        if run["meta"].get("kind") == "pr" and github:
+            await post_to_pr(run)
         return store.get_run(run_id)
+
+    async def post_to_pr(run: dict) -> None:
+        """The outward action, only after a human decision: commit status + comment as the App's bot."""
+        m, run_url = run["meta"], f"{public_url}/runs/{run['id']}"
+        state = "success" if run["decision"] == "approved" else "failure"
+        desc = f"{run['decision']} by @{run['decided_by']} (verdict: {run['verdict']})"
+        try:
+            await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, run_url)
+            url = await github.comment(m["owner"], m["repo"], m["number"],
+                                       build_comment(run, store.events(run["id"]), run_url))
+            store.update_run(run["id"], meta={**m, "posted": {"comment_url": url, "status": state}})
+            store.append_event(run["id"], "github_posted", f"posted to {m['owner']}/{m['repo']}#{m['number']}: "
+                               f"commit status {state} and a comment", comment_url=url, status=state, source="github")
+        except Exception as e:  # noqa: BLE001 - the decision stands; report the failed post
+            store.update_run(run["id"], meta={**m, "posted": {"error": f"{type(e).__name__}: {e}"[:300]}})
+            store.append_event(run["id"], "error", f"posting to GitHub failed: {type(e).__name__}: {str(e)[:200]}")
 
     return app
 

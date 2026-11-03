@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS runs (
   submitted_by TEXT,
   decision TEXT,                   -- approved | rejected
   decided_by TEXT,
+  meta TEXT,                       -- JSON: PR details, GitHub post results
   decision_note TEXT,
   created REAL NOT NULL,
   finished REAL,
@@ -53,7 +54,7 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(runs)")}
-        for col in ("submitted_by", "decided_by"):
+        for col in ("submitted_by", "decided_by", "meta"):
             if col not in cols:  # databases created before auth existed
                 self.db.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
         self.db.commit()
@@ -64,8 +65,9 @@ class Store:
         self.db.commit()
 
     def update_run(self, run_id: str, **fields) -> None:
-        if "evidence" in fields:
-            fields["evidence"] = json.dumps(fields["evidence"])
+        for k in ("evidence", "meta"):
+            if k in fields:
+                fields[k] = json.dumps(fields[k])
         cols = ", ".join(f"{k} = ?" for k in fields)
         self.db.execute(f"UPDATE runs SET {cols} WHERE id = ?", (*fields.values(), run_id))
         self.db.commit()
@@ -90,6 +92,13 @@ class Store:
             "FROM runs r ORDER BY created DESC LIMIT ?", (limit,)).fetchall()
         return [_run(r) for r in rows]
 
+    def append_event(self, run_id: str, kind: str, summary: str, **data) -> dict:
+        """Add an event to a finished run (e.g. what was posted after the decision)."""
+        seq = (self.db.execute("SELECT COALESCE(MAX(seq), 0) FROM events WHERE run_id = ?", (run_id,)).fetchone()[0]) + 1
+        ev = Event(kind=kind, summary=summary, data=data, id=seq)
+        self.add_event(run_id, ev)
+        return ev.to_dict()
+
     def events(self, run_id: str, after: int = 0) -> list[dict]:
         rows = self.db.execute("SELECT * FROM events WHERE run_id = ? AND seq > ? ORDER BY seq",
                                (run_id, after)).fetchall()
@@ -99,6 +108,7 @@ class Store:
 def _run(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["evidence"] = json.loads(d["evidence"]) if d["evidence"] else []
+    d["meta"] = json.loads(d["meta"]) if d.get("meta") else {}
     return d
 
 

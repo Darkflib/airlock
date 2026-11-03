@@ -1,6 +1,7 @@
 #!/bin/sh
-# Runs ON THE HOST (via scripts/deploy.sh). Reads three lines on stdin: the
-# inference API key, the GitHub OAuth client id, and its secret. Writes them
+# Runs ON THE HOST (via scripts/deploy.sh). Reads five lines on stdin: the
+# inference API key, the GitHub OAuth client id and secret, the GitHub App id,
+# and the App private key (base64, one line). Writes them
 # only to a mode-600 env file, installs the systemd unit and Caddy config, and
 # restarts both. The session secret is generated once and kept across deploys.
 set -eu
@@ -8,7 +9,10 @@ cd "$(dirname "$0")/.."
 IFS= read -r KEY
 IFS= read -r CLIENT_ID
 IFS= read -r CLIENT_SECRET
-[ -n "$KEY" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] || { echo "missing secrets on stdin" >&2; exit 1; }
+IFS= read -r APP_ID
+IFS= read -r APP_KEY_B64
+[ -n "$KEY" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -n "$APP_ID" ] && [ -n "$APP_KEY_B64" ] \
+  || { echo "missing secrets on stdin" >&2; exit 1; }
 
 uv sync -q
 [ -x ~/.local/bin/mitmdump ] || uv tool install -q mitmproxy
@@ -25,6 +29,8 @@ mkdir -p "$CONF"
   printf 'AIRLOCK_SESSION_SECRET=%s\n' "$(cat "$CONF/session_secret")"
   printf 'AIRLOCK_ALLOWED_USERS=%s\n' "${AIRLOCK_OWNERS:-Darkflib}"
   printf 'AIRLOCK_PUBLIC_URL=https://airlock.darkflib.dev\n'
+  printf 'GITHUB_APP_ID=%s\n' "$APP_ID"
+  printf 'GITHUB_APP_PRIVATE_KEY_B64=%s\n' "$APP_KEY_B64"
 } > "$CONF/web.env"
 
 # Basic auth has been replaced by OAuth: remove its leftovers.

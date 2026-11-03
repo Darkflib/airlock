@@ -28,7 +28,7 @@
     <div class="panel">
       <div class="body">
         <form class="submit" id="submit">
-          <input type="text" id="spec" name="spec" placeholder="npm package, e.g. left-pad@1.3.0" autocomplete="off" spellcheck="false">
+          <input type="text" id="spec" name="spec" placeholder="GitHub PR URL, or npm package e.g. left-pad@1.3.0" autocomplete="off" spellcheck="false">
           <button type="submit" id="go">Detonate</button>
           <label class="drop" id="drop">
             <input type="file" id="file" accept=".tgz,application/gzip" hidden>
@@ -36,8 +36,9 @@
           </label>
         </form>
         <div class="examples">Try:
+          <button class="chip" data-spec="https://github.com/Darkflib/airlock-demo/pull/1" type="button">airlock-demo PR #1</button>
+          <button class="chip" data-spec="https://github.com/Darkflib/airlock-demo/pull/3" type="button">airlock-demo PR #3</button>
           <button class="chip" data-spec="left-pad@1.3.0" type="button">left-pad@1.3.0</button>
-          <button class="chip" data-spec="is-odd@3.0.1" type="button">is-odd@3.0.1</button>
         </div>
         <div class="err" id="err"></div>
       </div>

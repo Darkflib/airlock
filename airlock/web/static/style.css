@@ -217,3 +217,13 @@ nav.user button { padding: 6px 12px; font-size: 13px; }
   color: var(--text); font: 12px/1.45 var(--mono); white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow: auto;
 }
 .payload mark { background: var(--bad); color: #1a0306; border-radius: 3px; padding: 0 2px; }
+
+/* --- pull request panel --- */
+.pr-title { display: block; font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.pr-meta { color: var(--muted); font-size: 12.5px; }
+.pr-files { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.pr-files li { display: flex; gap: 8px; align-items: baseline; word-break: break-all; }
+.pr-files .fs { font: 700 9.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); min-width: 56px; }
+.pr-files .fs.added { color: var(--good); }
+.pr-files .fs.removed { color: var(--bad); }
+.pr-posted { margin: 12px 0 0; font-size: 13px; }

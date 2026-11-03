@@ -228,3 +228,22 @@ Tags: #win #demo
 - The shell stealer gave MALICIOUS with **PROVEN** exfil on the first try. The first VM boot took 6 s, because a fresh box pulls the node image once.
 **So:** a rebuild takes cloud-init plus one deploy command, about 10 minutes. That makes the planned late-week move to a US region low-risk: new reserved IP, DNS update, same two steps.
 Tags: #win #metric
+
+### 22:27 — Demo repo + GitHub PR flow (waiting on App permissions to test live)
+**Tried:**
+- `Darkflib/airlock-demo`, a tiny `status-api` service.
+  - PR #1 bumps left-pad.
+  - PR #3, "feat: coloured startup log", vendors `colorful-logs-2.0.1.tgz` as a `file:` dependency.
+  - Renovate opened #2 on its own.
+  - **`npm test` passes on #3**, so CI would be green. The malicious install was only ever run inside sandboxes; local npm used `--ignore-scripts`.
+- In a sandbox, #1 showed 0 containment events. #3 showed PROVEN exfil of `.npmrc` and AWS canaries, plus `cat`/`python3` reads.
+- PR flow:
+  1. A GitHub App (not OAuth scopes) mints one-hour tokens per repo.
+  2. The control plane fetches the PR head tarball and diff.
+  3. The VM runs `npm ci` + `npm test` as `node` under detonation.
+  4. The agent triages with the PR's title and files, treated as untrusted claims.
+  5. On a human decision, it posts a commit status (`airlock` context) and a comment with the verdict, containment list, captured payload (marked as canaries) and the evidence, as the App's bot.
+- If posting fails, the decision stands and an `error` event records why. 4 new tests (42 in total), with a fake GitHub client asserting **nothing is posted before the decision**.
+**Result:** deployed. The App key reaches the host as one base64 line, because the PEM is multi-line and the deploy reads stdin line by line. Live test blocked: the App `airlocksandbox` has no permissions yet and isn't installed on the demo repo (`GET /repos/…/installation` → 404).
+**So:** next is the App settings change, then run PRs #1 and #3 through the UI and approve or reject them on camera.
+Tags: #win #demo

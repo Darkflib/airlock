@@ -14,4 +14,5 @@ rsync -az --delete \
   --exclude .git/ --exclude .env --exclude .venv/ --exclude assets/ \
   --exclude evals/results/ --exclude __pycache__/ --exclude .pytest_cache/ \
   ./ "$HOST:airlock/"
-{ op read "$KEY_REF"; op read "$ID_REF"; op read "$SECRET_REF"; } | ssh "$HOST" "cd ~/airlock && scripts/install-web.sh"
+APP_REF="op://Private/Airlock Github App"
+{ op read "$KEY_REF"; op read "$ID_REF"; op read "$SECRET_REF"; op read "$APP_REF/app-id"; op read "$APP_REF/private-key" | base64 | tr -d '\n'; echo; } | ssh "$HOST" "cd ~/airlock && scripts/install-web.sh"

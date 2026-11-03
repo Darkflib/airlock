@@ -40,6 +40,9 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - `airlock/agent.py`: triage loop with a hard turn budget; the last turn forces `finish`.
 - `airlock/pipeline.py`: acquire → unpack → detonate under the tracer → agent triage → report.
 - `airlock/cli.py`: `airlock analyse <file.tgz | npm-spec>`.
+- `airlock/github.py`: GitHub App client (`airlocksandbox`). It signs a JWT with the App key, mints a one-hour installation token scoped to one repo, fetches the PR, tarball and diff, and posts comments and commit statuses. The key comes from 1Password "Airlock Github App" via `scripts/deploy.sh`.
+- PR runs: `airlock analyse https://github.com/o/r/pull/N`, or paste the URL in the UI. The control plane fetches the head (the VM has no GitHub access), and the VM runs `npm ci` and `npm test` as `node` under detonation before the agent triages. **Nothing is posted until a human decides.** Then `airlock/prcomment.py` builds the comment, and a status of `success` or `failure` is set as `<app>[bot]`.
+- Demo repo: `Darkflib/airlock-demo` (private). PR #1 is a benign left-pad bump; PR #3 vendors the `colorful-logs` shell stealer; `npm test` passes on both.
 - `airlock/store.py`: SQLite for runs and events (`$AIRLOCK_DATA`, default `~/.local/share/airlock`).
 - `airlock/web/auth.py`: GitHub OAuth, HMAC-signed session cookie, allowlist re-checked on every request. The app refuses to start without OAuth config (it fails closed).
 - `airlock/web/`: FastAPI app (submit, SSE event stream, approval decision) and the static UI. Event text is untrusted: insert it with `textContent` only.

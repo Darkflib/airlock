@@ -230,7 +230,33 @@ const Airlock = (() => {
       st.textContent = r.status;
       $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}${r.submitted_by ? ' · by @' + r.submitted_by : ''}`;
       $('live').hidden = !(r.status === 'running' || r.status === 'queued');
+      renderPR(r.meta || {});
       renderGate(r);
+    }
+
+    function renderPR(m) {
+      if (m.kind !== 'pr') return;
+      $('pr-panel').hidden = false;
+      const b = $('pr');
+      b.replaceChildren();
+      const a = el('a', 'pr-title', `#${m.number} ${m.title}`); a.href = m.html_url; a.target = '_blank'; a.rel = 'noopener';
+      b.append(a, el('div', 'pr-meta', `${m.owner}/${m.repo} · @${m.author} · ${m.head_ref} → ${m.base_ref} · ${String(m.head_sha).slice(0, 7)}`));
+      const ul = el('ul', 'pr-files');
+      for (const f of (m.files || []).slice(0, 12)) {
+        const li = el('li');
+        li.append(el('span', `fs ${f.status}`, f.status), el('span', 'mono', f.filename), el('span', 'pr-meta', ` +${f.additions} −${f.deletions}`));
+        ul.append(li);
+      }
+      b.append(ul);
+      if (m.posted) {
+        const p = el('p', 'pr-posted');
+        if (m.posted.comment_url) {
+          const l = el('a', '', `Posted to the PR as a comment + "${m.posted.status}" commit status`);
+          l.href = m.posted.comment_url; l.target = '_blank'; l.rel = 'noopener';
+          p.append(l);
+        } else p.textContent = `Posting to GitHub failed: ${m.posted.error}`;
+        b.append(p);
+      }
     }
 
     function renderGate(r) {
@@ -249,6 +275,8 @@ const Airlock = (() => {
       g.append(el('p', '', r.verdict === 'benign'
         ? 'The agent found nothing harmful. Approve to let this change through.'
         : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
+      if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
+        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as a commit status and a comment from the Airlock GitHub App.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
       const mk = (label, cls, decision) => {
