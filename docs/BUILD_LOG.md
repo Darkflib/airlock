@@ -126,3 +126,16 @@ Tags: #fail #demo
 **Result:** `pkill -f 'uvicorn airlock.web'` over SSH matched the remote shell's own command line, which contained that string, so it killed the session (exit 255) before the server started.
 **So:** `scripts/serve.sh` uses a pidfile instead.
 Tags: #fail
+
+### 19:05 — Public at https://airlock.darkflib.dev
+**Tried:** Caddy 2.11 (official apt repo) with automatic HTTPS and basic auth, proxying to the app on 127.0.0.1:8000. The app runs as the `airlock-web` systemd unit. `scripts/deploy.sh` rsyncs the tree, then pipes the inference key and web password from 1Password over SSH stdin. `scripts/install-web.sh` writes them only to mode-600 files: the app's EnvironmentFile, and a bcrypt hash for Caddy.
+**Result:** Let's Encrypt cert issued on the first try. 401 without credentials or with a wrong password, 200 with the right one. A left-pad@1.3.0 run through the public URL streamed SSE one event at a time through Caddy and gave BENIGN in 9 s. Port 8000 isn't reachable from outside.
+**So:** the submission's live-URL requirement is met behind auth. Before judging, decide between sharing credentials with judges and a read-only public view.
+Tags: #win #decision
+
+### 19:05 — Two deploy snags
+**Result:**
+- `printf '%s' "$PASSWORD" | caddy hash-password` failed with `EOF`: without a trailing newline it never gets a full line.
+- Caddy refused to start because `/var/log/caddy` had been created by a root `caddy validate`, so the caddy user couldn't open the log file. Dropped the file log; the journal is enough.
+- Also noticed: the packaged caddy.service runs `caddy run --environ`, which prints its environment to the journal at startup. Only the bcrypt hash is in there, never the password, but don't put real secrets in Caddy's environment.
+Tags: #fail

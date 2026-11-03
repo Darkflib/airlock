@@ -54,4 +54,9 @@ runcmd:
   # ~/.local/bin is only on PATH for login shells; link so non-interactive ssh finds them
   - ln -sf /home/airlock/.local/bin/msb /home/airlock/.local/bin/uv /usr/local/bin/
   - su - airlock -c '~/.local/bin/msb doctor' > /var/log/airlock-msb-doctor 2>&1
+  # Caddy (official repo). Config, secrets and the app service come from scripts/deploy.sh.
+  - 'curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg'
+  - 'curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt -o /etc/apt/sources.list.d/caddy-stable.list'
+  - apt-get update -qq
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy
   - 'test -c /dev/kvm && echo "kvm: present" > /var/log/airlock-kvm || echo "kvm: MISSING" > /var/log/airlock-kvm'

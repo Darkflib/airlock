@@ -24,7 +24,7 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - microsandbox 0.7.x: Python SDK (`uv add microsandbox`), no daemon. Its storage root (`~/.microsandbox`) must not be group-writable.
 - Python with `uv`. Keep dependencies minimal.
 - Run anything that needs KVM or the inference key on the host via `scripts/remote.sh "<cmd>"`. It rsyncs the tree to `~/airlock` and pipes the key from 1Password. Example: `scripts/remote.sh "uv run airlock analyse evals/fixtures/left-padder-hostile.tgz"`.
-- Web UI: `scripts/remote.sh scripts/serve.sh` (re)starts it on the host at 127.0.0.1:8000, which isn't public yet. View it through a tunnel: `ssh -N -L 8077:127.0.0.1:8000 airlock@airlock.darkflib.dev`, then open http://localhost:8077.
+- Web UI: live at https://airlock.darkflib.dev (basic auth; user `airlock`, password in 1Password as "Airlock web - hackathon"). Deploy the working tree with `scripts/deploy.sh`. It rsyncs, writes secrets to mode-600 files on the host from 1Password via SSH stdin, installs `infra/Caddyfile` and the `airlock-web` systemd unit, and restarts both. Logs: `journalctl -u airlock-web -f`.
 - Unit tests run locally: `uv run pytest`. Evals: `evals/run.sh`; results go in `evals/RESULTS.md`.
 - Model per role lives in `roles.toml`. Change it only with eval evidence.
 

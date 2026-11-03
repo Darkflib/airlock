@@ -1,0 +1,23 @@
+# Airlock public front door: automatic HTTPS, basic auth, proxy to the app on
+# localhost. User and bcrypt hash come from /etc/caddy/airlock.env (written by
+# scripts/install-web.sh, never committed).
+{$AIRLOCK_DOMAIN:airlock.darkflib.dev} {
+	basic_auth {
+		{$AIRLOCK_WEB_USER} {$AIRLOCK_WEB_HASH}
+	}
+
+	# No `encode`: compression would buffer the Server-Sent Events stream.
+	reverse_proxy 127.0.0.1:8000
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	request_body {
+		max_size 25MB
+	}
+}

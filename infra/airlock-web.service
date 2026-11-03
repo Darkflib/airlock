@@ -1,0 +1,18 @@
+[Unit]
+Description=Airlock web control plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=airlock
+Group=airlock
+WorkingDirectory=/home/airlock/airlock
+# VULTR_INFERENCE_API_KEY; mode 600, written by scripts/install-web.sh
+EnvironmentFile=/home/airlock/.config/airlock/web.env
+ExecStart=/home/airlock/airlock/.venv/bin/uvicorn airlock.web.app:app_factory --factory --host 127.0.0.1 --port 8000 --proxy-headers --no-server-header
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
