@@ -47,6 +47,7 @@ runcmd:
   - ufw allow 443/tcp
   - ufw --force enable
   - su - airlock -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+  - su - airlock -c '~/.local/bin/uv tool install -q mitmproxy'   # the egress sinkhole
   # microsandbox (installs to ~/.microsandbox). msb refuses a storage root that is
   # group-writable, and Ubuntu's default umask 002 makes it so.
   - su - airlock -c 'curl -fsSL https://install.microsandbox.dev | sh'

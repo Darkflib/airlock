@@ -98,7 +98,7 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
             if any(bare == h or bare.endswith("." + h) for h in allowed_hosts):
                 out.append(("egress_allowed", f"{script} contacted allowlisted {host}", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
             else:
-                out.append(("egress_blocked", f"{script} tried to reach {host}; blocked by default-deny egress", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
+                out.append(("egress_blocked", f"{script} tried to reach {host}; contained, never reached the internet", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "exec":
             out.append(("process_spawn", f"{script} spawned: {rec.get('cmd', '')[:80]}", {"cmd": rec.get("cmd", ""), "argv": argv, "pid": pid, "source_kind": "node"}))
     return out
@@ -144,6 +144,7 @@ class WatchTranslator:
         self.seen: set[tuple] = set()
         self.ip_names: dict[str, str] = {}      # resolved IP -> hostname, from DNS answers
         self.pid_exe: dict[int, str] = {}       # pid -> program path, from exec records
+        self.pid_uid: dict[int, int] = {}       # pid -> uid, from exec records (captured at start)
 
     def feed(self, jsonl: str) -> list[tuple[str, str, dict]]:
         out: list[tuple[str, str, dict]] = []
@@ -161,6 +162,8 @@ class WatchTranslator:
         for r in recs:
             if r.get("ev") == "exec" and r.get("path"):
                 self.pid_exe[r.get("pid")] = r["path"]
+                if r.get("uid") is not None:
+                    self.pid_uid[r.get("pid")] = r["uid"]
         for rec in recs:
             if rec.get("ev") == "dns_answer":
                 for ip in rec.get("ips", []):
@@ -173,6 +176,8 @@ class WatchTranslator:
                             "egress policy (refused too fast to attribute to a process)",
                             {"count": n, "via": "tcp-counter", "source_kind": "watch", "ts_guest": rec.get("ts")}))
                 continue
+            if rec.get("uid") is None and pid in self.pid_uid:  # process exited before we could look
+                rec = {**rec, "uid": self.pid_uid[pid]}
             if ev in ("watch_ready", "dns_answer", None) or rec.get("uid") in (0, None) or pid in npm_pids:
                 continue
             if not rec.get("exe") and pid in self.pid_exe:
@@ -202,8 +207,11 @@ class WatchTranslator:
                 for k in (pid, rec.get("ppid")):
                     if k:
                         self.blocked.setdefault(k, name)
-                out.append(("egress_blocked", f"{who} looked up {name}; blocked by default-deny egress",
-                            {**base, "host": name, "via": "dns"}))
+                if rec.get("sinkholed"):
+                    msg = f"{who} looked up {name}; answered with sinkhole address {rec['sinkholed']}"
+                else:
+                    msg = f"{who} looked up {name}; not allowlisted, blocked"
+                out.append(("egress_blocked", msg, {**base, "host": name, "via": "dns"}))
             elif ev == "connect":
                 dest = rec.get("dest", "?")
                 ip = dest.rsplit(":", 1)[0].strip("[]").removeprefix("::ffff:")
@@ -214,9 +222,11 @@ class WatchTranslator:
                     for k in (pid, rec.get("ppid")):
                         if k:
                             self.blocked.setdefault(k, dest)
-                    out.append(("egress_blocked",
-                                f"{who} tried to connect to {name or 'raw IP'} {dest}; not allowlisted, refused by egress policy",
-                                {**base, "host": dest, "via": "connect"}))
+                    if ip.startswith(("198.18.", "198.19.")):
+                        msg = f"{who} connected to {name or dest} via the sinkhole ({dest}); answered by Airlock"
+                    else:
+                        msg = f"{who} tried to connect to {name or 'raw IP'} {dest}; not allowlisted, refused by egress policy"
+                    out.append(("egress_blocked", msg, {**base, "host": name or dest, "via": "connect"}))
 
             # Same process, or siblings under one parent (e.g. a script that cats the
             # credentials and then curls them out): likely exfiltration.
@@ -231,3 +241,23 @@ class WatchTranslator:
                                  "scope": scope}))
                     break
         return out
+
+
+def events_from_sinkhole(records: list[dict], canary_token: str) -> list[tuple[str, str, dict]]:
+    """Requests the host sinkhole answered for this run. A body carrying the run's
+    canary token is proven credential exfiltration, with the payload as evidence."""
+    out: list[tuple[str, str, dict]] = []
+    for rec in records:
+        body, host, url = rec.get("body", ""), rec.get("host", "?"), rec.get("url", "?")
+        data = {"host": host, "url": url, "method": rec.get("method"), "bytes": rec.get("bytes", 0),
+                "payload": body[:2000], "user_agent": rec.get("user_agent", ""), "source_kind": "sinkhole"}
+        if "AIRLOCKCANARY" in body:
+            out.append(("canary_exfil",
+                        f"{rec.get('method')} {url} carried the canary credentials: captured by Airlock's sinkhole, "
+                        "never reached the internet",
+                        {**data, "proven": True, "this_run": canary_token in body}))
+        else:
+            out.append(("egress_blocked",
+                        f"{rec.get('method')} {url} ({rec.get('bytes', 0)} bytes): answered by Airlock's sinkhole, "
+                        "never reached the internet", data))
+    return out

@@ -161,6 +161,22 @@ const Airlock = (() => {
       if (ev.containment) s.append(el('span', 'flag', repro ? 'REPRODUCED BY AGENT' : 'CONTAINED'));
       li.append(s);
       if (ev.kind === 'guard_flagged' && ev.data.text) li.append(el('div', 'detail', `“${ev.data.text}”`));
+      if (ev.kind === 'canary_exfil') {
+        const proven = ev.data.proven || ev.data.source_kind === 'node';
+        s.append(el('span', `proof ${proven ? 'proven' : 'inferred'}`, proven ? 'PROVEN' : 'INFERRED'));
+      }
+      if (ev.data.payload) {
+        // Captured request body: untrusted text, built with text nodes; canary tokens highlighted.
+        const d = el('div', 'detail payload');
+        d.append(el('div', 'payload-head', `captured ${ev.data.method || ''} ${ev.data.url || ''} · ${ev.data.bytes || 0} bytes`));
+        const pre = el('pre');
+        for (const part of String(ev.data.payload).split(/(AIRLOCKCANARY[A-Z0-9]+)/g)) {
+          if (!part) continue;
+          pre.append(/^AIRLOCKCANARY/.test(part) ? el('mark', '', part) : document.createTextNode(part));
+        }
+        d.append(pre);
+        li.append(d);
+      }
       tl.append(li);
 
       if (ev.containment && !repro) counts.contain++;
@@ -176,6 +192,7 @@ const Airlock = (() => {
         fact('microVM', ev.summary.replace(/^microVM \S+ /, ''));
         fact('egress', `${ev.data.egress}, allow ${ (ev.data.allow || []).join(', ')}`);
         fact('resources', `${ev.data.cpus} vCPU, ${ev.data.memory_mb} MB`);
+        if (ev.data.sinkhole) fact('sinkhole', `${ev.data.sinkhole}: other names get fake addresses answered by Airlock`);
       }
       if (ev.kind === 'canaries_seeded') fact('canaries', (ev.data.files || []).join(', '));
       if (ev.kind === 'agent_start') { $('verdict').textContent = 'Agent investigating…'; fact('agent', ev.data.model); }

@@ -1,0 +1,22 @@
+[Unit]
+Description=Airlock sinkhole (mitmproxy SOCKS5 for sandbox egress)
+After=network-online.target
+Wants=network-online.target
+Before=airlock-web.service
+
+[Service]
+User=airlock
+Group=airlock
+WorkingDirectory=/home/airlock/airlock
+Environment=AIRLOCK_SINKHOLE_LOG=/home/airlock/.local/share/airlock/sinkhole.jsonl
+ExecStartPre=/bin/mkdir -p /home/airlock/.local/share/airlock
+ExecStart=/home/airlock/.local/bin/mitmdump --quiet --mode socks5 --listen-host 127.0.0.1 --listen-port 1080 \
+  --set connection_strategy=lazy \
+  --ignore-hosts "^(registry\.npmjs\.org|pypi\.org|files\.pythonhosted\.org)(:443)?$" \
+  -s /home/airlock/airlock/airlock/sinkhole/addon.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

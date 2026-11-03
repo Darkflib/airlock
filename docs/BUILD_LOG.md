@@ -195,3 +195,25 @@ Tags: #fail
 - (3) Note for ops: microsandbox policy is checked against the real destination *before* the proxy, which is why the fake range has to be allowed explicitly.
 **So:** feasible. To productise it: the watcher's DNS answers sinkhole IPs for non-allowlisted names, mitmproxy runs as a host service, sinkhole hits become `canary_exfil` events with the payload, and each run gets its own fake /24 so concurrent runs are attributed correctly.
 Tags: #win #demo #decision
+
+### 20:57 — Sinkhole integrated: exfiltration is now *proven* with the payload, in any language
+**Tried:**
+- `airlock-sinkhole` systemd unit: mitmdump in SOCKS5 mode with `airlock/sinkhole/addon.py`. Every run routes all guest TCP through it via microsandbox's outbound proxy.
+- Each run gets a random /24 inside 198.18.0.0/15. The in-guest DNS answers non-allowlisted names with a stable address in that /24, and empty AAAA answers so clients fall back to IPv4.
+- The policy allows only that /24 (ports 80/443/8080/8443) plus the registries.
+- `TlsConfig(upstream_ca_certs=mitmproxy CA)`.
+- Sinkhole records are matched to the run by its /24 and become events. A body containing the canary token becomes `canary_exfil` with `proven` set and the payload attached.
+- UI: PROVEN/INFERRED tag, and the captured request shown with canary tokens highlighted.
+**Result:**
+- Shell stealer: `POST https://telemetry.colorful-logs.invalid/v1` is captured with **both** the `.npmrc` token and the AWS keys in the body, so it's now **PROVEN**; before it was inferred. Plus `cat`/`python3.13` canary reads, the sinkholed DNS answer and the refused raw-IP connect.
+- Node stealer: JSON payload captured, PROVEN.
+- left-pad: BENIGN, with npm reaching the registry through the proxy.
+- In the browser, the payload panel with the red-highlighted token is the clearest frame in the demo so far.
+- 38 tests.
+**So:** containment is now three independent layers:
+1. microsandbox default-deny for real destinations
+2. a fake DNS + sinkhole that captures what would have been sent
+3. the in-VM watcher and the Node tracer for who did it
+
+Also: a test failure got deployed because `… | tail -1 && deploy` hides pytest's exit code. Deploy commands now run with `set -o pipefail`.
+Tags: #win #demo

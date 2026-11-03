@@ -67,3 +67,22 @@ def test_canary_read_without_egress_is_not_exfil():
 def test_unattributed_refusals_are_still_reported():
     out = WatchTranslator(ALLOW).feed(lines({"ev": "connect_refused", "count": 2}))
     assert kinds(out) == ["egress_blocked"] and "2 outbound connection attempts refused" in out[0][1]
+
+
+def test_sinkholed_dns_and_connect_are_described_as_such():
+    t = WatchTranslator(ALLOW)
+    out = t.feed(lines(
+        {"ev": "dns", "name": "t.evil.invalid", "sinkholed": "198.18.7.9", "pid": 3, "exe": "/usr/bin/curl", "uid": 1000},
+        {"ev": "dns_answer", "name": "t.evil.invalid", "ips": ["198.18.7.9"], "sinkholed": True},
+        {"ev": "connect", "dest": "198.18.7.9:443", "state": "ESTABLISHED", "pid": 3, "exe": "/usr/bin/curl", "uid": 1000},
+    ))
+    assert [k for k, _, _ in out] == ["egress_blocked", "egress_blocked"]
+    assert "sinkhole address 198.18.7.9" in out[0][1] and "via the sinkhole" in out[1][1]
+
+
+def test_open_by_exited_process_uses_uid_from_its_exec_record():
+    out = WatchTranslator(ALLOW).feed(lines(
+        {"ev": "exec", "path": "/usr/bin/cat", "pid": 540, "uid": 1000},
+        {"ev": "open", "path": "/home/node/.npmrc", "pid": 540},
+    ))
+    assert [k for k, _, _ in out] == ["process_spawn", "canary_read"] and "cat read canary" in out[1][1]

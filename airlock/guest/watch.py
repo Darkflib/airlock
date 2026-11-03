@@ -4,14 +4,19 @@ root-only log. Language-agnostic, unlike the Node tracer:
 
   * fanotify FAN_OPEN_EXEC on the root mount: every program executed, with pid
   * fanotify FAN_OPEN on home directories:     who opened which dotfile (canaries)
-  * a logging DNS forwarder on 127.0.0.1:53:   every name looked up, with pid
-  * /proc/net/tcp{,6} polling:                 outbound connects stuck in SYN_SENT
-                                               (default-deny drops them silently)
+  * a DNS server on 127.0.0.1:53:              every name looked up, with pid. Allowlisted
+                                               names are forwarded; with --sinkhole, every
+                                               other name gets a fake address in the run's
+                                               sinkhole /24 (Airlock's host proxy answers it)
+  * /proc/net/tcp{,6} polling:                 outbound connections, with pid
 
-  python3 watch.py <log.jsonl> <home> [<home> ...]
+  python3 watch.py <log.jsonl> <home> [<home> ...] [--sinkhole 198.18.N.0/24] [--allow a,b]
 """
 
+import argparse
 import ctypes
+import hashlib
+import ipaddress
 import json
 import os
 import queue
@@ -22,7 +27,15 @@ import sys
 import threading
 import time
 
-LOG_PATH, HOMES = sys.argv[1], sys.argv[2:]
+_ap = argparse.ArgumentParser()
+_ap.add_argument("log")
+_ap.add_argument("homes", nargs="+")
+_ap.add_argument("--sinkhole", help="per-run /24 for fake answers to non-allowlisted names")
+_ap.add_argument("--allow", default="", help="comma-separated allowlisted hostnames")
+ARGS = _ap.parse_args()
+LOG_PATH, HOMES = ARGS.log, ARGS.homes
+SINKHOLE = ipaddress.ip_network(ARGS.sinkhole) if ARGS.sinkhole else None
+ALLOW = tuple(h.strip().lower() for h in ARGS.allow.split(",") if h.strip())
 ME = os.getpid()
 _lock = threading.Lock()
 _log = open(LOG_PATH, "a", buffering=1)
@@ -152,6 +165,36 @@ def qname(packet: bytes) -> str:
     return ".".join(labels)
 
 
+def qtype(packet: bytes) -> int:
+    i = 12
+    while i < len(packet) and packet[i]:
+        i += 1 + packet[i]
+    return struct.unpack_from(">H", packet, i + 1)[0] if i + 3 <= len(packet) else 0
+
+
+def allowlisted(name: str) -> bool:
+    name = name.lower().rstrip(".")
+    return any(name == h or name.endswith("." + h) for h in ALLOW)
+
+
+def sinkhole_ip(name: str) -> str:
+    """Stable fake address for a name inside the run's sinkhole /24 (.1 to .254)."""
+    host = 1 + int(hashlib.sha256(name.lower().encode()).hexdigest(), 16) % 254
+    return str(SINKHOLE.network_address + host)
+
+
+def fake_answer(query: bytes, ip: str | None) -> bytes:
+    """Answer the query ourselves: one A record, or an empty NOERROR (e.g. for AAAA,
+    so clients fall back to IPv4 and reach the sinkhole)."""
+    i = 12
+    while query[i]:
+        i += 1 + query[i]
+    question = query[12:i + 5]
+    header = query[:2] + struct.pack(">HHHHH", 0x8180, 1, 1 if ip else 0, 0, 0)
+    answer = (b"\xc0\x0c" + struct.pack(">HHIH", 1, 1, 30, 4) + socket.inet_aton(ip)) if ip else b""
+    return header + question + answer
+
+
 def answer_ips(resp: bytes) -> list[str]:
     """A and AAAA records from a DNS response (enough parsing for our own forwarder)."""
     try:
@@ -202,7 +245,14 @@ def dns_loop() -> None:
         data, addr = srv.recvfrom(4096)
         pid = udp_pid(addr[1])
         info = proc_info(pid) if pid else {}
-        log("dns", name=qname(data), **info)
+        name = qname(data)
+        if SINKHOLE and name and not allowlisted(name):
+            ip = sinkhole_ip(name)
+            log("dns", name=name, sinkholed=ip, **info)
+            srv.sendto(fake_answer(data, ip if qtype(data) == 1 else None), addr)
+            log("dns_answer", name=name, ips=[ip], sinkholed=True)
+            continue
+        log("dns", name=name, **info)
 
         def forward(data=data, addr=addr):
             up = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

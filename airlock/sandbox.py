@@ -1,11 +1,20 @@
 """One disposable microVM per run: default-deny egress, canary credentials,
-resource limits, and the guest tracer installed. Every exec is an event."""
+resource limits, the guest tracer and watcher installed. Every exec is an event.
+
+With the sinkhole available (airlock-sinkhole service on the host), all guest TCP
+is routed through it. The run gets its own fake /24 in 198.18.0.0/15: the guest's
+DNS answers non-allowlisted names with addresses there, the egress policy allows
+that /24 and the registries only, and the sinkhole answers those requests itself,
+logging the full payload. Real internet destinations stay denied by microsandbox."""
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
+import json
 import os
+import socket
 import re
 import secrets
 import shlex
@@ -13,10 +22,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from microsandbox import Action, Destination, Network, NetworkPolicy, Protocol, Rule, Sandbox
+from microsandbox import Action, Destination, Network, NetworkPolicy, OutboundProxy, Protocol, Rule, Sandbox
 from microsandbox.types import TlsConfig
 
-from .events import EventLog, WatchTranslator, events_from_trace
+from .events import EventLog, WatchTranslator, events_from_sinkhole, events_from_trace
+from .store import data_dir
 
 TRACER = Path(__file__).parent / "guest" / "trace.js"
 WATCHER = Path(__file__).parent / "guest" / "watch.py"
@@ -24,6 +34,24 @@ TRACE_LOG = "/tmp/airlock-trace.jsonl"     # written by the Node tracer, as the 
 WATCH_LOG = "/opt/airlock/watch.jsonl"     # written by the root watcher; unreadable to the package user
 PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user
 DEFAULT_ALLOW = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
+SINKHOLE_ADDR = os.environ.get("AIRLOCK_SINKHOLE", "127.0.0.1:1080")
+SINKHOLE_CA = Path.home() / ".mitmproxy" / "mitmproxy-ca-cert.pem"
+SINKHOLE_PORTS = (80, 443, 8080, 8443)
+
+
+def sinkhole_available() -> bool:
+    if os.environ.get("AIRLOCK_SINKHOLE") == "off" or not SINKHOLE_CA.exists():
+        return False
+    host, port = SINKHOLE_ADDR.rsplit(":", 1)
+    try:
+        with socket.create_connection((host, int(port)), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def sinkhole_log() -> Path:
+    return data_dir() / "sinkhole.jsonl"
 
 
 @dataclass
@@ -38,12 +66,18 @@ class ExecResult:
         return self.exit_code == 0 and not self.timed_out
 
 
-def egress_network(allow_hosts: tuple[str, ...]) -> Network:
+def egress_network(allow_hosts: tuple[str, ...], sinkhole: str | None = None) -> Network:
     rules = [*Rule.allow_dns()]
     for host in allow_hosts:
         rules.append(Rule.allow(protocol=Protocol.TCP, port=443, destination=Destination.domain(host)))
+    if sinkhole:  # only this run's fake range; the policy is checked before the proxy
+        rules += [Rule.allow(protocol=Protocol.TCP, port=p, destination=Destination.cidr(sinkhole)) for p in SINKHOLE_PORTS]
+        # microsandbox re-encrypts intercepted TLS towards the proxy; trust the sinkhole's CA for that hop
+        tls = TlsConfig(upstream_ca_certs=(str(SINKHOLE_CA),))
+    else:
+        tls = TlsConfig()
     policy = NetworkPolicy(default_egress=Action.DENY, default_ingress=Action.ALLOW, rules=tuple(rules))
-    return Network(policy=policy, tls=TlsConfig(), strict=True)
+    return Network(policy=policy, tls=tls, strict=True)
 
 
 class Workspace:
@@ -59,16 +93,25 @@ class Workspace:
         self._watch_seen = 0
         self._watch = WatchTranslator(allow_hosts)
         self._emitted: set[tuple] = set()
+        self._proven_exfil: set[str] = set()
+        self.sinkhole = None
+        if sinkhole_available():
+            n = secrets.randbelow(512)  # one /24 out of 198.18.0.0/15
+            self.sinkhole = str(ipaddress.ip_network("198.18.0.0/15").network_address + n * 256) + "/24"
 
     async def __aenter__(self) -> "Workspace":
         t0 = time.monotonic()
+        extra = {"proxy": OutboundProxy.socks5(SINKHOLE_ADDR)} if self.sinkhole else {}
+        log = sinkhole_log()
+        self._sink_offset = log.stat().st_size if log.exists() else 0
         self._cm = await Sandbox.create(
             self.name, image=self.image, cpus=self.cpus, memory=self.memory_mb,
-            max_duration=self.max_duration_s, replace=True, network=egress_network(self.allow_hosts))
+            max_duration=self.max_duration_s, replace=True,
+            network=egress_network(self.allow_hosts, self.sinkhole), **extra)
         self.sb = await self._cm.__aenter__()
         self.events.emit("vm_created", f"microVM {self.name} up in {time.monotonic() - t0:.2f}s",
                          image=self.image, cpus=self.cpus, memory_mb=self.memory_mb,
-                         egress="default-deny", allow=list(self.allow_hosts))
+                         egress="default-deny", allow=list(self.allow_hosts), sinkhole=self.sinkhole)
         await self.sb.fs.mkdir("/work")
         await self.sb.fs.mkdir("/opt/airlock")
         await self.sb.fs.mkdir("/opt/airlock-trace")  # world-readable: the package user's Node loads it
@@ -105,7 +148,8 @@ class Workspace:
             "chmod 700 /opt/airlock && chmod 755 /opt/airlock-trace && chmod 644 /opt/airlock-trace/trace.js && cp /etc/resolv.conf /etc/resolv.conf.airlock-orig"
             " && echo 'nameserver 127.0.0.1' > /etc/resolv.conf"
             f" && (setsid python3 /opt/airlock/watch.py {WATCH_LOG} {PKG_HOME} /root"
-            " >/opt/airlock/watch.err 2>&1 </dev/null &)", timeout=20)
+            + (f" --sinkhole {self.sinkhole} --allow {','.join(self.allow_hosts)}" if self.sinkhole else "")
+            + " >/opt/airlock/watch.err 2>&1 </dev/null &)", timeout=20)
         for _ in range(40):
             out = await self.sb.shell(f"grep -c watch_ready {WATCH_LOG} 2>/dev/null || true", timeout=10)
             if out.stdout_text.strip() == "2":
@@ -140,10 +184,12 @@ class Workspace:
         Both sources can see the same act; the first report wins."""
         if settle:  # package code ran: the watcher needs ~0.5s to call a dropped connect "blocked"
             await asyncio.sleep(0.6)
+        # Sinkhole first: when it captured the request, its report carries the payload.
+        found = self._read_sinkhole()
         out = await self.sb.shell(f"cat {TRACE_LOG} 2>/dev/null || true", timeout=10)
         lines = out.stdout_text.splitlines()
         new, self._trace_seen = lines[self._trace_seen:], len(lines)
-        found = events_from_trace("\n".join(new), self.allow_hosts)
+        found += events_from_trace("\n".join(new), self.allow_hosts)
         out = await self.sb.shell(f"cat {WATCH_LOG} 2>/dev/null || true", timeout=10)
         lines = out.stdout_text.splitlines()
         new, self._watch_seen = lines[self._watch_seen:], len(lines)
@@ -151,12 +197,38 @@ class Workspace:
         for kind, summary, data in found:
             target = (data.get("path") or data.get("host") or data.get("cmd") or "").split(":")[0]
             if kind == "canary_exfil":
-                target = ""  # one exfil per process: the tracer's proven report beats the watcher's inference
-            key = (kind, target, data.get("pid"), data.get("ts_guest"))
+                # One exfil report per destination: captured payload > Node tracer > inference.
+                target, pid = (data.get("host") or "").split(":")[0], None
+            else:
+                pid = data.get("pid")
+            key = (kind, target, pid, data.get("ts_guest"))
             if key in self._emitted:
                 continue
             self._emitted.add(key)
             self.events.emit(kind, summary, stage=stage, **data)
+
+    def _read_sinkhole(self) -> list[tuple[str, str, dict]]:
+        """This run's requests captured by the host sinkhole (matched by the run's /24)."""
+        if not self.sinkhole:
+            return []
+        log = sinkhole_log()
+        if not log.exists():
+            return []
+        with open(log) as f:
+            f.seek(self._sink_offset)
+            chunk = f.read()
+        complete, _, _ = chunk.rpartition("\n")
+        self._sink_offset += len(complete.encode()) + (1 if complete else 0)
+        net = ipaddress.ip_network(self.sinkhole)
+        mine = []
+        for line in complete.splitlines():
+            try:
+                rec = json.loads(line)
+                if ipaddress.ip_address(rec.get("dest", "")) in net:
+                    mine.append(rec)
+            except (json.JSONDecodeError, ValueError):
+                continue
+        return events_from_sinkhole(mine, self.canary_token)
 
     async def write(self, path: str, data: bytes) -> None:
         await self.sb.fs.mkdir(os.path.dirname(path) or "/")

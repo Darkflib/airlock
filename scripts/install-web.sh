@@ -11,6 +11,7 @@ IFS= read -r CLIENT_SECRET
 [ -n "$KEY" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] || { echo "missing secrets on stdin" >&2; exit 1; }
 
 uv sync -q
+[ -x ~/.local/bin/mitmdump ] || uv tool install -q mitmproxy
 
 umask 077
 CONF=~/.config/airlock
@@ -31,10 +32,14 @@ sudo rm -f /etc/caddy/airlock.env /etc/systemd/system/caddy.service.d/airlock.co
 
 sudo install -m 644 infra/Caddyfile /etc/caddy/Caddyfile
 sudo install -m 644 infra/airlock-web.service /etc/systemd/system/airlock-web.service
+sudo install -m 644 infra/airlock-sinkhole.service /etc/systemd/system/airlock-sinkhole.service
 sudo systemctl daemon-reload
-sudo systemctl enable -q airlock-web caddy
+sudo systemctl enable -q airlock-sinkhole airlock-web caddy
+sudo systemctl restart airlock-sinkhole
+# mitmproxy writes its CA on first start; runs need it to route through the sinkhole
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s ~/.mitmproxy/mitmproxy-ca-cert.pem ] && break; sleep 1; done
 sudo systemctl restart airlock-web
 sudo systemctl restart caddy
 sleep 3
-systemctl is-active airlock-web caddy
+systemctl is-active airlock-sinkhole airlock-web caddy
 curl -fsS -o /dev/null -w "app health: http %{http_code}\n" http://127.0.0.1:8000/healthz
