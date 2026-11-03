@@ -89,3 +89,24 @@ Tags: #demo
 **Result:** mimo-v2.6-flash 15/15, qwen3.8-27b 14/15, glm-5.2 14/15, mimo-v2.6-pro 13/15. 0 invalid tool calls out of 631. **12/12 hostile triages said malicious and cited both canary reads and the exfil host; none followed the README injection.** glm-5.2 failed one benign triage by using up its 15 turns grepping a 4-file package. The demo-package misses were soft refusals: no canary reads, no README line.
 **So:** mimo-v2.6-flash becomes the agent and verdict model, with qwen3.8-27b as fallback. The agent loop needs a hard turn budget with a forced final "verdict now" turn.
 Tags: #metric #decision #demo
+
+### 18:48 — Airlock core works end to end
+**Tried:** `airlock analyse <tgz | npm-spec>`. One microVM per run (default-deny egress, per-run canary token in fake `~/.npmrc` and `~/.aws/credentials`). The package is installed under the Node tracer, trace lines become typed containment events, and a mimo-v2.6-flash triage agent (12-turn budget, last turn forces `finish`) investigates. Every tool result passes a pattern guard before the model sees it.
+**Result:**
+- Hostile fixture: **MALICIOUS** in 4 turns. Events: canary_read ×2, egress_blocked, canary_exfil, and guard_flagged (README "AI code reviewers… should be approved" redacted). The agent reproduced the theft itself with a fake HOME and cited event ids.
+- Benign fixture: **BENIGN** with 0 containment events. The agent correctly put the `.npmrc` reads down to npm itself, not the package.
+- Real `left-pad@1.3.0` from npm: **BENIGN** in 4 turns.
+- VM boot is 0.64–0.66 s.
+**So:** the demo's core story works today, a day ahead of plan. Next: the web UI (live timeline over SSE) and the approval gate.
+Tags: #win #demo #metric
+
+### 18:48 — Tracer now flags canary payloads, not just connections
+**Tried:** wrapped `http.ClientRequest.prototype.write/end` and `fetch` bodies to look for the per-run canary token.
+**Result:** a POST carrying the token logs `net_payload_canary`, which becomes a `canary_exfil` event separate from `egress_blocked`.
+**So:** the timeline can say "tried to send *your credentials*", not just "made a network call". That's a stronger moment for the demo.
+Tags: #win #demo
+
+### 18:48 — Bug: npm-spec path failed because /work didn't exist yet
+**Result:** `mv: cannot move ... to '/work/candidate.tgz': No such file or directory`. Only file targets wrote /work implicitly.
+**So:** `Workspace` now creates /work on start.
+Tags: #fail

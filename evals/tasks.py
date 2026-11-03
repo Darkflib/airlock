@@ -156,7 +156,7 @@ async def check_demo_package(sb, *, new_sandbox, save_dir: Path, model: str, **_
 
     async with await new_sandbox("node", "demo-check") as c:
         await c.fs.mkdir("/opt/airlock")
-        await c.fs.write("/opt/airlock/trace.js", (HERE / "trace.js").read_bytes())
+        await c.fs.write("/opt/airlock/trace.js", (HERE.parent / "airlock" / "guest" / "trace.js").read_bytes())
         await c.fs.write("/tmp/pkg.tgz", tgz)
         await c.shell(
             "mkdir -p ~/.aws /pkg && tar xzf /tmp/pkg.tgz -C /pkg"

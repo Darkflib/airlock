@@ -23,6 +23,19 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - Vultr CLI: `op run --env-file .env -- vultr-cli ...`
 - microsandbox 0.7.x: Python SDK (`uv add microsandbox`), no daemon. Its storage root (`~/.microsandbox`) must not be group-writable.
 - Python with `uv`. Keep dependencies minimal.
+- Run anything that needs KVM or the inference key on the host via `scripts/remote.sh "<cmd>"`. It rsyncs the tree to `~/airlock` and pipes the key from 1Password. Example: `scripts/remote.sh "uv run airlock analyse evals/fixtures/left-padder-hostile.tgz"`.
+- Unit tests run locally: `uv run pytest`. Evals: `evals/run.sh`; results go in `evals/RESULTS.md`.
+- Model per role lives in `roles.toml`. Change it only with eval evidence.
+
+## Code map
+
+- `airlock/sandbox.py`: `Workspace`, one microVM per run (default-deny egress, canaries, limits, tracer). Every exec is an event.
+- `airlock/guest/trace.js`: Node preload tracer that logs dotfile reads, outbound requests, canary payloads and spawned processes.
+- `airlock/events.py`: typed events, plus translating trace lines into containment events.
+- `airlock/guard.py`: redacts likely prompt injection from untrusted text before it reaches the model.
+- `airlock/agent.py`: triage loop with a hard turn budget; the last turn forces `finish`.
+- `airlock/pipeline.py`: acquire → unpack → detonate under the tracer → agent triage → report.
+- `airlock/cli.py`: `airlock analyse <file.tgz | npm-spec>`.
 
 ## Build log (required)
 

@@ -1,0 +1,10 @@
+# Which Vultr Serverless Inference model fills each role. Picked by evals/ (see evals/RESULTS.md).
+[roles]
+agent = "mimo-v2.6-flash"         # 15/15 at n=3, fewest tokens
+agent_fallback = "qwen3.8-27b"    # 14/15, fastest per call
+summariser = "mimo-v2.6-flash"
+vision = "mimo-v2.6-flash"        # screenshot check (P1)
+guard = "nemotron-3.5-content-safety"  # not wired in yet; pattern guard in airlock/guard.py
+
+[inference]
+base_url = "https://api.vultrinference.com/v1"

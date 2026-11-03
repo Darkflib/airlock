@@ -62,11 +62,30 @@ for (const modName of ['http', 'https']) {
   }
 }
 
+// Request bodies: flag any that carry a canary token (exfil attempt).
+const CANARY = 'AIRLOCKCANARY';
+const ClientRequest = require('http').ClientRequest;
+for (const fn of ['write', 'end']) {
+  const orig = ClientRequest.prototype[fn];
+  ClientRequest.prototype[fn] = function (chunk, ...rest) {
+    try {
+      if (chunk && typeof chunk !== 'function' && String(chunk).includes(CANARY)) {
+        log({ ev: 'net_payload_canary', host: this.host || this.getHeader('host') || '?' });
+      }
+    } catch (_) {}
+    return orig.call(this, chunk, ...rest);
+  };
+}
+
 if (typeof globalThis.fetch === 'function') {
   const orig = globalThis.fetch;
-  globalThis.fetch = function (input, ...rest) {
-    log({ ev: 'net_request', mod: 'fetch', host: hostOf(typeof input === 'string' ? input : input && input.url) });
-    return orig.call(this, input, ...rest);
+  globalThis.fetch = function (input, init, ...rest) {
+    const host = hostOf(typeof input === 'string' ? input : input && input.url);
+    log({ ev: 'net_request', mod: 'fetch', host });
+    try {
+      if (init && init.body && String(init.body).includes(CANARY)) log({ ev: 'net_payload_canary', host });
+    } catch (_) {}
+    return orig.call(this, input, init, ...rest);
   };
 }
 
