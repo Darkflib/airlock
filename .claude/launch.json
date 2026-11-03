@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ui-replay",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "scripts/ui_replay.py", "8099"],
+      "port": 8099
+    }
+  ]
+}

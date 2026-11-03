@@ -109,20 +109,55 @@ const Airlock = (() => {
       const li = el('li'); li.append(el('span', '', `${label}: `), el('b', '', value)); $('facts').append(li);
     };
 
+    // Which part of the run an event belongs to, from what the backend records.
+    const STAGES = {
+      setup: ['Setup', 'Fresh microVM, fake credentials planted, package fetched. Airlock code, no AI.'],
+      detonate: ['Detonation', 'The package is installed with the tracer on. Anything it tries shows up here.'],
+      agent: ['Agent investigation', 'Commands chosen by the AI reviewer, run inside the same VM.'],
+      verdict: ['Verdict', 'The agent\'s conclusion, then the VM is destroyed. A human decides on the right.'],
+    };
+    let stage = null, stageSignals = 0;  // non-exec events seen in the current stage
+    const stageOf = (ev) => {
+      if (['verdict', 'vm_destroyed', 'error'].includes(ev.kind)) return 'verdict';
+      if (ev.kind === 'agent_start' || ev.kind === 'guard_flagged') return 'agent';
+      const src = ev.data.source || ev.data.stage;
+      if (src === 'agent') return 'agent';
+      if (src === 'detonate') return 'detonate';
+      return stage === 'agent' ? 'agent' : 'setup';
+    };
+    const enterStage = (next) => {
+      if (next === stage) return;
+      if (stage === 'detonate' && stageSignals === 0) {
+        tl.append(el('li', 'stage-note', '✓ Nothing suspicious observed during install: no credential reads, no outbound requests, no spawned processes.'));
+      }
+      stage = next;
+      stageSignals = 0;
+      const [title, desc] = STAGES[next];
+      const h = el('li', `stage-head stage-${next}`);
+      h.append(el('span', 'stage-title', title), el('span', 'stage-desc', desc));
+      tl.append(h);
+    };
+
     function addEvent(ev) {
       if (t0 === null) t0 = ev.ts;
+      enterStage(stageOf(ev));
       const li = el('li', `ev ${ev.kind}`);
       li.id = `E${ev.id}`;
       const repro = ev.containment && ev.data.stage === 'agent';
       if (ev.containment) li.classList.add('contain');
+      if (ev.kind !== 'exec') stageSignals++;
       if (repro) li.classList.add('repro');
       if (ev.kind === 'exec') {
         li.classList.add('exec');
         if (ev.data.source === 'agent') li.classList.add('agent');
+        if (ev.data.source === 'detonate') li.classList.add('key');
       }
       li.append(el('span', 't', `+${(ev.ts - t0).toFixed(1)}s`), el('span', 'id', `E${ev.id}`));
       const s = el('div');
-      s.append(el('span', 'kind', ev.kind.replace(/_/g, ' ')), el('span', 'sum', ev.summary));
+      s.append(el('span', 'kind', ev.kind.replace(/_/g, ' ')));
+      if (ev.kind === 'exec') s.append(el('span', `who ${ev.data.source === 'agent' ? 'ai' : 'sys'}`,
+        ev.data.source === 'agent' ? 'AI' : 'AIRLOCK'));
+      s.append(el('span', 'sum', ev.summary));
       if (ev.containment) s.append(el('span', 'flag', repro ? 'REPRODUCED BY AGENT' : 'CONTAINED'));
       li.append(s);
       if (ev.kind === 'guard_flagged' && ev.data.text) li.append(el('div', 'detail', `“${ev.data.text}”`));

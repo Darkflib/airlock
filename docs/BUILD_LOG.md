@@ -145,3 +145,9 @@ Tags: #fail
 **Result:** 9 new auth tests, including forged state, a tampered cookie, open redirect via `next`, an unlisted user, revocation, and failing closed; 25/25 pass. Deployed: signed-out `/` → `/login`, `/api/*` → 401, and the button reaches GitHub's "Sign in to continue to Airlock dev" page.
 **So:** judges can be let in by GitHub login, one line each, with no shared password. The basic-auth hash and Caddy env override were removed from the host.
 Tags: #win #decision #demo
+
+### 19:30 — Timeline explains itself: stage headings and who ran what
+**Tried:** grouped the run timeline into Setup → Detonation → Agent investigation → Verdict, each with a one-line description. Commands are tagged AIRLOCK (our fixed steps) or AI (chosen by the model). The install step always shows, even with "show every command" off. If detonation produced no traced activity, a green "nothing suspicious observed during install" note appears.
+**Result:** a benign run now reads as a story without narration, and in the hostile run the attack sits visibly under Detonation, before the AI has done anything.
+**So:** this answers the two questions judges are likeliest to ask: what did the AI actually decide, and where did the evidence come from. Added `scripts/ui_replay.py`, which replays recorded runs (`tests/fixtures/runs/`) for UI work without a VM, an inference key or sign-in.
+Tags: #demo
