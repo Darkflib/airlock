@@ -16,7 +16,7 @@ dist/
 # runtime data
 *.sqlite
 *.db
-runs/
+/runs/
 
 # os / editor
 .DS_Store
