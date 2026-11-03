@@ -1,0 +1,21 @@
+Mode: built-in image_gen
+
+Logo prompt:
+Use case: logo-brand
+Asset type: square project logo / GitHub avatar for an open-source software project called Airlock, a sandbox for testing untrusted code.
+Primary request: a distinctive, simple, vector-friendly emblem combining the idea of a sealed airlock chamber and a secure code execution boundary. Think two nested doorway or hatch contours with one small contained code-bracket motif, or an equally elegant abstract solution. Strong silhouette at 48 px.
+Style/medium: flat geometric brand mark, precise curves, minimal shapes, clean tech identity.
+Color palette: deep midnight navy and vivid cyan with a restrained safety-orange accent if useful.
+Composition/framing: centered square mark with generous transparent padding, no background.
+Constraints: genuinely transparent background; no text, no letters, no wordmark, no gradient, no mockup, no shadows, no watermark. Crisp edges and balanced negative space.
+
+Banner prompt:
+Use case: logo-brand
+Asset type: wide GitHub repository README banner / social preview for the software project Airlock.
+Primary request: a polished, very wide 2:1 banner for a sandbox project for testing untrusted code. Large, exact title text "AIRLOCK". On the left, a clean emblem of a sealed rounded airlock hatch containing a small orange code-bracket symbol. Set the word AIRLOCK to the right in bold, modern, highly legible sans-serif capitals. Beneath it, smaller exact subtitle: "Sandbox untrusted code".
+Scene/backdrop: deep midnight navy field with faint architectural concentric hatch lines and subtle technical grid details, leaving clear breathing room around title.
+Style/medium: restrained flat geometric tech branding, crisp and professional, no photorealism.
+Color palette: midnight navy base, electric cyan hatch lines, small safety orange code accent, white title.
+Composition/framing: horizontal 2:1 banner, everything contained safely within center 75% of frame so GitHub cropping will not clip the emblem or text. Strong hierarchy and readability at small sizes.
+Text (verbatim): "AIRLOCK" and "Sandbox untrusted code".
+Constraints: no other text, no random glyphs, no watermark, no mockup, no 3D depth, no gradients that reduce text contrast.

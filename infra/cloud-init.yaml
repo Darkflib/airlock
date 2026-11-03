@@ -1,0 +1,57 @@
+#cloud-config
+# Airlock host: Vultr VX1, Ubuntu 24.04.
+# Rebuildable from scratch; anything done by hand on the box should land here.
+
+hostname: airlock
+timezone: UTC
+
+users:
+  - name: airlock
+    groups: [sudo, kvm]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO1E7qtIMp0dD8CtJCXLeIkICUEL/06G3Sb7UhdbOXKn darkflib-ecc-2026
+
+ssh_pwauth: false
+disable_root: true
+
+package_update: true
+package_upgrade: true
+packages:
+  - build-essential
+  - curl
+  - git
+  - htop
+  - jq
+  - nftables
+  - python3-venv
+  - strace
+  - tmux
+  - ufw
+  - unzip
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-airlock.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+
+runcmd:
+  - systemctl reload ssh
+  - ufw default deny incoming
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+  - su - airlock -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+  # microsandbox (installs to ~/.microsandbox). msb refuses a storage root that is
+  # group-writable, and Ubuntu's default umask 002 makes it so.
+  - su - airlock -c 'curl -fsSL https://install.microsandbox.dev | sh'
+  - su - airlock -c 'chmod -R go-w ~/.microsandbox && chmod 700 ~/.microsandbox'
+  # ~/.local/bin is only on PATH for login shells; link so non-interactive ssh finds them
+  - ln -sf /home/airlock/.local/bin/msb /home/airlock/.local/bin/uv /usr/local/bin/
+  - su - airlock -c '~/.local/bin/msb doctor' > /var/log/airlock-msb-doctor 2>&1
+  - 'test -c /dev/kvm && echo "kvm: present" > /var/log/airlock-kvm || echo "kvm: MISSING" > /var/log/airlock-kvm'
