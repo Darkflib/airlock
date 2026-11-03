@@ -326,5 +326,5 @@ Tags: #fail #decision
 - Deployed `30dc32e`. The first live self-test (`20261103-234726-8e911e`) passed **3/3**: the Node stealer had 5 containment events and the shell stealer 6, both with exfil proven by payload; the benign package had 0.
 - Minted 60-day share links for PR #3 (rejected, bot comment posted), PR #1 (approved) and that self-test. Plus the `lablab` invite: 50 accounts, 30 days.
 - Checked signed out against the live site: each share link opens its page and API (200) but not the run list or submit (401). The invite redirects to GitHub OAuth.
-**So:** the submission can link straight to the money shot. The links are bearer tokens: they're kept in 1Password, not in this repo.
+**So:** the submission can link straight to the money shot. The links are bearer tokens: store them in 1Password, never in this repo (it goes public).
 Tags: #win #demo #metric

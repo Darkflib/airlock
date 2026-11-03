@@ -229,3 +229,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 - [x] Live demo URL on Vultr
 - [ ] Video with a containment moment; slide deck; cover image
 - [ ] Entry submitted on lablab.ai
+
+## Review follow-up — 3 Nov, 23:46 UTC
+
+The independent [working-tree review](docs/REVIEW-2026-11-03.md) found unresolved issues behind the earlier P0-complete claim. Before publishing judge invites: separate guest access from maintainer/GitHub authority, run model-selected commands unprivileged, fail closed on incomplete observation, preserve unique VM names, and require current-run host-captured canaries for PROVEN evidence. Cleanup guarantees, merge-gate setup, and submission copy also need correction. These findings are not fixed by the review; 54 local unit tests passing and the recorded 18/18 fixture regression do not establish those security properties. Live deployment and new judge-access features were not verified in this review.
