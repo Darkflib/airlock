@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airlock self-test</title>
+  <link rel="icon" href="/static/favicon-32x32.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <img src="/static/apple-touch-icon.png" alt="">
+      <div>
+        <div class="brand">AIRLOCK</div>
+        <div class="tag">Dependency detonation chamber</div>
+      </div>
+      <div class="spacer"></div>
+      <nav class="user" id="user"><a href="/">← All runs</a></nav>
+    </header>
+
+    <div class="run-head">
+      <h1>Containment self-test</h1>
+      <span class="meta" id="meta"></span>
+      <button type="button" class="ghost" id="share" hidden>Share read-only link</button>
+    </div>
+
+    <div class="panel">
+      <div class="body">
+        <div class="verdict-big pending" id="score">…</div>
+        <div class="verdict-meta">Each probe is a normal run: fresh microVM, canary credentials, sinkhole, agent review.
+          Open a probe to see its live timeline.</div>
+      </div>
+      <table class="runs">
+        <thead><tr><th>Probe</th><th>Expected</th><th>Verdict</th><th>Contained</th><th>Exfil</th><th>Result</th></tr></thead>
+        <tbody id="probes"></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>Airlock.selftest();</script>
+</body>
+</html>

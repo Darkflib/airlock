@@ -24,7 +24,7 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - microsandbox 0.7.x: Python SDK (`uv add microsandbox`), no daemon. Its storage root (`~/.microsandbox`) must not be group-writable.
 - Python with `uv`. Keep dependencies minimal.
 - Run anything that needs KVM or the inference key on the host via `scripts/remote.sh "<cmd>"`. It rsyncs the tree to `~/airlock` and pipes the key from 1Password. Example: `scripts/remote.sh "uv run airlock analyse evals/fixtures/left-padder-hostile.tgz"`.
-- Web UI: live at https://airlock.darkflib.dev. Sign-in is GitHub OAuth (1Password "Airlock OAuth") with an allowlist: `Darkflib` is always allowed, and judges and others go in `~/.config/airlock/allowed_users` on the host. Manage it with `scripts/allow.sh [list | add <login> | rm <login>]`; changes take effect immediately, including revoking. Deploy the working tree with `scripts/deploy.sh`. It pipes secrets from 1Password over SSH stdin into a mode-600 env file and restarts the `airlock-web` unit and Caddy. Logs: `journalctl -u airlock-web -f`.
+- Web UI: live at https://airlock.darkflib.dev. Sign-in is GitHub OAuth (1Password "Airlock OAuth") with an allowlist: `Darkflib` is always allowed, and judges and others go in `~/.config/airlock/allowed_users` on the host. Manage it with `scripts/allow.sh [list | add <login> | rm <login>]`; changes take effect immediately, including revoking. For people whose logins we don't know (judges), `scripts/invite.sh new|list|revoke` mints a signed sign-up link; accounts it admits are appended to `allowed_users` tagged `# invite <id>`. Guests (everyone not in `AIRLOCK_ALLOWED_USERS`) are capped per rolling 24 h: `AIRLOCK_USER_DAILY_RUNS` (15) each and `AIRLOCK_GLOBAL_DAILY_RUNS` (150) between them. Deploy the working tree with `scripts/deploy.sh`. It pipes secrets from 1Password over SSH stdin into a mode-600 env file and restarts the `airlock-web` unit and Caddy. Logs: `journalctl -u airlock-web -f`.
 - Unit tests run locally: `uv run pytest`. Evals: `evals/run.sh`; results go in `evals/RESULTS.md`.
 - Model per role lives in `roles.toml`. Change it only with eval evidence.
 
@@ -44,7 +44,9 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - PR runs: `airlock analyse https://github.com/o/r/pull/N`, or paste the URL in the UI. The control plane fetches the head (the VM has no GitHub access), and the VM runs `npm ci` and `npm test` as `node` under detonation before the agent triages. **Nothing is posted until a human decides.** Then `airlock/prcomment.py` builds the comment, and a status of `success` or `failure` is set as `<app>[bot]`.
 - Demo repo: `Darkflib/airlock-demo` (private). PR #1 is a benign left-pad bump; PR #3 vendors the `colorful-logs` shell stealer; `npm test` passes on both.
 - `airlock/store.py`: SQLite for runs and events (`$AIRLOCK_DATA`, default `~/.local/share/airlock`).
-- `airlock/web/auth.py`: GitHub OAuth, HMAC-signed session cookie, allowlist re-checked on every request. The app refuses to start without OAuth config (it fails closed).
+- `airlock/web/auth.py`: GitHub OAuth, HMAC-signed session cookie, allowlist re-checked on every request. The app refuses to start without OAuth config (it fails closed). Session, share and invite tokens share the session secret and carry a kind (`k`) so one can't stand in for another. A share token (`/s/<token>`, cookie `airlock_share`) allows only GETs of the runs and self-test it names.
+- `airlock/web/invite.py`: CLI behind `scripts/invite.sh`.
+- Self-test: `POST /api/selftests` runs the three `evals/fixtures` tarballs as ordinary runs; `judge_probe` in `airlock/web/app.py` requires payload-proven exfil for stealers and zero containment for the benign one.
 - `airlock/web/`: FastAPI app (submit, SSE event stream, approval decision) and the static UI. Event text is untrusted: insert it with `textContent` only.
 
 ## Build log (required)

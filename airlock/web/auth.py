@@ -4,6 +4,12 @@ Sessions are stateless signed cookies (HMAC-SHA256). The allowlist is re-read
 on every request, so removing a login from the file revokes access at once.
 Allowlist: AIRLOCK_ALLOWED_USERS (comma-separated) plus one login per line in
 AIRLOCK_ALLOWED_USERS_FILE (default ~/.config/airlock/allowed_users).
+
+Two more signed tokens share the session secret, each tagged with a kind `k` so
+one can never stand in for another:
+- share: read-only access to named runs (and a self-test), no sign-in needed.
+- invite: whoever signs in with GitHub through it is appended to the allowlist
+  file, tagged `# invite <id>`, so `scripts/allow.sh` still lists and revokes them.
 """
 
 from __future__ import annotations
@@ -28,7 +34,9 @@ SESSION_COOKIE = "airlock_session"
 STATE_COOKIE = "airlock_oauth"
 SESSION_TTL = 7 * 24 * 3600
 STATE_TTL = 600
-PUBLIC_PATHS = ("/auth/", "/static/", "/login", "/healthz")
+SHARE_COOKIE = "airlock_share"
+SHARE_TTL = 60 * 24 * 3600
+PUBLIC_PATHS = ("/auth/", "/static/", "/login", "/healthz", "/s/", "/api/me")
 
 
 @dataclass
@@ -55,6 +63,24 @@ class AuthConfig:
             allowed=frozenset(u.strip().lower() for u in os.environ.get("AIRLOCK_ALLOWED_USERS", "").split(",") if u.strip()),
             allowed_file=Path(os.environ.get("AIRLOCK_ALLOWED_USERS_FILE", default_file)),
         )
+
+    @property
+    def revoked_file(self) -> Path | None:
+        return self.allowed_file.with_name("revoked_invites") if self.allowed_file else None
+
+    def admit(self, login: str, invite: dict) -> bool:
+        """Add a login to the allowlist file through a valid, unrevoked invite with uses left."""
+        if not self.allowed_file:
+            return False
+        inv = invite["id"]
+        if self.revoked_file.exists() and inv in self.revoked_file.read_text().split():
+            return False
+        lines = self.allowed_file.read_text().splitlines() if self.allowed_file.exists() else []
+        if sum(line.split("#", 1)[-1].split()[:2] == ["invite", inv] for line in lines if "#" in line) >= invite["max"]:
+            return False
+        with self.allowed_file.open("a") as f:
+            f.write(f"{login}  # invite {inv} {time.strftime('%Y-%m-%d')}\n")
+        return True
 
     def is_allowed(self, login: str) -> bool:
         login = login.lower()
@@ -97,6 +123,32 @@ def verify(secret: bytes, token: str | None) -> dict | None:
     return payload if payload.get("exp", 0) > time.time() else None
 
 
+def share_token(secret: bytes, runs: list[str], selftest: str | None = None, ttl: int = SHARE_TTL) -> str:
+    return sign(secret, {"k": "share", "runs": runs, "selftest": selftest, "exp": time.time() + ttl})
+
+
+def invite_token(secret: bytes, invite_id: str, days: float, max_uses: int) -> str:
+    return sign(secret, {"k": "invite", "id": invite_id, "max": max_uses, "exp": time.time() + days * 86400})
+
+
+def verify_kind(secret: bytes, token: str | None, kind: str | None) -> dict | None:
+    """verify() plus the token kind; kind None means a session token (no `k`)."""
+    payload = verify(secret, token)
+    return payload if payload and payload.get("k") == kind else None
+
+
+def share_allows(share: dict, method: str, path: str) -> bool:
+    """A share token opens only reads of the runs and self-test it names."""
+    if method not in ("GET", "HEAD"):
+        return False
+    allowed = set()
+    for r in share.get("runs", []):
+        allowed |= {f"/runs/{r}", f"/api/runs/{r}", f"/api/runs/{r}/events"}
+    if share.get("selftest"):
+        allowed |= {f"/selftests/{share['selftest']}", f"/api/selftests/{share['selftest']}"}
+    return path in allowed
+
+
 # --- GitHub ----------------------------------------------------------------------
 
 async def github_login(cfg: AuthConfig, code: str) -> str:
@@ -125,6 +177,10 @@ def current_user(request: Request) -> str | None:
     return getattr(request.state, "user", None)
 
 
+def current_share(request: Request) -> dict | None:
+    return getattr(request.state, "share", None)
+
+
 def _safe_next(path: str | None) -> str:
     return path if path and path.startswith("/") and not path.startswith("//") else "/"
 
@@ -136,27 +192,44 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
         resp.set_cookie(name, value, max_age=max_age, httponly=True, secure=cfg.secure_cookies, samesite="lax", path="/")
 
     @router.get("/auth/login")
-    async def login(next: str = "/"):
+    async def login(next: str = "/", invite: str = ""):
         state = secrets.token_urlsafe(24)
         url = "https://github.com/login/oauth/authorize?" + urlencode({
             "client_id": cfg.client_id, "redirect_uri": f"{cfg.public_url}/auth/callback",
             "state": state, "allow_signup": "false"})
         resp = RedirectResponse(url, status_code=302)
-        cookie(resp, STATE_COOKIE, sign(cfg.session_secret, {"state": state, "next": _safe_next(next),
+        cookie(resp, STATE_COOKIE, sign(cfg.session_secret, {"state": state, "next": _safe_next(next), "invite": invite,
                                                              "exp": time.time() + STATE_TTL}), STATE_TTL)
+        return resp
+
+    @router.get("/auth/invite/{token}")
+    async def invite(token: str):
+        if not verify_kind(cfg.session_secret, token, "invite"):
+            return RedirectResponse("/login?error=invite", status_code=302)
+        return RedirectResponse("/auth/login?" + urlencode({"invite": token}), status_code=302)
+
+    @router.get("/s/{token}")
+    async def shared(token: str):
+        share = verify_kind(cfg.session_secret, token, "share")
+        if not share:
+            return RedirectResponse("/login?error=share", status_code=302)
+        target = f"/selftests/{share['selftest']}" if share.get("selftest") else f"/runs/{share['runs'][0]}"
+        resp = RedirectResponse(target, status_code=302)
+        cookie(resp, SHARE_COOKIE, token, int(share["exp"] - time.time()))
         return resp
 
     @router.get("/auth/callback")
     async def callback(request: Request, code: str = "", state: str = ""):
         saved = verify(cfg.session_secret, request.cookies.get(STATE_COOKIE))
-        if not saved or not code or not hmac.compare_digest(saved["state"], state):
+        if not saved or saved.get("k") or not code or not hmac.compare_digest(saved.get("state", ""), state):
             return RedirectResponse("/login?error=state", status_code=302)
         try:
             login_name = await exchange(cfg, code)
         except Exception:  # noqa: BLE001 - any GitHub failure is a failed login
             return RedirectResponse("/login?error=github", status_code=302)
-        if not cfg.is_allowed(login_name):
-            resp = RedirectResponse("/login?error=not_allowed", status_code=302)
+        inv = verify_kind(cfg.session_secret, saved.get("invite"), "invite")
+        if not cfg.is_allowed(login_name) and not (inv and cfg.admit(login_name, inv)):
+            resp = RedirectResponse(f"/login?error={'invite_closed' if inv else 'not_allowed'}", status_code=302)
             resp.delete_cookie(STATE_COOKIE, path="/")
             return resp
         resp = RedirectResponse(saved.get("next", "/"), status_code=302)
@@ -176,10 +249,15 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     @app.middleware("http")
     async def require_login(request: Request, call_next):
         path = request.url.path
-        session = verify(cfg.session_secret, request.cookies.get(SESSION_COOKIE))
-        if session and cfg.is_allowed(session["login"]):
+        session = verify_kind(cfg.session_secret, request.cookies.get(SESSION_COOKIE), None)
+        if session and session.get("login") and cfg.is_allowed(session["login"]):
             request.state.user = session["login"]
             return await call_next(request)
+        share = verify_kind(cfg.session_secret, request.cookies.get(SHARE_COOKIE), "share")
+        if share:
+            request.state.share = share
+            if share_allows(share, request.method, path):
+                return await call_next(request)
         if any(path.startswith(p) for p in PUBLIC_PATHS):
             return await call_next(request)
         if path.startswith("/api/"):

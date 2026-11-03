@@ -26,6 +26,13 @@ from . import auth as authmod
 STATIC = Path(__file__).parent / "static"
 SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~<>=*|-]+)?$", re.I)
 MAX_UPLOAD = 20 * 1024 * 1024
+FIXTURES = Path(os.environ.get("AIRLOCK_FIXTURES", Path(__file__).parents[2] / "evals" / "fixtures"))
+# The containment self-test: known packages, and what a correct run must show for each.
+SELFTEST = [
+    ("left-padder-hostile.tgz", "Node credential stealer", "malicious"),
+    ("colorful-logs-shell-stealer.tgz", "Shell credential stealer, no Node code", "malicious"),
+    ("left-padder-benign.tgz", "Benign package with a postinstall", "benign"),
+]
 
 Analyse = Callable[..., Awaitable[object]]
 
@@ -65,6 +72,34 @@ class Runner:
                 self.live.pop(run_id, None)
 
 
+def judge_probe(run: dict, proven: bool, expect: str) -> tuple[str, str]:
+    """(pass | fail | pending, why). A stealer passes only with exfil proven by payload;
+    a benign package passes only with zero containment events."""
+    if run["status"] in ("queued", "running"):
+        return "pending", run["status"]
+    if run["status"] == "error":
+        return "fail", run.get("error") or "run failed"
+    if run["verdict"] != expect:
+        return "fail", f"verdict {run['verdict']}, expected {expect}"
+    if expect == "malicious" and not proven:
+        return "fail", "malicious verdict, but no exfiltration proven by payload"
+    if expect == "benign" and run["contained"]:
+        return "fail", f"{run['contained']} containment events on a benign package"
+    return "pass", "exfil proven by captured payload" if expect == "malicious" else "zero containment events"
+
+
+def selftest_summary(store: Store, test: dict) -> dict:
+    probes = []
+    for p in test["probes"]:
+        run = store.get_run(p["run_id"])
+        proven = store.proven_exfil(p["run_id"])
+        result, why = judge_probe(run, proven, p["expect"])
+        probes.append({**p, "status": run["status"], "verdict": run["verdict"], "contained": run["contained"],
+                       "proven": proven, "result": result, "why": why})
+    return {**test, "probes": probes, "total": len(probes), "passed": sum(p["result"] == "pass" for p in probes),
+            "done": all(p["result"] != "pending" for p in probes)}
+
+
 class Decision(BaseModel):
     decision: str
     note: str = ""
@@ -72,15 +107,37 @@ class Decision(BaseModel):
 
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
                auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
-               github: GitHubApp | None = None) -> FastAPI:
-    """auth=None disables sign-in (tests only); app_factory always passes a config."""
+               github: GitHubApp | None = None, user_daily: int | None = None,
+               global_daily: int | None = None) -> FastAPI:
+    """auth=None disables sign-in (tests only); app_factory always passes a config.
+
+    Run caps (per rolling 24 h) apply to everyone except the owners in AIRLOCK_ALLOWED_USERS,
+    so an invite link that spreads can't run up the bill."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
     store = store or Store()
     github = github or GitHubApp.from_env()
-    public_url = os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
+    public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
     runner = Runner(store, analyse)
+    user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
+    global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
+    owners = auth.allowed if auth else frozenset()
+
+    def check_quota(user: str | None, n: int) -> None:
+        if user and user.lower() in owners:
+            return
+        since = time.time() - 86400
+        if user and store.count_runs(since, user=user) + n > user_daily:
+            raise HTTPException(429, f"daily limit of {user_daily} runs per account reached; try again tomorrow")
+        if store.count_runs(since, exclude=owners) + n > global_daily:
+            raise HTTPException(429, "Airlock's daily run limit for guests is used up; try again tomorrow")
+
+    def share_url(runs: list[str], selftest: str | None = None) -> dict:
+        if not auth:
+            raise HTTPException(400, "share links need sign-in configured")
+        token = authmod.share_token(auth.session_secret, runs, selftest)
+        return {"url": f"{public_url}/s/{token}", "expires": time.time() + authmod.SHARE_TTL}
     uploads = data_dir() / "uploads"
     uploads.mkdir(exist_ok=True)
 
@@ -100,7 +157,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
 
     @app.get("/api/me")
     async def me(request: Request):
-        return {"login": authmod.current_user(request), "auth": bool(auth)}
+        return {"login": authmod.current_user(request), "auth": bool(auth),
+                "share": authmod.current_share(request) is not None and not authmod.current_user(request)}
 
     @app.get("/")
     async def index():
@@ -115,6 +173,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.post("/api/runs")
     async def submit(request: Request, spec: str = Form(""), file: UploadFile | None = File(None)):
         user = authmod.current_user(request)
+        check_quota(user, 1)
         if file and file.filename:
             data = await file.read(MAX_UPLOAD + 1)
             if len(data) > MAX_UPLOAD:
@@ -138,6 +197,55 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                 raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, or upload a .tgz")
             run_id = runner.start(spec, spec, user)
         return {"id": run_id, "url": f"/runs/{run_id}"}
+
+    @app.get("/selftests/{test_id}")
+    async def selftest_page(test_id: str):
+        if not store.get_selftest(test_id):
+            raise HTTPException(404)
+        return FileResponse(STATIC / "selftest.html")
+
+    @app.post("/api/selftests")
+    async def start_selftest(request: Request):
+        """Detonate the bundled fixtures through the normal run path. One self-test at a time:
+        while one is in progress, starting another returns it instead."""
+        latest = store.get_selftest()
+        if latest and not selftest_summary(store, latest)["done"]:
+            return {"id": latest["id"], "url": f"/selftests/{latest['id']}", "existing": True}
+        missing = [f for f, _, _ in SELFTEST if not (FIXTURES / f).is_file()]
+        if missing:
+            raise HTTPException(503, f"self-test fixtures missing on this server: {', '.join(missing)}")
+        user = authmod.current_user(request)
+        check_quota(user, len(SELFTEST))
+        probes = [{"run_id": runner.start(str(FIXTURES / f), f"self-test: {label}", user), "label": label,
+                   "expect": expect} for f, label, expect in SELFTEST]
+        test_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
+        store.create_selftest(test_id, probes, user)
+        return {"id": test_id, "url": f"/selftests/{test_id}", "existing": False}
+
+    @app.get("/api/selftests/latest")
+    async def latest_selftest():
+        test = store.get_selftest()
+        return selftest_summary(store, test) if test else None
+
+    @app.get("/api/selftests/{test_id}")
+    async def get_selftest(test_id: str):
+        test = store.get_selftest(test_id)
+        if not test:
+            raise HTTPException(404)
+        return selftest_summary(store, test)
+
+    @app.post("/api/selftests/{test_id}/share")
+    async def share_selftest(test_id: str):
+        test = store.get_selftest(test_id)
+        if not test:
+            raise HTTPException(404)
+        return share_url([p["run_id"] for p in test["probes"]], test_id)
+
+    @app.post("/api/runs/{run_id}/share")
+    async def share_run(run_id: str):
+        if not store.get_run(run_id):
+            raise HTTPException(404)
+        return share_url([run_id])
 
     @app.get("/api/runs")
     async def list_runs():

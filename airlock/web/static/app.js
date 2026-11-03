@@ -16,10 +16,14 @@ const Airlock = (() => {
   };
   const pill = (text, cls) => el('span', `pill ${cls || text}`, text);
 
+  // Who is looking: a signed-in reviewer, or someone holding a read-only share link.
+  const meP = fetch('/api/me').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+
   async function user() {
     const nav = $('user');
     if (!nav) return;
-    const me = await (await fetch('/api/me')).json();
+    const me = await meP;
+    if (me.share) { nav.replaceChildren(el('span', 'muted', 'Shared read-only view')); return; }
     if (!me.login) return;
     nav.append(el('span', 'mono', `@${me.login}`));
     const form = el('form'); form.method = 'post'; form.action = '/auth/logout';
@@ -27,6 +31,23 @@ const Airlock = (() => {
     nav.append(form);
   }
   user();
+
+  // "Share" button: mints a signed read-only link and copies it.
+  async function shareButton(btn, endpoint) {
+    if (!btn || !(await meP).login) return;
+    btn.hidden = false;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const r = await fetch(endpoint, { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || r.statusText);
+        try { await navigator.clipboard.writeText(j.url); btn.textContent = 'Link copied'; }
+        catch { prompt('Read-only share link:', j.url); btn.textContent = 'Share read-only link'; }
+      } catch (e) { btn.textContent = `Share failed: ${e.message}`; }
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Share read-only link'; }, 2500);
+    });
+  }
 
   // ---------------------------------------------------------------- index
   function index() {
@@ -85,6 +106,63 @@ const Airlock = (() => {
     };
     load();
     setInterval(load, 5000);
+
+    const last = async () => {
+      const t = await (await fetch('/api/selftests/latest')).json();
+      const span = $('selftest-last');
+      span.replaceChildren();
+      if (!t) { span.textContent = 'Not run yet.'; return; }
+      const a = el('a', t.done ? (t.passed === t.total ? 'pass' : 'fail') : '',
+        t.done ? `Last run: ${t.passed}/${t.total} passed` : `In progress: ${t.passed}/${t.total} passed so far`);
+      a.href = `/selftests/${t.id}`;
+      span.append(a, el('span', 'muted', ` · ${ago(t.created)}`));
+    };
+    last();
+    setInterval(last, 5000);
+    $('selftest-go').addEventListener('click', async (ev) => {
+      ev.target.disabled = true;
+      $('selftest-err').textContent = '';
+      try {
+        const r = await fetch('/api/selftests', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || r.statusText);
+        location.href = j.url;
+      } catch (e) {
+        $('selftest-err').textContent = e.message;
+        ev.target.disabled = false;
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------- self-test
+  function selftest() {
+    const id = location.pathname.split('/').pop();
+    shareButton($('share'), `/api/selftests/${id}/share`);
+    const load = async () => {
+      const t = await (await fetch(`/api/selftests/${id}`)).json();
+      const head = $('score');
+      head.className = `verdict-big ${t.done ? (t.passed === t.total ? 'benign' : 'malicious') : 'pending'}`;
+      head.textContent = t.done ? `${t.passed}/${t.total} passed` : `Running… ${t.passed}/${t.total} passed so far`;
+      $('meta').textContent = `started ${ago(t.created)}${t.submitted_by ? ` by @${t.submitted_by}` : ''}`;
+      const tb = $('probes');
+      tb.replaceChildren();
+      for (const p of t.probes) {
+        const tr = el('tr');
+        const td = (child) => { const c = el('td'); if (child) c.append(child); tr.append(c); };
+        const a = el('a', '', p.label); a.href = `/runs/${p.run_id}`;
+        td(a);
+        td(pill(p.expect));
+        td(p.verdict ? pill(p.verdict) : pill(p.status));
+        td(el('span', p.contained ? 'count-hazard' : '', String(p.contained)));
+        td(el('span', p.proven ? 'count-hazard' : 'muted', p.proven ? 'PROVEN' : '—'));
+        const res = el('td');
+        res.append(el('span', `result ${p.result}`, p.result.toUpperCase()), el('div', 'muted small', p.why));
+        tr.append(res);
+        tb.append(tr);
+      }
+      if (!t.done) setTimeout(load, 2000);
+    };
+    load();
   }
 
   // ---------------------------------------------------------------- run
@@ -262,6 +340,12 @@ const Airlock = (() => {
     function renderGate(r) {
       const g = $('gate');
       g.replaceChildren();
+      if (readOnly && !r.decision) {
+        g.append(el('p', '', r.status === 'done'
+          ? 'Read-only shared view. A signed-in reviewer approves or rejects this run.'
+          : 'Nothing leaves Airlock until a human decides. Waiting for the verdict…'));
+        return;
+      }
       if (r.decision) {
         const d = el('div', 'done');
         d.append(pill(r.decision), document.createTextNode(
@@ -296,7 +380,10 @@ const Airlock = (() => {
       g.append(note, row);
     }
 
+    let readOnly = false;
+    shareButton($('share'), `/api/runs/${id}/share`);
     (async () => {
+      readOnly = !!(await meP).share;
       renderHead(await (await fetch(`/api/runs/${id}`)).json());
       const es = new EventSource(`/api/runs/${id}/events`);
       es.addEventListener('ev', (m) => addEvent(JSON.parse(m.data)));
@@ -310,5 +397,5 @@ const Airlock = (() => {
     })();
   }
 
-  return { index, run };
+  return { index, run, selftest };
 })();

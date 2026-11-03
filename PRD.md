@@ -145,14 +145,17 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 
 **Wed 4 Nov: optional depth**
 
+- [x] Containment self-test judges can click: three fixtures scored pass/fail live, exfil must be proven by payload (built Tue night, local check only; deploy and run on the host)
 - [ ] Harder demo PR: an obfuscated or encoded payload with no tell-tale comments, to see how far static AI review gets (Codex caught the readable one)
 - [ ] Behaviour diff, base vs head (F9): show only what the PR *adds*
 - [ ] Pattern B: Playwright before/after screenshots checked by a vision model (F10)
 
 **Thu 5 Nov: hardening and judge access**
 
-- [ ] Rate limits and per-user run caps; clean up stale VMs after a crash
-- [ ] Judges on the allowlist (`scripts/allow.sh add`); README and PRD final pass
+- [x] Per-user and global daily run caps for guests (owners exempt)
+- [ ] Clean up stale VMs after a crash
+- [x] Judge access: signed invite link (`scripts/invite.sh`) that adds whoever signs in through it to the allowlist, tagged and revocable; signed read-only share links for runs and self-tests
+- [ ] Mint the lablab invite and share links on the host after deploy; README and PRD final pass
 
 **Fri 6 Nov: story**
 
@@ -209,7 +212,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 **Open questions**
 
 - [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.15.
-- [ ] Read-only public view for judges, or allowlist only? Allowlist is the current plan.
+- [x] Read-only public view for judges, or allowlist only? Both: signed read-only share links to recorded runs, plus an invite link with run caps for judges who want to submit their own (decided Tue 3 Nov). The lablab page is public, so the invite link should be treated as public.
 - [ ] Build the obfuscated PR before the video, or after submission?
 
 **Success metrics**

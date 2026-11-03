@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS events (
   containment INTEGER NOT NULL,
   PRIMARY KEY (run_id, seq)
 );
+CREATE TABLE IF NOT EXISTS selftests (
+  id TEXT PRIMARY KEY,
+  probes TEXT NOT NULL,            -- JSON list of {run_id, label, expect}
+  submitted_by TEXT,
+  created REAL NOT NULL
+);
 """
 
 
@@ -98,6 +104,31 @@ class Store:
         ev = Event(kind=kind, summary=summary, data=data, id=seq)
         self.add_event(run_id, ev)
         return ev.to_dict()
+
+    def count_runs(self, since: float, user: str | None = None, exclude: frozenset[str] = frozenset()) -> int:
+        """Runs created since a time, for one submitter, or for everyone not in `exclude` (case-insensitive)."""
+        rows = self.db.execute("SELECT LOWER(COALESCE(submitted_by, '')) FROM runs WHERE created >= ?", (since,)).fetchall()
+        names = [r[0] for r in rows]
+        if user is not None:
+            return names.count(user.lower())
+        return sum(n not in exclude for n in names)
+
+    def proven_exfil(self, run_id: str) -> bool:
+        """Whether the package itself (not the agent's re-runs) had exfiltration proven by payload."""
+        return self.db.execute(
+            "SELECT 1 FROM events WHERE run_id = ? AND json_extract(data, '$.proven') = 1"
+            " AND COALESCE(json_extract(data, '$.stage'), '') != 'agent' LIMIT 1", (run_id,)).fetchone() is not None
+
+    def create_selftest(self, test_id: str, probes: list[dict], submitted_by: str | None = None) -> None:
+        self.db.execute("INSERT INTO selftests VALUES (?, ?, ?, ?)",
+                        (test_id, json.dumps(probes), submitted_by, time.time()))
+        self.db.commit()
+
+    def get_selftest(self, test_id: str | None = None) -> dict | None:
+        """One self-test by id, or the most recent when test_id is None."""
+        row = (self.db.execute("SELECT * FROM selftests WHERE id = ?", (test_id,)) if test_id else
+               self.db.execute("SELECT * FROM selftests ORDER BY created DESC LIMIT 1")).fetchone()
+        return {**dict(row), "probes": json.loads(row["probes"])} if row else None
 
     def events(self, run_id: str, after: int = 0) -> list[dict]:
         rows = self.db.execute("SELECT * FROM events WHERE run_id = ? AND seq > ? ORDER BY seq",

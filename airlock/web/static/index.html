@@ -44,6 +44,20 @@
       </div>
     </div>
 
+    <div class="panel selftest" style="margin-top:20px">
+      <h2>Containment self-test</h2>
+      <div class="body">
+        <p class="muted">Detonate three known packages through the same path as any run: a Node credential stealer,
+          a shell credential stealer, and a benign package with a postinstall. A stealer passes only if its exfiltration
+          is proven by the captured payload; the benign package passes only with zero containment events.</p>
+        <div class="selftest-row">
+          <button type="button" id="selftest-go">Run self-test</button>
+          <span id="selftest-last" class="muted"></span>
+        </div>
+        <div class="err" id="selftest-err"></div>
+      </div>
+    </div>
+
     <div class="hazard-rule" style="margin-top:28px"></div>
 
     <div class="panel">

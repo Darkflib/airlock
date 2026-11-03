@@ -8,9 +8,17 @@ Airlock runs a pull request, a new npm package or a version bump inside a throwa
 
 Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
-- **Live:** https://airlock.darkflib.dev (GitHub sign-in, allowlisted accounts; ask for access)
+- **Live:** https://airlock.darkflib.dev. Sign in with GitHub. Judges use the invite link in our lablab submission, or open a recorded run from a read-only share link without signing in.
 - **Demo repo:** `Darkflib/airlock-demo`. PR #1 is a dependency bump; PR #3 vendors a credential stealer whose `npm test` still passes.
 - **Build log:** [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md). What worked, what didn't, and why.
+
+## 30 seconds for judges
+
+- **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. A human approves or rejects before anything is posted to GitHub.
+- **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
+- **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
+- **Proof.** 18/18 correct on the real pipeline ([results](#results)). Click **Run self-test** on the home page to re-run three known packages yourself and see pass/fail live.
+- **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm only. See [the security model](#security-model-and-limits).
 
 ## Why
 
@@ -92,10 +100,17 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 
 ## Security model and limits
 
-**Containment**
-- Untrusted code only ever runs in the microVM.
-- No real secrets enter the VM: the GitHub App key and the inference key stay on the control plane.
-- Runs are unprivileged inside the guest.
+**Containment, mapped to the challenge's four focus areas** (plus egress)
+
+| Focus area | Control | Code | What you see in a run |
+| --- | --- | --- | --- |
+| **Process isolation** | Untrusted code only ever runs in a microVM with its own kernel, never on the control plane. The package installs and tests as the unprivileged `node` user, so it can't reach the root watcher or its log | `airlock/sandbox.py:107` (VM), `:168` (`runuser`), `:146` (root-only watcher) | `vm_created` opens every timeline; the watcher keeps reporting after the package has run |
+| **Secret hygiene** | No real secret enters the VM. The inference key, GitHub App key and OAuth secret stay on the control plane. The VM gets only canary credentials with a per-run token, and untrusted text passes a prompt-injection guard before the model sees it | `airlock/sandbox.py:130` (canaries), `airlock/agent.py:81` (guard) | `canary_read` / `canary_exfil` show the fake token; `guard_flagged` when text is redacted |
+| **Resource limits** | 2 vCPU, 2 GB RAM and a 480 s wall clock per VM; per-command timeouts; a 12-turn agent budget whose last turn forces a verdict; 2 concurrent runs | `airlock/sandbox.py:87`, `:176`; `airlock/agent.py:77`; `airlock/web/app.py:36` | `limit_hit` when a command is killed; turn count on the verdict |
+| **Lifecycle discipline** | One fresh VM per run, destroyed in a `finally` whatever the outcome; each run gets its own fake /24 and canary token | `airlock/sandbox.py:124` | `vm_destroyed` closes every timeline |
+| **Egress** | Default-deny. Only the registries and this run's fake /24 are allowed; the sinkhole answers that /24 itself and never connects upstream | `airlock/sandbox.py:69`, `airlock/sinkhole/addon.py` | **PROVEN** exfil with the captured request body |
+
+**Check it yourself:** **Run self-test** on the home page detonates a Node stealer, a shell stealer and a benign package with a postinstall. A probe passes only if the stealers get a malicious verdict *with exfil proven by payload*, and the benign package gets a benign verdict with zero containment events.
 
 **Credentials Airlock holds**
 - **GitHub App:** contents read, pull requests write, statuses write, on selected repos only. Each post uses a one-hour token minted for that one repo.
@@ -126,7 +141,11 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 3. Put the secrets in 1Password: the inference key, the GitHub OAuth client, and the GitHub App ID and key.
 4. Run `scripts/deploy.sh`.
 
-`scripts/allow.sh add <github-login>` manages access.
+**Access.**
+- `scripts/allow.sh add <github-login>` allows a known account.
+- `scripts/invite.sh new --days 30 --max 50 --id lablab` prints a sign-up link for people whose logins you don't know. Anyone who signs in through it is added to the allowlist tagged with the invite, and `scripts/invite.sh revoke lablab` removes them all.
+- Accounts other than the owners are capped at 15 runs a day each and 150 a day between them (`AIRLOCK_USER_DAILY_RUNS`, `AIRLOCK_GLOBAL_DAILY_RUNS`).
+- **Share read-only link** on a run or self-test page mints a signed link, valid for 60 days, that opens only that run (or that self-test and its probe runs), with no sign-in and no approve or reject buttons.
 
 ## Repository map
 

@@ -5,8 +5,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from airlock.events import Event
 from airlock.store import Store
-from airlock.web.app import create_app
+from airlock.web import app as app_module
+from airlock.web.app import create_app, judge_probe
 
 
 async def fake_analyse(target, *, events, **_):
@@ -74,3 +76,84 @@ def test_decision_before_verdict_is_refused(tmp_path, monkeypatch):
     with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow)) as c:
         run_id = c.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
         assert c.post(f"/api/runs/{run_id}/decision", json={"decision": "approved"}).status_code == 409
+
+
+async def fixture_analyse(target, *, events, **_):
+    """Stealers show proven exfil; the benign fixture is quiet. "agent-only" proves exfil
+    only during the agent's re-run, which must not count."""
+    if "benign" in target:
+        events.emit("verdict", "verdict: benign", verdict="benign")
+        return SimpleNamespace(verdict="benign", evidence=[], model="fake-model")
+    stage = "agent" if "agent-only" in target else "detonate"
+    events.emit("canary_exfil", "POST carried the canary", proven=True, stage=stage)
+    return SimpleNamespace(verdict="malicious", evidence=["exfil [E1]"], model="fake-model")
+
+
+def wait_selftest(c, test_id):
+    for _ in range(200):
+        t = c.get(f"/api/selftests/{test_id}").json()
+        if t["done"]:
+            return t
+        time.sleep(0.02)
+    raise AssertionError("self-test never finished")
+
+
+@pytest.fixture
+def fixtures(tmp_path, monkeypatch):
+    d = tmp_path / "fixtures"
+    d.mkdir()
+    for f, _, _ in app_module.SELFTEST:
+        (d / f).write_bytes(b"\x1f\x8b")
+    monkeypatch.setattr(app_module, "FIXTURES", d)
+    return d
+
+
+def test_selftest_runs_fixtures_and_judges_them(tmp_path, monkeypatch, fixtures):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+    with TestClient(create_app(store=Store(tmp_path / "t.db"), analyse=fixture_analyse)) as c:
+        assert c.get("/api/selftests/latest").json() is None
+        r = c.post("/api/selftests").json()
+        t = wait_selftest(c, r["id"])
+        assert (t["passed"], t["total"]) == (3, 3)
+        assert [p["proven"] for p in t["probes"]] == [True, True, False]
+        assert c.get("/api/selftests/latest").json()["id"] == r["id"]
+        assert c.get(f"/selftests/{r['id']}").status_code == 200
+        assert len(c.get("/api/runs").json()) == 3  # probes are ordinary runs
+
+
+def test_selftest_in_progress_is_reused(tmp_path, monkeypatch, fixtures):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+
+    async def slow(target, *, events, **_):
+        await asyncio.sleep(5)
+
+    with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow)) as c:
+        first = c.post("/api/selftests").json()
+        again = c.post("/api/selftests").json()
+        assert again == {**first, "existing": True}
+
+
+def test_selftest_needs_its_fixtures(tmp_path, monkeypatch):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+    monkeypatch.setattr(app_module, "FIXTURES", tmp_path / "nowhere")
+    with TestClient(create_app(store=Store(tmp_path / "t.db"), analyse=fixture_analyse)) as c:
+        assert c.post("/api/selftests").status_code == 503
+
+
+def test_judge_probe_requires_proof_not_just_a_verdict():
+    done = {"status": "done", "verdict": "malicious", "contained": 2}
+    assert judge_probe(done, True, "malicious")[0] == "pass"
+    assert judge_probe(done, False, "malicious") == ("fail", "malicious verdict, but no exfiltration proven by payload")
+    assert judge_probe({**done, "verdict": "benign", "contained": 1}, False, "benign")[0] == "fail"
+    assert judge_probe({**done, "verdict": "benign", "contained": 0}, False, "benign")[0] == "pass"
+    assert judge_probe({**done, "status": "running"}, False, "benign")[0] == "pending"
+    assert judge_probe({**done, "status": "error", "error": "boom"}, False, "benign") == ("fail", "boom")
+
+
+def test_exfil_proven_only_by_the_agent_does_not_count(tmp_path):
+    store = Store(tmp_path / "t.db")
+    store.create_run("r1", "x")
+    store.add_event("r1", Event(kind="canary_exfil", summary="agent re-run", data={"proven": True, "stage": "agent"}, id=1))
+    assert not store.proven_exfil("r1")
+    store.add_event("r1", Event(kind="canary_exfil", summary="install", data={"proven": True, "stage": "detonate"}, id=2))
+    assert store.proven_exfil("r1")

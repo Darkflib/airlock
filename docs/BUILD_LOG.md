@@ -298,3 +298,19 @@ Tags: #metric #win
 - Submission deadline confirmed: **Sun 8 Nov, 23:00 GMT**.
 **So:** the cost is a slide in itself: per-PR detonation plus AI review is cheap enough to run on every dependency bump.
 Tags: #metric #demo
+
+### 23:32 — Containment self-test button; README mapped to the brief
+**Tried:** three ideas to make judging easier: a judges' summary at the top of the README, a security table mapped to the brief's four focus areas (process isolation, secret hygiene, resource limits, lifecycle) with `file:line` references, and a self-test judges can click.
+**Result:** **Run self-test** on the home page starts three ordinary runs on the bundled fixtures (Node stealer, shell stealer, benign with a postinstall) and opens `/selftests/<id>`, which scores them live. It is stricter than the regression: a stealer passes only with exfil *proven by payload* during install (proof found only in the agent's re-runs doesn't count), and the benign package only with zero containment events. One self-test runs at a time; pressing it again reopens the one in progress. 47 unit tests pass; the UI was checked locally with a fake analyser, **not yet on the host**.
+**So:** judges get the 18/18 claim as something they trigger themselves. Next: deploy, run it on the real host, and put the result in a slide.
+Tags: #win #decision #demo
+
+### 23:43 — Judge access: invite link, share links, guest run caps
+**Tried:** the allowlist needs judges' GitHub logins, which we won't know, and lablab project pages are public, so any link in the submission is effectively public.
+**Result:** three pieces, all signed with the session secret and tagged with a token kind so one can't stand in for another (tested):
+- `scripts/invite.sh new` mints an expiring sign-up link with a use limit. Whoever signs in with GitHub through it is appended to `allowed_users` tagged `# invite <id>`; `invite.sh revoke <id>` stops the link and removes everyone it admitted.
+- **Share read-only link** on run and self-test pages: `/s/<token>`, valid 60 days, GETs of the named runs only (a self-test link includes its probe runs), and no Approve or Reject.
+- Guests are capped at 15 runs a day each and 150 a day between them; owners are exempt.
+54 tests pass. Checked the shared view in a browser locally; **not deployed yet**.
+**So:** the submission can carry a share link to a recorded PR #3 run (the money shot, no sign-in) and an invite link for judges who want to try their own package. Submission copy drafted in `docs/SUBMISSION.md`, and its length is checked by `scripts/check-submission.py`.
+Tags: #decision #win

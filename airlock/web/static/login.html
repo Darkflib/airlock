@@ -28,6 +28,9 @@
       not_allowed: 'That GitHub account is not on the allowlist. Ask the Airlock team for access.',
       state: 'Sign-in expired or was tampered with. Please try again.',
       github: 'GitHub sign-in failed. Please try again.',
+      invite: 'That invite link is invalid or has expired. Ask the Airlock team for a new one.',
+      invite_closed: 'That invite link has been used up or withdrawn. Ask the Airlock team for access.',
+      share: 'That share link is invalid or has expired.',
     };
     const q = new URLSearchParams(location.search);
     document.getElementById('err').textContent = MESSAGES[q.get('error')] || '';
