@@ -182,3 +182,16 @@ Tags: #win #demo
 - **The egress policy refuses raw-IP connects on non-HTTP ports with an RST in about 7 ms.** No poll sees the socket. The kernel's `Tcp: AttemptFails` counter still increments, so we report "N attempts refused (too fast to attribute)" rather than nothing.
 - **eBPF/kprobes aren't available** in the libkrunfw guest kernel, which is why we poll instead of hooking.
 Tags: #fail
+
+### 20:07 — Sinkhole spike: full exfil payloads from curl, Python and Node (spikes/sinkhole_*.py)
+**Tried:** a host-side mitmproxy (SOCKS5, `connection_strategy=lazy`) plus an addon that answers every request to 198.18.0.0/15 itself and logs it. microsandbox's outbound proxy steers all guest TCP to it **transparently**, with no guest proxy settings. The policy allows only the fake range plus the registries, so real internet stays denied by microsandbox.
+**Result:**
+- POSTs from `curl` (HTTPS), Python `urllib` (HTTP) and Node `https` were all answered `{"ok":true}` and logged **with the full plaintext body containing the canary token**.
+- The registry still returns 200 and raw IPs are still refused, so both layers hold.
+- No guest trust-store changes were needed in the end.
+**Dead ends on the way:**
+- (1) Without microsandbox TLS inspection, **domain allow rules fail for HTTPS** (`curl exit 35`), because it needs the SNI. So inspection must stay on.
+- (2) With inspection on, HTTPS to the sinkhole failed with "client does not trust the proxy's certificate": microsandbox re-encrypts upstream and didn't trust mitmproxy. **`TlsConfig(upstream_ca_certs=(mitmproxy CA,))` fixed it.**
+- (3) Note for ops: microsandbox policy is checked against the real destination *before* the proxy, which is why the fake range has to be allowed explicitly.
+**So:** feasible. To productise it: the watcher's DNS answers sinkhole IPs for non-allowlisted names, mitmproxy runs as a host service, sinkhole hits become `canary_exfil` events with the payload, and each run gets its own fake /24 so concurrent runs are attributed correctly.
+Tags: #win #demo #decision
