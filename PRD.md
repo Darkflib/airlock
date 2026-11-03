@@ -208,7 +208,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 **Open questions**
 
-- [ ] Exact submission deadline time on 8 Nov (UTC or Mountain Time)? Confirm on Discord.
+- [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.15.
 - [ ] Read-only public view for judges, or allowlist only? Allowlist is the current plan.
 - [ ] Build the obfuscated PR before the video, or after submission?
 

@@ -291,3 +291,10 @@ Tags: #demo #decision
   - the security model and limits, how to try it, and a repo map
 **So:** the product is at the cut line a day early. What remains is presentation (PRD refresh, video, slides), plus optional depth: a harder obfuscated fixture, and Pattern B browser checks.
 Tags: #metric #win
+
+### 23:00 — Cost and deadline
+**Result:**
+- **Vultr Serverless Inference spend for the entire build so far is $1.15.** That covers the 13-model eval (about 700 agent calls), the n=3 shortlist runs, the 18-run product regression, and every demo and debug run. A full Airlock review costs a fraction of a cent.
+- Submission deadline confirmed: **Sun 8 Nov, 23:00 GMT**.
+**So:** the cost is a slide in itself: per-PR detonation plus AI review is cheap enough to run on every dependency bump.
+Tags: #metric #demo
