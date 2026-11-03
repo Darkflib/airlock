@@ -31,8 +31,9 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 ## Code map
 
 - `airlock/sandbox.py`: `Workspace`, one microVM per run (default-deny egress, canaries, limits, tracer). Every exec is an event.
-- `airlock/guest/trace.js`: Node preload tracer that logs dotfile reads, outbound requests, canary payloads and spawned processes.
-- `airlock/events.py`: typed events, plus translating trace lines into containment events.
+- `airlock/guest/trace.js`: Node preload tracer that logs dotfile reads, outbound requests, canary payloads (in plaintext) and spawned processes. It lives in world-readable `/opt/airlock-trace` so the package user can load it.
+- `airlock/guest/watch.py`: root watcher in the guest, standard library only and language-agnostic. fanotify sees every program run and dotfile opened (with pid); a DNS forwarder logs every lookup (with pid); polling `/proc/net/tcp` sees connections; `/proc/net/snmp` counts connects refused too fast to see. Its log lives in root-only `/opt/airlock`. The package installs as the unprivileged `node` user, so it can't tamper with the watcher.
+- `airlock/events.py`: typed events. `events_from_trace` (Node tracer) and `WatchTranslator` (watcher) turn raw lines into events. The watcher infers exfiltration when one process, or siblings under one parent, both reads a canary and reaches out. Root and npm's own activity are ignored.
 - `airlock/guard.py`: redacts likely prompt injection from untrusted text before it reaches the model.
 - `airlock/agent.py`: triage loop with a hard turn budget; the last turn forces `finish`.
 - `airlock/pipeline.py`: acquire → unpack → detonate under the tracer → agent triage → report.

@@ -167,3 +167,18 @@ Tags: #fail #demo
 - **eBPF tracing is not viable.** The `bpf()` syscall exists, but the libkrunfw guest kernel has no kprobes, no tracefs and no BTF, so there's nothing to attach tracing programs to. It would need a custom guest kernel.
 **So:** use a root fanotify watcher in the guest for exec and canary reads, instead of strace. fanotify has no network events, so outbound attempts need another source.
 Tags: #decision #metric
+
+### 20:04 — Language-agnostic detection: in-guest watcher + unprivileged installs
+**Tried:** `airlock/guest/watch.py`, a standard-library Python daemon running as root in the VM. It uses fanotify for every program executed and every dotfile opened, a logging DNS forwarder with resolv.conf pointed at it, and polls `/proc/net/tcp`. `npm install` now runs as the unprivileged `node` user, with canaries in /home/node and the watcher's log root-only. Added a fixture written in pure shell, `colorful-logs`: postinstall `cat`s both canaries into a temp file, `curl`s it to a `.invalid` host, tries a TEST-NET IP, and has `python3` read the AWS file.
+**Result:** before, the Node tracer saw none of that. Now detonation shows: `cat` read both canaries; `curl`'s command line; DNS lookup of `telemetry.colorful-logs.invalid` blocked; **inferred exfil** (canary read and blocked egress under the same parent script); a refused raw-IP connect; `python3.13` read the credentials. MALICIOUS. Node stealer still MALICIOUS, with the tracer's proven exfil kept and the watcher's inference deduped. left-pad: BENIGN with **zero** detonation events, so no false positives from the watcher. 34 tests.
+**So:** "it only catches Node" is no longer true. Remaining gap: some exfil (HTTPS from non-Node code) is *inferred*, not proven by payload. That's what the mitmproxy sinkhole spike is for.
+Tags: #win #demo
+
+### 20:04 — Watcher snags worth remembering
+**Result:**
+- **The root-only directory broke npm.** The tracer lived in /opt/airlock (mode 700), so the `node` user's `NODE_OPTIONS=--require` failed with `MODULE_NOT_FOUND` and npm exited 1 before running anything. The tracer moved to world-readable /opt/airlock-trace.
+- **`FAN_OPEN_EXEC` fires before execve completes,** so /proc still shows the parent's command line. Fixed by reading it 30 ms later, with the uid captured at event time, because short-lived processes are gone by then.
+- **npm re-execs through its shebang** (`npm-cli.js` → `env` → `node`) under one pid, so the whole pid is dropped.
+- **The egress policy refuses raw-IP connects on non-HTTP ports with an RST in about 7 ms.** No poll sees the socket. The kernel's `Tcp: AttemptFails` counter still increments, so we report "N attempts refused (too fast to attribute)" rather than nothing.
+- **eBPF/kprobes aren't available** in the libkrunfw guest kernel, which is why we poll instead of hooking.
+Tags: #fail

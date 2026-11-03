@@ -86,18 +86,148 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
             continue
         seen.add(key)
         script = argv.split("/")[-1] or argv
+        pid = rec.get("pid")
         if ev == "file_read" and (path.endswith(".npmrc") or "/.aws/" in path):
-            out.append(("canary_read", f"{script} read canary {path}", {"path": path, "argv": argv}))
+            out.append(("canary_read", f"{script} read canary {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "file_read":
-            out.append(("file_read", f"{script} read {path}", {"path": path, "argv": argv}))
+            out.append(("file_read", f"{script} read {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "net_payload_canary":
-            out.append(("canary_exfil", f"{script} tried to send canary credentials to {host}", {"host": host, "argv": argv}))
+            out.append(("canary_exfil", f"{script} tried to send canary credentials to {host}", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "net_request":
             bare = host.split(":")[0]
             if any(bare == h or bare.endswith("." + h) for h in allowed_hosts):
-                out.append(("egress_allowed", f"{script} contacted allowlisted {host}", {"host": host, "argv": argv}))
+                out.append(("egress_allowed", f"{script} contacted allowlisted {host}", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
             else:
-                out.append(("egress_blocked", f"{script} tried to reach {host}; blocked by default-deny egress", {"host": host, "argv": argv}))
+                out.append(("egress_blocked", f"{script} tried to reach {host}; blocked by default-deny egress", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "exec":
-            out.append(("process_spawn", f"{script} spawned: {rec.get('cmd', '')[:80]}", {"cmd": rec.get("cmd", ""), "argv": argv}))
+            out.append(("process_spawn", f"{script} spawned: {rec.get('cmd', '')[:80]}", {"cmd": rec.get("cmd", ""), "argv": argv, "pid": pid, "source_kind": "node"}))
     return out
+
+
+CANARY_SUFFIXES = (".npmrc", "/.aws/credentials")
+NPM_MARKERS = ("npm-cli.js", "/bin/npm ", "npm install", "npm pack", "npm init")
+
+
+def _is_npm(rec: dict) -> bool:
+    cmd = rec.get("cmd", "")
+    return any(m in cmd for m in NPM_MARKERS)
+
+
+def _who(rec: dict) -> str:
+    if rec.get("exe"):
+        return rec["exe"].rsplit("/", 1)[-1]
+    if rec.get("ev") == "exec" and rec.get("path"):
+        return rec["path"].rsplit("/", 1)[-1]
+    if rec.get("cmd"):
+        return rec["cmd"].split()[0].rsplit("/", 1)[-1]
+    return "a process"
+
+
+def _allowed(host: str, allowed_hosts: tuple[str, ...]) -> bool:
+    bare = host.split(":")[0].rstrip(".")
+    return any(bare == h or bare.endswith("." + h) for h in allowed_hosts)
+
+
+class WatchTranslator:
+    """Turns in-guest watcher lines (airlock/guest/watch.py) into events.
+
+    Only the unprivileged package user counts: root activity is Airlock itself or
+    the agent. Exfiltration is inferred when one process both read a canary and
+    tried to reach a non-allowlisted destination.
+    """
+
+    def __init__(self, allowed_hosts: tuple[str, ...]):
+        self.allowed_hosts = allowed_hosts
+        self.read_canary: dict[int, str] = {}   # pid or parent pid -> canary path
+        self.blocked: dict[int, str] = {}       # pid or parent pid -> destination
+        self.exfil_reported: set[int] = set()
+        self.seen: set[tuple] = set()
+        self.ip_names: dict[str, str] = {}      # resolved IP -> hostname, from DNS answers
+        self.pid_exe: dict[int, str] = {}       # pid -> program path, from exec records
+
+    def feed(self, jsonl: str) -> list[tuple[str, str, dict]]:
+        out: list[tuple[str, str, dict]] = []
+        recs = []
+        for line in jsonl.splitlines():
+            try:
+                recs.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        # npm re-execs through its shebang (npm-cli.js -> env -> node) under one pid;
+        # only the last step shows npm's command line, so drop the whole pid.
+        npm_pids = {r.get("pid") for r in recs if _is_npm(r) or "/node_modules/npm/" in r.get("path", "")}
+        # Short-lived processes may be gone before their open/dns record is enriched;
+        # their exec record still names the program.
+        for r in recs:
+            if r.get("ev") == "exec" and r.get("path"):
+                self.pid_exe[r.get("pid")] = r["path"]
+        for rec in recs:
+            if rec.get("ev") == "dns_answer":
+                for ip in rec.get("ips", []):
+                    self.ip_names[ip] = rec.get("name", "")
+        for rec in recs:
+            ev, pid = rec.get("ev"), rec.get("pid")
+            if ev == "connect_refused":
+                n = rec.get("count", 1)
+                out.append(("egress_blocked", f"{n} outbound connection attempt{'s' if n != 1 else ''} refused by the "
+                            "egress policy (refused too fast to attribute to a process)",
+                            {"count": n, "via": "tcp-counter", "source_kind": "watch", "ts_guest": rec.get("ts")}))
+                continue
+            if ev in ("watch_ready", "dns_answer", None) or rec.get("uid") in (0, None) or pid in npm_pids:
+                continue
+            if not rec.get("exe") and pid in self.pid_exe:
+                rec = {**rec, "exe": self.pid_exe[pid]}
+            who, cmd = _who(rec), rec.get("cmd", "")
+            base = {"pid": pid, "cmd": cmd, "exe": rec.get("exe") or rec.get("path"), "source_kind": "watch"}
+            key = (ev, rec.get("path") or rec.get("name") or rec.get("dest"), pid)
+            if key in self.seen:
+                continue
+            self.seen.add(key)
+
+            if ev == "exec":
+                out.append(("process_spawn", f"ran {rec.get('path')}" + (f": {cmd[:100]}" if cmd else ""), base))
+            elif ev == "open":
+                path = rec["path"]
+                if path.endswith(CANARY_SUFFIXES):
+                    for k in (pid, rec.get("ppid")):
+                        if k:
+                            self.read_canary.setdefault(k, path)
+                    out.append(("canary_read", f"{who} read canary {path}", {**base, "path": path}))
+                else:
+                    out.append(("file_read", f"{who} read {path}", {**base, "path": path}))
+            elif ev == "dns":
+                name = rec.get("name", "")
+                if _allowed(name, self.allowed_hosts):
+                    continue
+                for k in (pid, rec.get("ppid")):
+                    if k:
+                        self.blocked.setdefault(k, name)
+                out.append(("egress_blocked", f"{who} looked up {name}; blocked by default-deny egress",
+                            {**base, "host": name, "via": "dns"}))
+            elif ev == "connect":
+                dest = rec.get("dest", "?")
+                ip = dest.rsplit(":", 1)[0].strip("[]").removeprefix("::ffff:")
+                name = self.ip_names.get(ip)
+                if name and _allowed(name, self.allowed_hosts):
+                    out.append(("egress_allowed", f"{who} connected to {name} ({dest})", {**base, "host": name, "via": "connect"}))
+                else:
+                    for k in (pid, rec.get("ppid")):
+                        if k:
+                            self.blocked.setdefault(k, dest)
+                    out.append(("egress_blocked",
+                                f"{who} tried to connect to {name or 'raw IP'} {dest}; not allowlisted, refused by egress policy",
+                                {**base, "host": dest, "via": "connect"}))
+
+            # Same process, or siblings under one parent (e.g. a script that cats the
+            # credentials and then curls them out): likely exfiltration.
+            for k in (pid, rec.get("ppid")):
+                if k and k in self.read_canary and k in self.blocked and k not in self.exfil_reported:
+                    self.exfil_reported.add(k)
+                    scope = "same process" if k == pid else f"same parent process {k}"
+                    out.append(("canary_exfil",
+                                f"credentials {self.read_canary[k]} were read and {self.blocked[k]} contacted "
+                                f"({scope}): likely credential exfiltration",
+                                {**base, "host": self.blocked[k], "path": self.read_canary[k], "inferred": True,
+                                 "scope": scope}))
+                    break
+        return out

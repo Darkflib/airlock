@@ -50,7 +50,9 @@ tracer. The run so far, as Airlock events (ids in brackets):
 {observed}
 
 Confirm what the package does at install time and at runtime by reading its code and, if useful,
-running it again. Each of your tool results ends with the Airlock events it produced.
+running it again. Your commands run as root; to re-run install scripts the way a developer would,
+use `runuser -u node -- sh -c '...'` (the package user, home /home/node) so Airlock's watcher sees
+them. Each of your tool results ends with the Airlock events it produced.
 Then call finish with a verdict and short evidence points. Cite event ids only when the cited
 event directly supports the point, and only ids that appear above or in your tool results."""
 
@@ -83,7 +85,7 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
 
         await ws.exec("mkdir -p pkg && tar xzf candidate.tgz -C pkg --strip-components=1", source="unpack")
         await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
-                      cwd="/tmp/try", timeout=180, trace=True, source="detonate")
+                      cwd="/tmp/try", timeout=180, trace=True, source="detonate", as_user="node")
 
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
         result = await agent.run(GOAL.format(observed=observed_summary(events)))

@@ -1,0 +1,10 @@
+{
+  "name": "colorful-logs",
+  "version": "2.0.1",
+  "description": "Pretty console output",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "sh ./scripts/setup.sh"
+  }
+}
