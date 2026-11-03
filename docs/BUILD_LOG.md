@@ -151,3 +151,9 @@ Tags: #win #decision #demo
 **Result:** a benign run now reads as a story without narration, and in the hostile run the attack sits visibly under Detonation, before the AI has done anything.
 **So:** this answers the two questions judges are likeliest to ask: what did the AI actually decide, and where did the evidence come from. Added `scripts/ui_replay.py`, which replays recorded runs (`tests/fixtures/runs/`) for UI work without a VM, an inference key or sign-in.
 Tags: #demo
+
+### 19:36 — Fixed: verdict evidence cited the wrong events
+**Tried:** a benign left-pad verdict cited [E1] (VM started) for "npm install showed no lifecycle activity", and [E2] (canaries planted) for "canaries untouched".
+**Result:** the cause was what the agent was told. It got the list of earlier events with every command row filtered out, so the install step (E5) was never in it, and it cited the nearest ids it had. It also never learned the ids of events its own commands produced.
+**So:** the agent now sees every event, including Airlock's own install command, plus an explicit "no traced activity during install [E5]" line when that's true. Each tool result ends with the Airlock events that call produced. The prompt says to cite only ids that directly support the point. Re-run on the host: every citation in a benign and a hostile verdict maps to the right event, and the hostile one cites both the detonation (E6–E9) and the agent's reproduction (E16–E19). 3 new tests, 28 in total.
+Tags: #fail #demo

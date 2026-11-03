@@ -45,12 +45,24 @@ class Report:
 
 GOAL = """Review the npm package in /work/candidate.tgz (unpacked at /work/pkg). It is a new
 release of a dependency our app uses. Airlock has already installed it once in /tmp/try with a
-tracer; these events were observed (ids in brackets):
+tracer. The run so far, as Airlock events (ids in brackets):
 
 {observed}
 
 Confirm what the package does at install time and at runtime by reading its code and, if useful,
-running it again. Then call finish with a verdict and short evidence points citing event ids."""
+running it again. Each of your tool results ends with the Airlock events it produced.
+Then call finish with a verdict and short evidence points. Cite event ids only when the cited
+event directly supports the point, and only ids that appear above or in your tool results."""
+
+
+def observed_summary(events: EventLog) -> str:
+    """The run so far, for the agent: every event including Airlock's own commands, so the
+    install step itself can be cited. States plainly when the install produced no traced activity."""
+    lines = [f"[E{e.id}] {e.kind}: {e.summary}" for e in events.events]
+    detonate = next((e for e in events.events if e.kind == "exec" and e.data.get("source") == "detonate"), None)
+    if detonate and not any(e.data.get("stage") == "detonate" for e in events.events):
+        lines.append(f"(no file, network or process activity was traced during the install in [E{detonate.id}])")
+    return "\n".join(lines)
 
 
 async def analyse(target: str, *, events: EventLog | None = None, model: str | None = None,
@@ -73,10 +85,8 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
         await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
                       cwd="/tmp/try", timeout=180, trace=True, source="detonate")
 
-        observed = "\n".join(f"[E{e.id}] {e.kind}: {e.summary}" for e in events.events
-                             if e.kind not in {"exec"}) or "(nothing notable)"
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
-        result = await agent.run(GOAL.format(observed=observed))
+        result = await agent.run(GOAL.format(observed=observed_summary(events)))
 
     return Report(target=target, verdict=result.verdict, evidence=result.evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1))

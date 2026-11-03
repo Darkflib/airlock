@@ -84,6 +84,14 @@ class TriageAgent:
                              origin=origin, text=f.text)
         return clean
 
+    def _new_events_note(self, start: int) -> str:
+        """Tell the model which Airlock events its call produced, so it can cite real ids."""
+        new = self.events.events[start:]
+        if not new:
+            return ""
+        lines = "\n".join(f"[E{e.id}] {e.kind}: {e.summary}" for e in new)
+        return "\n\nAirlock events from this call:\n" + self._screen(lines, "event summaries")
+
     async def _tool(self, name: str, args: dict) -> str:
         if name == "exec":
             r = await self.ws.exec(args["cmd"], cwd=args.get("cwd") or "/work", timeout=120, trace=True)
@@ -135,7 +143,9 @@ class TriageAgent:
                         self.events.emit("verdict", f"verdict: {res.verdict}", verdict=res.verdict,
                                          evidence=res.evidence, turns=turn, forced=res.forced)
                         return res
+                    start = len(self.events.events)
                     result = await self._tool(tc.function.name, args)
+                    result += self._new_events_note(start)
                 except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as e:
                     res.invalid_calls += 1
                     result = f"invalid tool call: {type(e).__name__}: {e}"
