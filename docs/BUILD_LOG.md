@@ -314,3 +314,17 @@ Tags: #win #decision #demo
 54 tests pass. Checked the shared view in a browser locally; **not deployed yet**.
 **So:** the submission can carry a share link to a recorded PR #3 run (the money shot, no sign-in) and an invite link for judges who want to try their own package. Submission copy drafted in `docs/SUBMISSION.md`, and its length is checked by `scripts/check-submission.py`.
 Tags: #decision #win
+
+### 23:46 — Independent security, claims and hackathon review
+**Tried:** reviewed the working tree and public event/rules; ran unit tests, submission length checks, and safe temporary-database/fake-sandbox reproductions. No hostile package ran locally or production GitHub write occurred.
+**Result:** 54 tests passed; confirmed guest approval authority, root agent commands, observer fail-open, VM-name collisions, wrong-run PROVEN evidence, and misleading cleanup reporting. Recorded regression numbers agree with 18 runs across six target strings; live DNS/deployment could not be verified from this environment.
+**So:** [review findings](REVIEW-2026-11-03.md) and PRD follow-up supersede the blanket P0-complete claim; fix security boundaries and proof provenance before public invites, then tighten claims and finish submission artifacts.
+Tags: #fail #decision
+
+### 23:48 — Deployed; live self-test 3/3; judge links minted
+**Result:**
+- Deployed `30dc32e`. The first live self-test (`20261103-234726-8e911e`) passed **3/3**: the Node stealer had 5 containment events and the shell stealer 6, both with exfil proven by payload; the benign package had 0.
+- Minted 60-day share links for PR #3 (rejected, bot comment posted), PR #1 (approved) and that self-test. Plus the `lablab` invite: 50 accounts, 30 days.
+- Checked signed out against the live site: each share link opens its page and API (200) but not the run list or submit (401). The invite redirects to GitHub OAuth.
+**So:** the submission can link straight to the money shot. The links are bearer tokens: they're kept in 1Password, not in this repo.
+Tags: #win #demo #metric
