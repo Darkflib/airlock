@@ -190,8 +190,10 @@ async def smoke(client: AsyncOpenAI, model: str) -> dict:
 class Run:
     model: str
     task: str
+    rep: int = 0
     passed: bool = False
     finished: bool = False
+    summary: str = ""
     turns: int = 0
     tool_calls: int = 0
     invalid_calls: int = 0
@@ -230,14 +232,17 @@ async def run_tool(sb, name: str, args: dict) -> str:
     raise KeyError(name)
 
 
-async def agent_run(client: AsyncOpenAI, model: str, task: Task, results_dir: Path) -> Run:
-    run = Run(model=model, task=task.name)
+async def agent_run(client: AsyncOpenAI, model: str, task: Task, results_dir: Path, rep: int = 0) -> Run:
+    run = Run(model=model, task=task.name, rep=rep)
     t0 = time.monotonic()
     try:
         async with await new_sandbox(task.image, f"{task.name}-{model}") as sb:
             await sb.fs.mkdir("/work")
             for path, content in task.files.items():
-                await sb.fs.write(path, content.encode())
+                await sb.fs.mkdir(os.path.dirname(path))
+                await sb.fs.write(path, content if isinstance(content, bytes) else content.encode())
+            if task.setup:
+                await sb.shell(task.setup, timeout=120)
 
             messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task.goal}]
             for _ in range(task.max_turns):
@@ -269,6 +274,7 @@ async def agent_run(client: AsyncOpenAI, model: str, task: Task, results_dir: Pa
                         args = json.loads(tc.function.arguments or "{}")
                         if tc.function.name == "finish":
                             run.finished = True
+                            run.summary = str(args.get("summary", ""))
                             result = "ok"
                         else:
                             result = await run_tool(sb, tc.function.name, args)
@@ -280,7 +286,8 @@ async def agent_run(client: AsyncOpenAI, model: str, task: Task, results_dir: Pa
                 if run.finished:
                     break
 
-            verdict = await task.check(sb, new_sandbox=check_sandbox, save_dir=results_dir / "packages", model=model)
+            verdict = await task.check(sb, new_sandbox=check_sandbox, save_dir=results_dir / "packages",
+                                       model=f"{model}-r{rep}", summary=run.summary)
             run.passed, run.checks, run.detail = verdict["passed"], verdict["checks"], verdict.get("detail", "")[:500]
     except Exception as e:  # noqa: BLE001
         run.error = f"{type(e).__name__}: {str(e)[:300]}"
@@ -311,17 +318,16 @@ def write_report(out: Path, smokes: list[dict], runs: list[Run], task_names: lis
         lines += ["## Agent tasks", "", "| Model | " + " | ".join(task_names) + " | Passed | Invalid calls | Median LLM s | Tokens (in/out) |",
                   "| --- | " + " | ".join("---" for _ in task_names) + " | --- | --- | --- | --- |"]
         for model in sorted({r.model for r in runs}):
-            mr = {r.task: r for r in runs if r.model == model}
+            rs = [r for r in runs if r.model == model]
             cells = []
             for t in task_names:
-                r = mr.get(t)
-                if not r:
+                tr = [r for r in rs if r.task == t]
+                if not tr:
                     cells.append("-")
-                elif r.error:
-                    cells.append("error")
-                else:
-                    cells.append(f"{'PASS' if r.passed else 'fail'} ({r.turns}t)")
-            rs = list(mr.values())
+                    continue
+                errs = sum(1 for r in tr if r.error)
+                turns = statistics.median(r.turns for r in tr)
+                cells.append(f"{sum(r.passed for r in tr)}/{len(tr)} ({turns:g}t)" + (f" {errs}err" if errs else ""))
             lat = [x for r in rs for x in r.llm_latencies]
             lines.append(
                 f"| `{model}` | " + " | ".join(cells) +
@@ -332,7 +338,7 @@ def write_report(out: Path, smokes: list[dict], runs: list[Run], task_names: lis
             keys = sorted({k for r in demo for k in r.checks})
             lines += ["", "## Demo package checks", "", "| Model | " + " | ".join(keys) + " |",
                       "| --- | " + " | ".join("---" for _ in keys) + " |"]
-            for r in sorted(demo, key=lambda r: r.model):
+            for r in sorted(demo, key=lambda r: (r.model, r.rep)):
                 lines.append(f"| `{r.model}` | " + " | ".join(tick(r.checks.get(k, False)) for k in keys) + " |")
     md = "\n".join(lines) + "\n"
     (out / "summary.md").write_text(md)
@@ -352,6 +358,7 @@ async def main() -> None:
     ap.add_argument("--tasks", help=f"comma-separated; default: {','.join(TASKS)}")
     ap.add_argument("--skip-smoke", action="store_true")
     ap.add_argument("--skip-agent", action="store_true")
+    ap.add_argument("--runs", type=int, default=1, help="repeats per model x task")
     ap.add_argument("--llm-concurrency", type=int, default=6)
     args = ap.parse_args()
 
@@ -375,9 +382,10 @@ async def main() -> None:
     runs: list[Run] = []
     if not args.skip_agent:
         agent_models = [m for m in models if m not in GUARD_MODELS]
-        print(f"agent: {len(agent_models)} models x {len(task_names)} tasks", flush=True)
+        print(f"agent: {len(agent_models)} models x {len(task_names)} tasks x {args.runs} runs", flush=True)
         runs = await asyncio.gather(*(
-            gated(agent_run(client, m, TASKS[t], out)) for m in agent_models for t in task_names))
+            gated(agent_run(client, m, TASKS[t], out, rep))
+            for rep in range(args.runs) for m in agent_models for t in task_names))
         (out / "runs.json").write_text(json.dumps([asdict(r) for r in runs], indent=2))
 
     print(write_report(out, smokes, runs, task_names))
