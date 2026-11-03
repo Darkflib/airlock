@@ -247,3 +247,16 @@ Tags: #win #metric
 **Result:** deployed. The App key reaches the host as one base64 line, because the PEM is multi-line and the deploy reads stdin line by line. Live test blocked: the App `airlocksandbox` has no permissions yet and isn't installed on the demo repo (`GET /repos/…/installation` → 404).
 **So:** next is the App settings change, then run PRs #1 and #3 through the UI and approve or reject them on camera.
 Tags: #win #demo
+
+### 22:37 — PR flow live: demo PRs through the site
+**Tried:** after giving the App permissions (contents:read, pull_requests:write, statuses:write, metadata:read) and installing it on airlock-demo only, submitted both demo PRs from the signed-in browser.
+**Result:**
+- **PR #3 "feat: coloured startup log": MALICIOUS in about 10 s.**
+  - During `npm ci`: **PROVEN** exfil, with the POST body holding the `.npmrc` token and AWS keys.
+  - `cat` read both canaries, `curl` was sinkholed, `python3.13` read the AWS file, and a raw-IP connect was refused.
+  - The agent's evidence notes that `npm test` passes and the title only matches the cosmetic `index.js` change.
+  - The PR card shows the vendored tarball as *added*.
+- **PR #1 left-pad bump: BENIGN, 0 containment events.** The evidence checks that the diff matches the title, the lockfile resolves to registry.npmjs.org, and there are no install scripts.
+- Both are left undecided, so the first bot comment and status get posted when a human clicks.
+**So:** the whole loop now runs end to end: PR → detonate → verdict → human gate → (on click) a comment and status from `airlocksandbox[bot]`.
+Tags: #win #demo
