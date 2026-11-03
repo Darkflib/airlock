@@ -1,0 +1,314 @@
+[
+  {
+    "model": "deepseek-v4.1-flash-1017",
+    "chat": {
+      "ok": true,
+      "s": 2.83,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 10.88,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.55,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 0.86,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "glm-5.2",
+    "chat": {
+      "ok": true,
+      "s": 1.28,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.95,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 4.16,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 1.23,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "glm-5.3",
+    "chat": {
+      "ok": true,
+      "s": 3.5,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.76,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 7.7,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 0.76,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "glm-5.3-flash",
+    "chat": {
+      "ok": true,
+      "s": 1.13,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.53,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 2.72,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 1.77,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "mimo-v2.6-flash",
+    "chat": {
+      "ok": true,
+      "s": 0.9,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.55,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 1.08,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 0.8,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "mimo-v2.6-pro",
+    "chat": {
+      "ok": true,
+      "s": 1.12,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.7,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.9,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 0.87,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "minimax-m3.1-flash",
+    "chat": {
+      "ok": true,
+      "s": 0.54,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.75,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 1.24,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 2.35,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "muse-glimmer-30b",
+    "chat": {
+      "ok": true,
+      "s": 0.81,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.9,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 1.67,
+      "err": null
+    },
+    "vision": {
+      "ok": false,
+      "s": 2.9,
+      "err": null,
+      "answer": "white"
+    }
+  },
+  {
+    "model": "nemotron-3-nano-omni-30b-a3b-reasoning",
+    "chat": {
+      "ok": true,
+      "s": 0.71,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 1.24,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.87,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 1.06,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "nemotron-3.5-content-safety",
+    "chat": {
+      "ok": false,
+      "s": 0.58,
+      "err": null
+    },
+    "tool_call": {
+      "ok": false,
+      "s": 0.12,
+      "err": "BadRequestError: Error code: 400 - This model does not support tool calling"
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.79,
+      "err": null
+    },
+    "vision": {
+      "ok": false,
+      "s": 2.25,
+      "err": null,
+      "answer": "User Safety: safe"
+    }
+  },
+  {
+    "model": "qwen3.8-27b",
+    "chat": {
+      "ok": true,
+      "s": 0.52,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.54,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.61,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 2.21,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "qwen3.8-flash-next",
+    "chat": {
+      "ok": true,
+      "s": 0.5,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.7,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 0.9,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 2.06,
+      "err": null,
+      "answer": "Red"
+    }
+  },
+  {
+    "model": "raon-1-mini-preview",
+    "chat": {
+      "ok": true,
+      "s": 0.61,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.79,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 1.05,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 0.67,
+      "err": null,
+      "answer": "Red"
+    }
+  }
+]

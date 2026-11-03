@@ -1,0 +1,26 @@
+[
+  {
+    "model": "glm-5.3",
+    "chat": {
+      "ok": true,
+      "s": 4.31,
+      "err": null
+    },
+    "tool_call": {
+      "ok": true,
+      "s": 0.63,
+      "err": null
+    },
+    "json_mode": {
+      "ok": true,
+      "s": 8.99,
+      "err": null
+    },
+    "vision": {
+      "ok": true,
+      "s": 3.76,
+      "err": null,
+      "answer": "Red"
+    }
+  }
+]
