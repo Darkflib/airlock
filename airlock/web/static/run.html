@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airlock run</title>
+  <link rel="icon" href="/static/favicon-32x32.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="hide-exec">
+  <div class="wrap">
+    <header class="top">
+      <img src="/static/apple-touch-icon.png" alt="">
+      <div>
+        <div class="brand">AIRLOCK</div>
+        <div class="tag">Dependency detonation chamber</div>
+      </div>
+      <div class="spacer"></div>
+      <nav><a href="/">← All runs</a></nav>
+    </header>
+
+    <div class="run-head">
+      <h1 id="target">…</h1>
+      <span class="pill" id="status"></span>
+      <span class="meta" id="meta"></span>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Timeline <span class="live" id="live" hidden>live</span></h2>
+        <ol class="timeline" id="timeline"></ol>
+        <div class="toggle-exec"><label><input type="checkbox" id="show-exec"> show every command</label></div>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>Verdict</h2>
+          <div class="body">
+            <div class="verdict-big pending" id="verdict">Waiting for agent…</div>
+            <div class="verdict-meta" id="verdict-meta"></div>
+            <ul class="evidence" id="evidence"></ul>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Containment</h2>
+          <div class="body">
+            <div class="stats">
+              <div class="stat hot"><div class="n" id="n-contain">0</div><div class="l">containment events</div></div>
+              <div class="stat"><div class="n" id="n-canary">0</div><div class="l">canary reads</div></div>
+              <div class="stat"><div class="n" id="n-egress">0</div><div class="l">egress blocked</div></div>
+              <div class="stat"><div class="n" id="n-guard">0</div><div class="l">injections redacted</div></div>
+            </div>
+            <ul class="facts" id="facts"></ul>
+          </div>
+        </div>
+
+        <div class="panel gate">
+          <h2>Approval gate</h2>
+          <div class="body" id="gate">
+            <p>Nothing leaves Airlock until a human decides.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>Airlock.run();</script>
+</body>
+</html>

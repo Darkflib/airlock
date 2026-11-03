@@ -24,6 +24,7 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - microsandbox 0.7.x: Python SDK (`uv add microsandbox`), no daemon. Its storage root (`~/.microsandbox`) must not be group-writable.
 - Python with `uv`. Keep dependencies minimal.
 - Run anything that needs KVM or the inference key on the host via `scripts/remote.sh "<cmd>"`. It rsyncs the tree to `~/airlock` and pipes the key from 1Password. Example: `scripts/remote.sh "uv run airlock analyse evals/fixtures/left-padder-hostile.tgz"`.
+- Web UI: `scripts/remote.sh scripts/serve.sh` (re)starts it on the host at 127.0.0.1:8000, which isn't public yet. View it through a tunnel: `ssh -N -L 8077:127.0.0.1:8000 airlock@airlock.darkflib.dev`, then open http://localhost:8077.
 - Unit tests run locally: `uv run pytest`. Evals: `evals/run.sh`; results go in `evals/RESULTS.md`.
 - Model per role lives in `roles.toml`. Change it only with eval evidence.
 
@@ -36,6 +37,8 @@ Key dates: P0 cut line end of Thu 5 Nov 2026; video and freeze Sat 7 Nov; submis
 - `airlock/agent.py`: triage loop with a hard turn budget; the last turn forces `finish`.
 - `airlock/pipeline.py`: acquire → unpack → detonate under the tracer → agent triage → report.
 - `airlock/cli.py`: `airlock analyse <file.tgz | npm-spec>`.
+- `airlock/store.py`: SQLite for runs and events (`$AIRLOCK_DATA`, default `~/.local/share/airlock`).
+- `airlock/web/`: FastAPI app (submit, SSE event stream, approval decision) and the static UI. Event text is untrusted: insert it with `textContent` only.
 
 ## Build log (required)
 

@@ -7,6 +7,7 @@ import asyncio
 import json
 import time
 from dataclasses import asdict, dataclass, field
+from typing import Callable
 
 # Kinds that represent containment (shown highlighted on the timeline).
 CONTAINMENT = {"egress_blocked", "canary_read", "canary_exfil", "guard_flagged", "limit_hit"}
@@ -31,21 +32,33 @@ class Event:
 class EventLog:
     """Append-only event list with async subscribers (for SSE later)."""
 
-    def __init__(self) -> None:
+    def __init__(self, on_emit: Callable[[Event], None] | None = None) -> None:
         self.events: list[Event] = []
-        self._subscribers: list[asyncio.Queue[Event]] = []
+        self._subscribers: list[asyncio.Queue[Event | None]] = []
+        self._on_emit = on_emit
 
     def emit(self, kind: str, summary: str, **data) -> Event:
         ev = Event(kind=kind, summary=summary, data=data, id=len(self.events) + 1)
         self.events.append(ev)
+        if self._on_emit:
+            self._on_emit(ev)
         for q in self._subscribers:
             q.put_nowait(ev)
         return ev
 
-    def subscribe(self) -> asyncio.Queue[Event]:
-        q: asyncio.Queue[Event] = asyncio.Queue()
+    def subscribe(self) -> asyncio.Queue[Event | None]:
+        q: asyncio.Queue[Event | None] = asyncio.Queue()
         self._subscribers.append(q)
         return q
+
+    def unsubscribe(self, q: asyncio.Queue) -> None:
+        if q in self._subscribers:
+            self._subscribers.remove(q)
+
+    def close(self) -> None:
+        """Tell subscribers the stream has ended."""
+        for q in self._subscribers:
+            q.put_nowait(None)
 
     def containment(self) -> list[Event]:
         return [e for e in self.events if e.containment]

@@ -110,3 +110,19 @@ Tags: #win #demo
 **Result:** `mv: cannot move ... to '/work/candidate.tgz': No such file or directory`. Only file targets wrote /work implicitly.
 **So:** `Workspace` now creates /work on start.
 Tags: #fail
+
+### 18:58 — Web UI: live timeline, verdict card, approval gate
+**Tried:** FastAPI control plane with a SQLite store. Runs execute as in-process tasks (max 2 at once), and events are persisted on emit and pushed to subscribers. The run page consumes Server-Sent Events: it replays stored events, then streams live ones, so a refresh mid-run loses nothing. Vanilla JS/CSS, no build step, colours taken from the logo (navy, cyan, hazard orange).
+**Result:** the hostile fixture streams 20 events into the browser in about 7 s, then a MALICIOUS verdict whose [E#] references jump to the timeline row. The Reject button records the decision. 16 tests pass, including the API with a fake analyser.
+**So:** the demo can now be filmed in a browser, not a terminal. The UI isn't public yet (localhost plus SSH tunnel); Caddy and auth come before the public demo URL.
+Tags: #win #demo
+
+### 18:58 — The agent's own re-runs inflated the containment count
+**Result:** the agent re-ran the postinstall to confirm its findings, and the tracer reported those reads and egress attempts too. The counter showed 12 "containment events" for 4 real behaviours.
+**So:** trace events now carry a `stage` (detonate vs agent). Agent-stage events show as "REPRODUCED BY AGENT" and are left out of the counts. Honest numbers matter in a security demo.
+Tags: #fail #demo
+
+### 18:58 — pkill -f killed its own SSH session
+**Result:** `pkill -f 'uvicorn airlock.web'` over SSH matched the remote shell's own command line, which contained that string, so it killed the session (exit 255) before the server started.
+**So:** `scripts/serve.sh` uses a pidfile instead.
+Tags: #fail

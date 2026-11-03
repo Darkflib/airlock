@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airlock</title>
+  <link rel="icon" href="/static/favicon-32x32.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <img src="/static/apple-touch-icon.png" alt="">
+      <div>
+        <div class="brand">AIRLOCK</div>
+        <div class="tag">Dependency detonation chamber</div>
+      </div>
+      <div class="spacer"></div>
+      <nav><a href="/">Runs</a></nav>
+    </header>
+
+    <section class="hero">
+      <h1>See what a dependency does before it runs anywhere that matters.</h1>
+      <p>Airlock installs the package inside a disposable microVM with fake credentials and no internet,
+        records everything it touches, and has an agent explain what happened. You approve or reject.</p>
+    </section>
+
+    <div class="panel">
+      <div class="body">
+        <form class="submit" id="submit">
+          <input type="text" id="spec" name="spec" placeholder="npm package, e.g. left-pad@1.3.0" autocomplete="off" spellcheck="false">
+          <button type="submit" id="go">Detonate</button>
+          <label class="drop" id="drop">
+            <input type="file" id="file" accept=".tgz,application/gzip" hidden>
+            <span id="drop-label">…or drop a package tarball (.tgz) here</span>
+          </label>
+        </form>
+        <div class="examples">Try:
+          <button class="chip" data-spec="left-pad@1.3.0" type="button">left-pad@1.3.0</button>
+          <button class="chip" data-spec="is-odd@3.0.1" type="button">is-odd@3.0.1</button>
+        </div>
+        <div class="err" id="err"></div>
+      </div>
+    </div>
+
+    <div class="hazard-rule" style="margin-top:28px"></div>
+
+    <div class="panel">
+      <h2>Recent runs</h2>
+      <table class="runs">
+        <thead><tr><th>Target</th><th>Status</th><th>Verdict</th><th>Contained</th><th>Decision</th><th>Started</th></tr></thead>
+        <tbody id="runs"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>No runs yet.</div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>Airlock.index();</script>
+</body>
+</html>

@@ -98,16 +98,16 @@ class Workspace:
                 self.events.emit("limit_hit", f"command killed after {timeout:.0f}s", cmd=cmd[:200])
         self.events.emit("exec", f"$ {cmd[:120]} → exit {res.exit_code}", cmd=cmd, cwd=cwd,
                          exit_code=res.exit_code, source=source)
-        await self.collect_trace()
+        await self.collect_trace(stage=source)
         return res
 
-    async def collect_trace(self) -> None:
+    async def collect_trace(self, stage: str = "detonate") -> None:
         """Turn new tracer lines into events (idempotent across calls)."""
         out = await self.sb.shell(f"cat {TRACE_LOG} 2>/dev/null || true", timeout=10)
         lines = out.stdout_text.splitlines()
         new, self._trace_seen = lines[self._trace_seen:], len(lines)
         for kind, summary, data in events_from_trace("\n".join(new), self.allow_hosts):
-            self.events.emit(kind, summary, **data)
+            self.events.emit(kind, summary, stage=stage, **data)
 
     async def write(self, path: str, data: bytes) -> None:
         await self.sb.fs.mkdir(os.path.dirname(path) or "/")
