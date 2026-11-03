@@ -217,3 +217,14 @@ Tags: #win #demo #decision
 
 Also: a test failure got deployed because `… | tail -1 && deploy` hides pytest's exit code. Deploy commands now run with `set -o pipefail`.
 Tags: #win #demo
+
+### 21:36 — Full rebuild from cloud-init: the box is reproducible end to end
+**Tried:** backed up the run DB (via the SQLite backup API), uploads and the allowlist. Reinstalled the VX1 from `infra/cloud-init.yaml`, ran `scripts/deploy.sh`, restored the data.
+**Result:**
+- cloud-init `done`, with no errors or recoverable errors.
+- KVM present, `msb doctor` ready, uv, mitmproxy 12.3.1, Caddy 2.11.7, ufw active.
+- Deploy brought up `airlock-sinkhole`, `airlock-web` and `caddy`. mitmproxy minted a fresh CA, and Caddy got a fresh certificate for the same reserved IP and DNS name.
+- 6 runs restored.
+- The shell stealer gave MALICIOUS with **PROVEN** exfil on the first try. The first VM boot took 6 s, because a fresh box pulls the node image once.
+**So:** a rebuild takes cloud-init plus one deploy command, about 10 minutes. That makes the planned late-week move to a US region low-risk: new reserved IP, DNS update, same two steps.
+Tags: #win #metric
