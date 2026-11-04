@@ -1,6 +1,6 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 425 words: about 2:50 at 150 words a minute, which is tight. If a read-through runs long, trim the 0:15 and 2:30 blocks first.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 407 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:30 blocks first.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
@@ -9,6 +9,8 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 - [ ] PR #1 is held at a pending `airlock` status; check it still is, and that its merge button is greyed out.
 - [ ] PR #3 and PR #4 carry bot comments from earlier decisions: tidy them, or frame only the newest.
 - [ ] Browser: signed in as `Darkflib`, zoom 125%, bookmarks bar hidden, notifications off, one tab for the site and one for GitHub.
+- [ ] Burn in English captions that match the narration word for word; many judges read English more easily than they hear it.
+- [ ] Speak slowly and leave a short pause after each number.
 - [ ] Recheck the inference spend on the Vultr dashboard and update the $1.45 figure if it moved.
 - [ ] Nothing on screen shows a share-link URL, an invite link, `.env` or a terminal with secrets. Canary values are fine (they're fake and per-run), but don't zoom in on them for long.
 
@@ -20,63 +22,63 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** GitHub, `Darkflib/airlock-demo` PR #3 "feat: coloured startup log". Scroll to the green `npm test` check, then the Files tab with one line in `package.json` and a vendored `colorful-logs-2.0.1.tgz`.
 
-> "This pull request adds a coloured logger. The tests pass. Would you merge it? A green test run tells you the code works. It doesn't tell you what the install script did with your credentials."
+> "This pull request adds a coloured logger. The tests pass. Would you merge it? Passing tests show that the code works. They do not show what the install script did with your passwords."
 
 ### 0:15–1:15 Detonation, PR #3 (live)
 
 **[SCREEN]** airlock.darkflib.dev. Paste the PR URL, submit. The PR card shows `colorful-logs-2.0.1.tgz` marked *added*. The timeline streams in.
 
-> "Airlock gives every untrusted change its own disposable computer. This is a microVM with its own kernel on a Vultr VX1, booted in under a second."
+> "Airlock runs every untrusted change in its own disposable computer. This is a small virtual machine on Vultr. It started in under one second."
 
-**[SCREEN]** Setup stage: VM started, canaries planted, watcher ready.
+**[SCREEN]** Setup stage: VM started, canaries (fake passwords) planted, watcher ready.
 
-> "Before anything runs, we plant fake credentials carrying a token unique to this run: an npm token, AWS keys. The VM can reach the package registry and nothing else."
+> "First, we put fake passwords in the machine, each with a token unique to this run. The machine can only reach the package registry."
 
 **[SCREEN]** Detonation stage: `npm ci` as the unprivileged user. Events land: `cat` reads `.npmrc` and `.aws/credentials`, `curl` is sinkholed, raw-IP connect refused.
 
-> "Now `npm ci` runs, as an unprivileged user, while a watcher outside its reach records every program, every credential file opened, every lookup and connection."
+> "Now the install runs, as a normal user. A watcher that the package cannot touch records every program, every file it reads, and every connection."
 
 **[SCREEN]** The PROVEN exfil row. Expand it: the captured POST body with this run's token highlighted. Hold for three seconds. **This is the money shot.**
 
-> "And there it is. The install script read both credential files and posted them out. Every destination outside the registry is answered by Airlock itself, so we caught the request with the stolen token inside. That's not a guess: it's proven by the payload. And notice this is a shell script. No Node, nothing language-specific to hook."
+> "And there it is. The script read both password files and sent them out. But every address outside the registry goes to Airlock's fake server. So we caught the request, with the stolen token inside. This is not a guess. It is proof. And it works for any language."
 
 ### 1:15–1:35 Verdict
 
 **[SCREEN]** Verdict card: MALICIOUS. Click an `[E#]` link; the timeline jumps to the exfil event.
 
-> "A triage agent on Vultr Serverless Inference investigates inside the same VM and writes the verdict. Every claim cites an event. The AI explains the evidence; it doesn't get to decide what the evidence is."
+> "Next, an AI agent on Vultr Serverless Inference looks inside the same machine and writes a verdict. Every claim links to an event. The AI explains the evidence. It does not decide what the evidence is."
 
 ### 1:35–2:10 The hard one, PR #4 (recorded run)
 
 **[SCREEN]** GitHub PR #4 "feat: timestamped startup log", Files tab. Scroll past "install analytics" and a "config discovery" helper.
 
-> "That script was easy to read. This one isn't. PR #4 reads like a routine dependency bump. The theft is split across install analytics and a config helper, and the collector's hostname is assembled from fragments."
+> "That script was easy to read. This one is not. Pull request four looks like a normal update. The stealing code is split across two files that look harmless, and the address it sends data to is built from small pieces."
 
 **[SCREEN]** Cut to the finished PR #4 run. Turn on "only what this PR adds". Rows tagged NEW IN THIS PR; the counter shows 10 new, 5 containment. Expand the PROVEN POST to `telemetry.tinystamp.invalid`.
 
-> "Airlock also detonated the merge base in a second VM, so this view shows only what the PR adds: ten new behaviours, five of them containment events. And the exfiltration is proven again, by the payload. It doesn't matter how readable the code is, only what it does when it runs."
+> "Airlock also ran the code from before this change, in a second machine. So we see only what is new: ten new behaviours, five of them blocked or caught. The stolen data is captured again. What matters is what the code does, not how it looks."
 
 ### 2:10–2:30 The gate
 
 **[SCREEN]** GitHub PR #4: merge button greyed out, `airlock` check pending. Back on the run page, click **Reject**. On GitHub: red `airlock` status and the `airlocksandbox[bot]` evidence comment.
 
-> "While all this happens, the PR can't merge: branch protection requires the Airlock check, and it stays pending until a human decides. Reject, and the bot posts the evidence on the PR."
+> "During all of this, the pull request cannot be merged. The repository requires the Airlock check, and it stays pending until a person decides. I click Reject, and Airlock posts the evidence on the pull request."
 
 **[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Click **Approve**. GitHub: green status, merge button unlocks.
 
-> "A clean bump: nothing new, nothing contained. Approve, and it's free to merge."
+> "This one is a safe update: nothing new, nothing blocked. I click Approve, and now it can be merged."
 
 ### 2:30–2:50 Under the hood
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three containment layers: default-deny egress, a sinkhole that captures what leaves, and a watcher the package can't touch. npm and PyPI. We benchmarked all 13 Serverless Inference models to pick the agent. Thirty out of thirty on our regression, exfiltration proven on every malicious run. And the inference for the whole build cost about a dollar fifty."
+> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. It works for npm and PyPI. We tested all thirteen Serverless Inference models to choose the agent. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
 
 ### 2:50–3:00 Close
 
 **[SCREEN]** Airlock logo, URL `airlock.darkflib.dev`, repo link.
 
-> "Every untrusted change gets its own disposable computer, and you see exactly what it tried to steal."
+> "Every untrusted change runs in its own disposable computer, and you see exactly what it tried to steal."
 
 ## Cutaways if a shot fails on the day
 

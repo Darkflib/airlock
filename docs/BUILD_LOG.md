@@ -502,3 +502,9 @@ Tags: #demo
 **Result:** deck republished (same ten slides, layouts unchanged); `assets/airlock-cover.png` re-rendered with the new tagline and plainer card labels (PROVEN THEFT, fake keys, token matches).
 **So:** the video narration and the lablab descriptions still use the old vocabulary; give them the same pass before recording.
 Tags: #demo
+
+### 12:10 — Plain-English pass on the narration and the lablab copy
+**Tried:** the same rewrite as the deck, for the video voice-over and `docs/SUBMISSION.md`: short sentences, no idioms, and jargon replaced (fake passwords, a fake server Airlock controls, the code from before this change, blocked or caught).
+**Result:** narration 425 → 407 words, but at a slower 135 words a minute it now fills the full 3:00 with no slack; the pre-recording checklist adds burned-in captions and pauses after numbers. Lablab copy: short 233/255 chars, long 1860/2000 chars (was 1977), `scripts/check-submission.py` passes.
+**So:** do a timed read-through before Saturday; if it runs over, trim the 0:15 and 2:30 blocks.
+Tags: #demo

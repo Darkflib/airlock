@@ -8,18 +8,18 @@ Airlock: Dependency Detonation Chamber
 
 ## Short Description
 
-Airlock runs an untrusted PR, npm or PyPI package in a disposable Vultr microVM with fake credentials and no internet beyond the registries. It proves what the code tried to steal, AI explains it, and the PR stays blocked until a human approves.
+Airlock tests a new pull request, npm package or PyPI package in a throwaway Vultr virtual machine with fake passwords. It captures what the code tries to steal as proof, an AI explains it, and nothing merges until a person approves.
 
 ## Long Description
 
-A passing test suite doesn't rule out a malicious install script. Postinstall scripts and test hooks run with real tokens and open network access in CI, and nobody reads the diff of a lockfile bump.
+Passing tests do not show what an install script did. In CI, install scripts and test hooks run with real passwords, real tokens and full internet access, and reviewers rarely read a lockfile change.
 
-Airlock gives every untrusted dependency change its own disposable computer. Paste a GitHub pull request URL, an npm or PyPI package, or a tarball. A fresh microVM with its own kernel boots in about 0.7 seconds on a Vultr VX1 instance, which exposes KVM. The VM holds canary credentials carrying a token unique to the run, and can reach nothing but the package registries. npm ci and npm test (or pip install for PyPI) run as an unprivileged user while a root watcher records the programs started, credential files opened, DNS lookups and connections.
+Airlock runs every untrusted code change in its own disposable computer. Paste a GitHub pull request, an npm or PyPI package, or a package file. A new virtual machine starts in about 0.7 seconds on a Vultr VX1 server. It has its own Linux kernel and can reach only the package registries. Inside are fake passwords, each with a token unique to the run. The install and the tests run as a normal user, while a watcher records every program, file read, DNS lookup and connection.
 
-Every other destination, DNS included, is answered by Airlock on the host and never forwarded. When a stealer posts the canary credentials, Airlock captures the exact payload, so exfiltration is proven rather than guessed. For a PR, its merge base is detonated in a second VM, so the review shows what the PR adds.
+Every other address is answered by a fake server that Airlock controls on the host, and nothing is forwarded. So when malicious code sends the fake passwords out, Airlock captures the full request: the theft is proven, not guessed. For a pull request, Airlock also runs the code from before the change in a second machine and shows only what is new.
 
-A tool-calling agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by benchmarking all 13 catalogue models) investigates inside the same VM, as the same unprivileged user, and gives a verdict that cites the events behind it. While it runs, the Airlock GitHub App holds the PR at a pending status that branch protection requires, so it cannot merge. Only a human click on Approve or Reject sets the final status and posts the evidence on the PR.
+An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then looks inside the same machine and writes a verdict. Every claim links to the event that proves it. During the run, the Airlock GitHub App keeps the pull request at "pending", and the repository requires this check, so it cannot be merged. Only a person clicking Approve or Reject sets the final result and posts the evidence on the pull request.
 
-On a small regression through the real pipeline (10 npm and PyPI targets, including three demo PRs, three runs each): 30 of 30 correct, exfiltration proven by payload on all 15 malicious runs and zero containment events on benign ones. Median run time is 12 to 31 seconds end to end. Inference for the whole build cost about $1.45 as of 4 November.
+In our test set, 10 npm and PyPI packages ran through the real system 3 times each: 30 of 30 correct. The stolen data was captured on all 15 malicious runs, and the 15 safe runs had no false alarms. A typical run takes 12 to 31 seconds. The AI cost for the whole project was about $1.45 (4 November).
 
-Judges can click Run self-test to detonate five known npm and PyPI packages and watch them scored live.
+Judges can click Run self-test to test five known packages live and see the score.
