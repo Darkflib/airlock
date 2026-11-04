@@ -562,3 +562,9 @@ Tags: #win #demo
 **Result:** 120 tests pass (3 new: auto-reject on, off, unproven exfil still waits). Deployed (on by default). Not yet seen on a real PR push. Script narration back to 407 words; deck slides 3 and 6 (v10), README, SUBMISSION (1903/2000 chars, check passes), PRD, report and AGENTS updated.
 **So:** the tagline "nothing merges until a person approves" stays true; the video's gate shot shows PR #4 already red with no click, then a person approving PR #1. Considered and rejected: auto-approving clean runs (sandbox-aware malware looks clean) and following the AI verdict (lets the model's word merge code).
 Tags: #decision #demo
+
+### 19:15 — First automatic rejection on a real PR
+**Tried:** pushed to PR #4 with auto-reject deployed.
+**Result:** webhook run `20261104-191139-8b864c`: malicious, rejected with no click (`decided_by` empty, `auto_decision` "exfiltration proven by a captured payload"); `failure` status and the evidence comment posted to PR #4.
+**So:** push → run → red check → evidence comment works end to end with nobody touching Airlock; this is the video's 1:35–2:33 sequence.
+Tags: #win #demo
