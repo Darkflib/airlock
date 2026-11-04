@@ -76,7 +76,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Airlock logo, URL `airlock.darkflib.dev`, repo link.
 
-> "Every untrusted change gets its own disposable computer, and you see exactly what it tried to take."
+> "Every untrusted change gets its own disposable computer, and you see exactly what it tried to steal."
 
 ## Cutaways if a shot fails on the day
 

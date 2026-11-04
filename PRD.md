@@ -204,7 +204,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
    - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
    - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
    - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30; $1.45 of inference for the whole build.
-7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to take."
+7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
 **Before recording:** fresh runs of PR #3 and PR #4 so the PR #3 run and the PR #4 diff are current; PR #1 is already held at pending for the gate shot. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
 

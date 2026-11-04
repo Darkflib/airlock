@@ -19,7 +19,7 @@ A green test run doesn't tell you what the install script did.
 
 ## 3. What Airlock does
 
-Paste a PR, an npm or PyPI package, or a tarball → it runs in a fresh microVM with fake credentials → you see what it tried to take → the PR stays blocked until a human approves.
+Paste a PR, an npm or PyPI package, or a tarball → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
 *Visual:* four-step strip: Submit → Detonate → Explain → Gate.
 
 ## 4. The money shot: proven exfiltration

@@ -496,3 +496,9 @@ Tags: #demo
 **Result:** `assets/airlock-cover.png`: wordmark and tagline on the left, a stylised PR #3 timeline card on the right ending in the PROVEN exfil to `telemetry.colorful-logs.invalid` and MALICIOUS with the merge held. First render used made-up timings; replaced them, so the card only shows things a real PR #3 run shows.
 **So:** text is HTML, so wording changes are a re-render, not a regeneration.
 Tags: #demo
+
+### 11:55 — Plain-English pass on the deck and cover
+**Tried:** many judges read English as a second language, so rewrote every slide in short, literal sentences: no idioms ("money shot", "routine bump", "hold the merge"), and the jargon either explained or replaced: canaries → fake passwords and keys, sinkhole → a fake server Airlock controls, exfiltration → stolen data, merge base → the code from before this change, fails closed → safe by default. The closing line now says "see what it tried to **steal**" instead of "take", in the deck, cover, video script and PRD.
+**Result:** deck republished (same ten slides, layouts unchanged); `assets/airlock-cover.png` re-rendered with the new tagline and plainer card labels (PROVEN THEFT, fake keys, token matches).
+**So:** the video narration and the lablab descriptions still use the old vocabulary; give them the same pass before recording.
+Tags: #demo

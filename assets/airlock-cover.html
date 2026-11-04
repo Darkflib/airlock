@@ -45,22 +45,22 @@
   <div class="left">
     <p class="kicker">Dependency detonation chamber</p>
     <div class="brand"><img src="airlock-logo.png" alt=""><h1>AIRLOCK</h1></div>
-    <p class="tag">Every untrusted change gets its own disposable computer.<br><em>See what it tried to take.</em></p>
-    <p class="sub">PRs, npm and PyPI detonated in a Vultr microVM. Exfiltration proven by payload. Merge held until a human approves.</p>
+    <p class="tag">Every untrusted code change runs in its own disposable computer.<br><em>See what it tried to steal.</em></p>
+    <p class="sub">Pull requests and npm and PyPI packages run in a throwaway Vultr virtual machine. Stolen data is captured as proof. Nothing merges until a person approves.</p>
   </div>
 
   <div class="card">
-    <div class="hd"><span>PR #3 · feat: coloured startup log</span><span>microVM</span></div>
-    <div class="row"><span>VM booted 0.7s · canaries</span><span class="pill ok">READY</span></div>
+    <div class="hd"><span>PR #3 · feat: coloured startup log</span><span>virtual machine</span></div>
+    <div class="row"><span>VM started 0.7s · fake keys</span><span class="pill ok">READY</span></div>
     <div class="row"><span>npm ci as node</span></div>
-    <div class="row"><span>cat ~/.npmrc ~/.aws/credentials</span><span class="pill warn">CANARY</span></div>
-    <div class="row"><span>curl → sinkhole</span><span class="pill warn">CONTAINED</span></div>
+    <div class="row"><span>cat ~/.npmrc ~/.aws/credentials</span><span class="pill warn">READ</span></div>
+    <div class="row"><span>curl → Airlock’s fake server</span><span class="pill warn">CAUGHT</span></div>
     <div class="proven">
-      <div class="row"><span class="pill warn">PROVEN EXFIL</span><span>captured by the sinkhole</span></div>
+      <div class="row"><span class="pill warn">PROVEN THEFT</span><span>request captured</span></div>
       <div class="row"><span>POST telemetry.colorful-logs.invalid</span></div>
-      <div class="row" style="color:var(--muted)"><span>body: .npmrc + AWS keys <span class="tok">run token ✓</span></span></div>
+      <div class="row" style="color:var(--muted)"><span>sent: npm token + AWS keys <span class="tok">token matches</span></span></div>
     </div>
-    <div class="verdict"><span>Merge held · airlock: pending</span><b>MALICIOUS</b></div>
+    <div class="verdict"><span>Merge blocked until a person approves</span><b>MALICIOUS</b></div>
   </div>
 
   <div class="foot">airlock.darkflib.dev · Vultr Agent Rush · Blast Radius Zero</div>
