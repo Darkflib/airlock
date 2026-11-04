@@ -404,6 +404,19 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(400, "decision must be approved or rejected")
         if newer := store.newer_run_of_commit(run):
             raise HTTPException(409, f"run {newer} reviewed the same commit later; decide that one instead")
+        m = run["meta"] or {}
+        if m.get("kind") == "pr" and github and auth:
+            # The decision sets the check that branch protection requires, so GitHub decides who may
+            # make it: only people with write access to the repo. Fails closed if GitHub can't say.
+            slug = f"{m['owner']}/{m['repo']}"
+            try:
+                perm = await github.permission(m["owner"], m["repo"], user)
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(503, f"couldn't confirm your access to {slug} on GitHub ({type(e).__name__}); "
+                                         "try again") from e
+            if perm not in ("admin", "write"):
+                raise HTTPException(403, f"deciding this PR sets its merge check, so it needs write access to "
+                                         f"{slug} on GitHub; @{user} has {perm}")
         store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
                          decided_by=authmod.current_user(request))
         run = store.get_run(run_id)

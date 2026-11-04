@@ -415,9 +415,10 @@ const Airlock = (() => {
           ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
-        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App.`));
+        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
+      const refused = el('p', 'warn'); refused.hidden = true;
       const mk = (label, cls, decision) => {
         const b = el('button', cls, label);
         b.addEventListener('click', async () => {
@@ -426,13 +427,17 @@ const Airlock = (() => {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ decision, note: note.value }),
           });
-          if (resp.ok) renderHead(await resp.json()); else b.disabled = false;
+          if (resp.ok) { renderHead(await resp.json()); return; }
+          b.disabled = false;
+          const err = await resp.json().catch(() => ({}));
+          refused.textContent = `Not recorded: ${err.detail || resp.statusText}`;
+          refused.hidden = false;
         });
         return b;
       };
       const reject = mk('Reject', 'reject', 'rejected'), approve = mk('Approve', 'approve', 'approved');
       row.append(...(r.verdict === 'benign' ? [approve, reject] : [reject, approve]));
-      g.append(note, row);
+      g.append(note, row, refused);
     }
 
     let readOnly = false, me = {};

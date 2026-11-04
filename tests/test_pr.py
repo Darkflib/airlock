@@ -140,3 +140,41 @@ def test_older_run_of_same_commit_cannot_decide_or_post(make):
         assert r.status_code == 409 and new in r.json()["detail"]
         assert c.post(f"/api/runs/{new}/decision", json={"decision": "approved"}).status_code == 200
     assert [x[2] for x in gh.calls if x[0] == "status"][-1] == "success"
+
+
+class PermGitHub(FakeGitHub):
+    """GitHub that knows each login's access to the repo; None means the lookup fails."""
+
+    def __init__(self, perms):
+        super().__init__()
+        self.perms = perms
+
+    async def permission(self, owner, repo, login):
+        if self.perms is None:
+            raise ConnectionError("github down")
+        return self.perms.get(login, "none")
+
+
+@pytest.mark.parametrize("perm, code", [("admin", 200), ("write", 200), ("read", 403), ("none", 403), (None, 503)])
+def test_deciding_a_pr_needs_github_write_access(tmp_path, monkeypatch, perm, code):
+    from tests.test_auth import cfg, sign_in
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+    gh = PermGitHub(None if perm is None else {"Darkflib": perm})
+
+    async def exchange(_cfg, _code):
+        return "Darkflib"
+    app = create_app(store=Store(tmp_path / "p.db"), analyse=fake_pr_analyse, auth=cfg(tmp_path), exchange=exchange,
+                     github=gh)
+    with TestClient(app, base_url="http://airlock.test") as c:
+        sign_in(c)
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        wait_done(c, run_id)
+        r = c.post(f"/api/runs/{run_id}/decision", json={"decision": "approved"})
+        assert r.status_code == code
+        run = c.get(f"/api/runs/{run_id}").json()
+    statuses = [x[2] for x in gh.calls if x[0] == "status"]
+    if code == 200:
+        assert run["decision"] == "approved" and statuses[-1] == "success"
+    else:
+        assert run["decision"] is None and "success" not in statuses  # still held at pending
+        assert "Darkflib/airlock-demo" in r.json()["detail"]

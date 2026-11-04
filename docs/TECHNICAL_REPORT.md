@@ -265,7 +265,7 @@ Installed on selected repositories only, with:
 
 | Permission | Level | Used for |
 | --- | --- | --- |
-| Metadata | read | Required by GitHub for every App |
+| Metadata | read | Required by GitHub for every App; also lets Airlock look up a person's access to the repo (section "Who may decide") |
 | Contents | read | Downloading the head and merge-base archives; computing the merge base |
 | Pull requests | write | Reading the PR, its files and diff; posting the evidence comment |
 | Commit statuses | write | Posting the `airlock` status that branch protection requires |
@@ -296,9 +296,13 @@ Details that matter:
 - **A failed decision post doesn't undo the decision.** The decision is stored first; if GitHub then fails, the error is logged as an event on the run. The PR stays at `pending`, so it fails safe, but there is no retry button yet: a new run is the way out.
 - **The comment** leads with what the PR adds, then containment, then the captured request (collapsed, labelled as canaries), then the agent's cited evidence.
 
-### Who may decide (a known gap)
+### Who may decide
 
-Today, the people who can approve a run are Airlock users: an owner, or the guest who submitted that run. Airlock does **not** check whether that person has write access to the repository on GitHub. For the hackathon this is contained, because guests can submit PRs only from the demo repo. In a product it is the first thing to change: the decision should require the person's GitHub permission on the repo (checked with the App's token), or move into GitHub itself as a Check Run action (section 14.2).
+Two checks, both required. First, Airlock's own rule: an owner, or the person who submitted the run. Second, for a PR run, **GitHub's rule**: at decision time, Airlock asks GitHub (with the App's installation token) what access the signed-in login has to the repository, and accepts the decision only for `admin` or `write` (GitHub reports `maintain` as `write`). Anyone else gets HTTP 403 with the reason, and the PR stays at `pending`. If GitHub can't answer, the decision is refused with 503: it fails closed.
+
+The reasoning: the decision sets the check that branch protection requires, so it is effectively a merge approval. The people who may give it should be the people GitHub already trusts to change that repo, not whoever has an Airlock account. The login being checked is the one GitHub itself confirmed at sign-in, so it can't be typed in. A side effect for the hackathon: judges can run the demo PRs and see the verdict, but only the repo's owner can approve or reject them on GitHub. Their own npm and PyPI runs they can still decide.
+
+Moving the decision into GitHub as a Check Run action (section 14.2) would make GitHub enforce this directly.
 
 ## 10. Control plane, sign-in and access
 
@@ -338,7 +342,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 ## 11. How we tested it
 
-- **Unit tests:** 106, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
+- **Unit tests:** 111, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
 - **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 10 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs. **30/30 correct**, exfiltration proven by payload on 15/15 malicious runs, zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
 - **Live self-test** on the public site: five fixtures, pass only if stealers are malicious *with payload-proven exfil* and benign ones have zero containment. 5/5 on 4 Nov.
 - **Probes** for specific holes: the DNS gateway probe (failed before the DNS guard, passes after), a malformed-DNS probe, the egress probe, the image probe.
@@ -390,7 +394,6 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy, and there is no backpressure on event queues.
 - **GitHub fetch limits.** The changed-file list stops at 100 files and the diff at 200,000 characters without a completeness marker. Files and diff are fetched by PR number while the archive is fetched by head SHA, so a push mid-run could mismatch.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
-- **Approval isn't tied to GitHub permissions.** Whoever may decide a run in Airlock can turn the check green, whether or not they have write access to the repo (section 9).
 - **No webhooks.** Runs start only when someone submits a PR URL; a new push to the PR isn't picked up automatically.
 - **Share links can't be revoked one by one,** and sessions can't be killed individually; both rely on the allowlist check or rotating the shared secret.
 - **No retry for a failed GitHub post** after a decision; the PR stays safely at `pending` but needs a new run.
@@ -408,7 +411,7 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 - Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [a day]
 - Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [half a day]
 - Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [half a day]
-- Require GitHub write access to decide a PR run (check the decider's repo permission with the App's token); a retry for failed GitHub posts; revocable share links via a small server-side table. [a day]
+- A retry for failed GitHub posts; revocable share links via a small server-side table. [a day]
 - Complete self-hosting docs: `.env.example`, App creation, OAuth callback, branch protection. [half a day]
 
 ### 14.2 Fit into how teams work (2–4 weeks)

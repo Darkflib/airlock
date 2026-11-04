@@ -115,6 +115,14 @@ class GitHubApp:
             r = (await c.post(f"/repos/{owner}/{repo}/issues/{number}/comments", json={"body": body})).raise_for_status()
             return r.json()["html_url"]
 
+    async def permission(self, owner: str, repo: str, login: str) -> str:
+        """The user's access to the repo: admin, write, read or none (maintain counts as write)."""
+        async with await self._client(owner, repo) as c:
+            r = await c.get(f"/repos/{owner}/{repo}/collaborators/{login}/permission")
+            if r.status_code == 404:
+                return "none"
+            return r.raise_for_status().json()["permission"]
+
     async def status(self, owner: str, repo: str, sha: str, state: str, description: str, target_url: str) -> None:
         async with await self._client(owner, repo) as c:
             (await c.post(f"/repos/{owner}/{repo}/statuses/{sha}", json={

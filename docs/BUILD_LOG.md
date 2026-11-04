@@ -526,3 +526,9 @@ Tags: #decision
 **Result:** reading the code surfaced four gaps now listed as weaknesses: deciding a PR run isn't tied to the decider's GitHub write access; no webhooks; share links and sessions can't be revoked one by one; a failed post-decision GitHub write has no retry (the PR stays `pending`, so it fails safe).
 **So:** productisation estimates halved, assuming one engineer with coding agents (about ten weeks to a multi-tenant beta), and the fixes for those gaps added to stage 14.1 and 14.2.
 Tags: #decision
+
+### 14:15 — Deciding a PR run now needs GitHub write access
+**Tried:** the decision sets the `airlock` check that branch protection requires, but any Airlock user who submitted a PR run could make it. Added `GitHubApp.permission` (`GET /repos/{o}/{r}/collaborators/{login}/permission` with the App's installation token) and a check in `decide`: PR runs accept a decision only from logins with `admin` or `write`; otherwise 403 with the reason, and 503 if GitHub can't answer (fails closed). The run page now shows the refusal reason and says who may decide.
+**Result:** 111 tests pass (5 new: admin, write, read, none, GitHub down). Deployed; on the host the App's token returns `admin` for Darkflib and `none` for a non-collaborator on `Darkflib/airlock-demo`, so the existing Metadata permission is enough.
+**So:** judges can still run the demo PRs and see the verdict, but only the repo owner can approve or reject them on GitHub. The video is unaffected (Darkflib decides). Report section 9 updated; the gap is off the weaknesses list.
+Tags: #decision #win
