@@ -347,3 +347,8 @@ Tags: #win #metric
 59 tests pass.
 **So:** the invite is safe to hand out. Still open from the review: the watcher failing open, cleanup after a failed setup, a pending status for the merge gate, the DNS-to-gateway check, and claim wording.
 Tags: #fail #decision
+
+### 00:08 — Regression after the review fixes: 18/18
+**Result:** the product regression on the host (`evals/results/product-20261104T000435Z`) is **18/18** correct. Exfil was proven on 9/9 malicious runs under the stricter rule (this run's token, host-captured). Benign targets had 0 containment, there were no forced verdicts and 0 invalid tool calls; median 10.7–19.4 s. The agent now running as `node` changed nothing: median turns 3–5, as before.
+**So:** the fixes cost no accuracy. The README results table can point at this run.
+Tags: #metric #win
