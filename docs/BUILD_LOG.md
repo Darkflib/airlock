@@ -616,3 +616,15 @@ Tags: #security #fix
 **Result:** webhook run at 23:32:02, evidence comment by 23:32:06 (written in place), `/airlock approve` at 23:32:57, `success` "approved by @Darkflib (verdict: benign)" at 23:33:00 and the comment rewritten to "BENIGN, approved by @Darkflib". The new time and PR binding accepted it as intended.
 **So:** the gate shot's `/airlock approve` works on the hardened build.
 Tags: #win #demo
+
+### 23:39 — Independent authority-fix recheck
+**Tried:** reviewed `aebf7ef` through `aba4d25`, ran the full suite and independently paused an old outbound approval while a newer review started; exercised share revocation through the actual event-stream generator with a deterministic clock.
+**Result:** 148 tests pass in 5.91 s; outbound status order `success, pending, pending` preserves the newer gate. A1–A4 are addressed within the documented single-worker/shared-SHA policy. One P2 remains: a signed-in guest's revoked share returns 404 on new requests but the existing stream keeps sending private events because the recheck accepts any valid session. Details: [AUTH_RECHECK-2026-11-04.md](AUTH_RECHECK-2026-11-04.md).
+**So:** close the four main findings; recheck run-level read permission, not just authentication, during SSE. Review artifacts only; no application change or production action.
+Tags: #security #decision
+
+### 23:52 — Recheck B1 fixed: streams re-check this run's read rule
+**Tried:** the authority recheck closed A1–A4 but found B1: the live event stream's recheck only asked whether some session was valid, so a signed-in guest who opened another guest's run through a share kept receiving events after the share was revoked. Now the stream re-reads cookies against current revocations and re-applies the run's read rule (fresh share, not the one cached at open), at most 15 s apart, before sending each received event and before the final `done`.
+**Result:** 150 tests pass (stream tests for a revoked share with a valid session, a revoked session, and a stream that continues while access holds). The recheck's script now stops at the B1 step.
+**So:** revocation ends live streams for every kind of viewer, within 15 s and before any further event is sent.
+Tags: #security #fix

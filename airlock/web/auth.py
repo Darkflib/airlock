@@ -271,12 +271,6 @@ def credentials(cfg: AuthConfig, request: Request) -> tuple[str | None, dict | N
     return user, (share if share and not cfg.share_revoked(share) else None)
 
 
-def still_allowed(cfg: AuthConfig, request: Request) -> bool:
-    """Whether the request's credentials still open its path (for a response that outlives the check)."""
-    user, share = credentials(cfg, request)
-    return bool(user) or bool(share and share_allows(share, request.method, request.url.path))
-
-
 def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     router = APIRouter()
 

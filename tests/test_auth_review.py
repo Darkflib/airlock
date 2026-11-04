@@ -186,13 +186,67 @@ async def test_signed_in_guest_can_read_through_a_share_but_not_decide(env):
         assert (await c.post("/api/runs/guest-private/share")).status_code == 403
 
 
-def test_live_stream_check_notices_a_revoked_session(env):
-    token = session_token(SECRET, "judge-a")
-    req = SimpleNamespace(cookies={SESSION_COOKIE: token}, method="GET",
-                          url=SimpleNamespace(path="/api/runs/x/events"))
-    assert authmod.still_allowed(env.cfg, req)
-    env.cfg.revoke_session(authmod.verify(SECRET, token))
-    assert not authmod.still_allowed(env.cfg, req)
+async def open_stream(env, run_id, cookies, clock):
+    """The real event-stream endpoint for `run_id`, driven directly, with the web module's clock replaced."""
+    from starlette.requests import Request
+    from airlock.events import EventLog
+    from airlock.web import app as web
+    app = create_app(store=env.store, analyse=never, auth=env.cfg, github=GitHub())
+    header = "; ".join(f"{k}={v}" for k, v in cookies.items())
+    request = Request({"type": "http", "method": "GET", "scheme": "https", "path": f"/api/runs/{run_id}/events",
+                       "query_string": b"", "headers": [(b"cookie", header.encode())], "server": ("airlock.test", 443)})
+    request.state.user, request.state.share = authmod.credentials(env.cfg, request)
+    log = EventLog(on_emit=lambda ev: env.store.add_event(run_id, ev))
+    app.state.runner.live[run_id] = log
+    endpoint = next(r.endpoint for r in app.routes if getattr(r, "path", "") == "/api/runs/{run_id}/events")
+    web.time = SimpleNamespace(monotonic=lambda: clock[0], time=time.time)
+    return await endpoint(run_id, request), log
+
+
+@pytest.mark.parametrize("revoke", ["share", "session"])
+async def test_live_stream_stops_when_its_only_grant_is_revoked(env, monkeypatch, revoke):
+    """B1 (recheck): the stream re-checks this run's read rule, not just that some session is valid."""
+    from airlock.web import app as web
+    monkeypatch.setattr(web, "time", web.time)   # restored after the test
+    session = session_token(SECRET, "judge-b")
+    share = share_payload(["private"], by="judge-a")
+    if revoke == "share":   # judge-b reads judge-a's private run only through the share
+        seed(env.store, "private", user="judge-a")
+        cookies = {SESSION_COOKIE: session, SHARE_COOKIE: sign(SECRET, share)}
+    else:                   # judge-b's own run, through the session alone
+        seed(env.store, "private", user="judge-b")
+        cookies = {SESSION_COOKIE: session}
+    clock = [0.0]
+    response, log = await open_stream(env, "private", cookies, clock)
+    body = response.body_iterator
+    try:
+        log.emit("note", "BEFORE")
+        assert "BEFORE" in await asyncio.wait_for(anext(body), 2)
+        if revoke == "share":
+            env.cfg.revoke_share(share["id"])
+        else:
+            env.cfg.revoke_session(authmod.verify(SECRET, session))
+        clock[0] = 16
+        log.emit("note", "AFTER REVOCATION")
+        with pytest.raises(StopAsyncIteration):   # ends without sending the event that arrived
+            await asyncio.wait_for(anext(body), 2)
+    finally:
+        await body.aclose()
+
+
+async def test_live_stream_keeps_going_while_access_holds(env, monkeypatch):
+    from airlock.web import app as web
+    monkeypatch.setattr(web, "time", web.time)
+    seed(env.store, "mine", user="judge-b")
+    clock = [0.0]
+    response, log = await open_stream(env, "mine", {SESSION_COOKIE: session_token(SECRET, "judge-b")}, clock)
+    body = response.body_iterator
+    try:
+        clock[0] = 16
+        log.emit("note", "STILL HERE")
+        assert "STILL HERE" in await asyncio.wait_for(anext(body), 2)
+    finally:
+        await body.aclose()
 
 
 class FailingPending(GitHub):

@@ -240,13 +240,15 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return (run.get("submitted_by") or "").lower() == (user or "").lower()
 
     def readable(run: dict, request: Request) -> bool:
+        return can_read(run, authmod.current_user(request), authmod.current_share(request))
+
+    def can_read(run: dict, user: str | None, share: dict | None) -> bool:
         """Share-link viewers were already limited to their runs by the auth middleware. A signed-in
         guest holding a share link may also read the runs it names (reads only: every mutation checks
         ownership separately)."""
-        user = authmod.current_user(request)
         if user is None or is_owner(user):
             return True
-        if run["id"] in ((authmod.current_share(request) or {}).get("runs") or []):
+        if run["id"] in ((share or {}).get("runs") or []):
             return True
         # An owner's run is shown to guests only when it is demo material: a self-test, a public
         # npm package or a PR from AIRLOCK_GUEST_REPOS. Uploads and other repos stay private.
@@ -538,7 +540,25 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     async def stream(run_id: str, request: Request):
         get_readable(run_id, request)
 
+        checked = None
+
+        def still_readable(force: bool = False) -> bool:
+            """Re-read the cookies against current revocations and the allowlist, then this run's read
+            rule, at least every 15 s: a stream must stop when the share or session that opened it ends,
+            even for a signed-in viewer whose only grant to this run was the share."""
+            nonlocal checked
+            if checked is None:  # first call: the stream has just passed the request's own check
+                checked = time.monotonic()
+            if not auth or (not force and time.monotonic() - checked <= 15):
+                return True
+            checked = time.monotonic()
+            user, share = authmod.credentials(auth, request)
+            if user:
+                return can_read(store.get_run(run_id), user, share)
+            return bool(share and authmod.share_allows(share, request.method, request.url.path))
+
         async def gen():
+            still_readable()  # starts the recheck clock
             log = runner.live.get(run_id)
             q = log.subscribe() if log else None  # subscribe before replay so nothing is missed
             sent = 0
@@ -546,26 +566,23 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                 for ev in store.events(run_id):
                     sent = ev["id"]
                     yield f"event: ev\ndata: {json.dumps(ev)}\n\n"
-                checked = time.monotonic()
                 while q is not None:
-                    if auth and time.monotonic() - checked > 15:
-                        # A revoked session or share link, or an allowlist removal, ends a live stream too.
-                        if not authmod.still_allowed(auth, request):
-                            return
-                        checked = time.monotonic()
                     try:
                         ev = await asyncio.wait_for(q.get(), timeout=15)
                     except asyncio.TimeoutError:
-                        if await request.is_disconnected():
+                        if await request.is_disconnected() or not still_readable():
                             return
                         yield ": keepalive\n\n"
                         continue
+                    if not still_readable():  # checked before sending what arrived, not after
+                        return
                     if ev is None:
                         break
                     if ev.id > sent:
                         sent = ev.id
                         yield f"event: ev\ndata: {json.dumps(ev.to_dict(), default=str)}\n\n"
-                yield f"event: done\ndata: {json.dumps(store.get_run(run_id))}\n\n"
+                if still_readable(force=True):
+                    yield f"event: done\ndata: {json.dumps(store.get_run(run_id))}\n\n"
             finally:
                 if log and q:
                     log.unsubscribe(q)
