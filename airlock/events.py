@@ -104,7 +104,7 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
     return out
 
 
-CANARY_SUFFIXES = (".npmrc", "/.aws/credentials")
+CANARY_SUFFIXES = (".npmrc", "/.aws/credentials", "/.pypirc")
 NPM_MARKERS = ("npm-cli.js", "/bin/npm ", "npm install", "npm pack", "npm init")
 
 

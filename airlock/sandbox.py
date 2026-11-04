@@ -34,7 +34,8 @@ TRACER = Path(__file__).parent / "guest" / "trace.js"
 WATCHER = Path(__file__).parent / "guest" / "watch.py"
 TRACE_LOG = "/tmp/airlock-trace.jsonl"     # written by the Node tracer, as the package user
 WATCH_LOG = "/opt/airlock/watch.jsonl"     # written by the root watcher; unreadable to the package user
-PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user
+PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user; created in other images
+IMAGES = {"npm": "node", "pypi": "python:3.12-slim"}  # the stock node image has no pip (spikes/python_image_probe.py)
 WATCH_READY = ("watcher", "dns", "fanotify")  # every observer must report ready before a run counts
 ACTIVE_SUBNETS: set[int] = set()  # sinkhole /24s held by live Workspaces in this process
 DEFAULT_ALLOW = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
@@ -165,17 +166,21 @@ class Workspace:
 
     async def _seed_canaries(self) -> None:
         npmrc = f"//registry.npmjs.org/:_authToken=npm_{self.canary_token}\n"
+        pypirc = f"[pypi]\nusername = __token__\npassword = pypi-{self.canary_token}\n"
         aws = (f"[default]\naws_access_key_id = AKIA{self.canary_token[-12:]}\n"
                f"aws_secret_access_key = {self.canary_token}/canary\n")
         b = lambda s: base64.b64encode(s.encode()).decode()  # noqa: E731
         for home in (PKG_HOME, "/root"):
             await self.sb.shell(
                 f"mkdir -p {home}/.aws && printf %s {b(npmrc)} | base64 -d > {home}/.npmrc"
-                f" && printf %s {b(aws)} | base64 -d > {home}/.aws/credentials", timeout=20)
-        await self.sb.shell(f"chown -R {PKG_USER}:{PKG_USER} {PKG_HOME} && mkdir -p /tmp/try && chown {PKG_USER} /tmp/try",
+                f" && printf %s {b(aws)} | base64 -d > {home}/.aws/credentials"
+                f" && printf %s {b(pypirc)} | base64 -d > {home}/.pypirc", timeout=20)
+        # Images other than node lack the user (and slim ones lack useradd): add it by hand.
+        await self.sb.shell(f"(id -u {PKG_USER} >/dev/null 2>&1 || (echo '{PKG_USER}:x:1000:1000::{PKG_HOME}:/bin/sh' >> /etc/passwd"
+                            f" && echo '{PKG_USER}:x:1000:' >> /etc/group)) && chown -R {PKG_USER}:{PKG_USER} {PKG_HOME} && mkdir -p /tmp/try && chown {PKG_USER} /tmp/try",
                             timeout=20)
-        self.events.emit("canaries_seeded", "fake ~/.npmrc and ~/.aws/credentials planted",
-                         files=["~/.npmrc", "~/.aws/credentials"], homes=[PKG_HOME, "/root"])
+        self.events.emit("canaries_seeded", "fake ~/.npmrc, ~/.aws/credentials and ~/.pypirc planted",
+                         files=["~/.npmrc", "~/.aws/credentials", "~/.pypirc"], homes=[PKG_HOME, "/root"])
 
     async def _start_watcher(self) -> None:
         """Root watcher (fanotify, DNS, connects). The guest resolver is pointed at it,
@@ -219,7 +224,8 @@ class Workspace:
         """After the run: the watcher is still alive and logged no errors. Otherwise a quiet
         run may just mean Airlock went blind, and a clean verdict can't be trusted."""
         _, errors = await self._watch_status()
-        alive = (await self.sb.shell("pgrep -f /opt/airlock/watch.py >/dev/null && echo up || echo down",
+        # No pgrep in slim images; the [w] keeps this command's own cmdline from matching.
+        alive = (await self.sb.shell("grep -qsa '/opt/airlock/[w]atch.py' /proc/[0-9]*/cmdline && echo up || echo down",
                                      timeout=10)).stdout_text.strip() == "up"
         if errors:
             return False, "watcher errors: " + "; ".join(errors)[:200]

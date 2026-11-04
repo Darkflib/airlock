@@ -1,0 +1,16 @@
+{
+  "name": "tinystamp",
+  "version": "1.0.2",
+  "description": "Minimal timestamped log prefixes",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "keywords": [
+    "log",
+    "logging",
+    "timestamp",
+    "prefix"
+  ]
+}
