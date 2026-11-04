@@ -131,6 +131,19 @@ class Store:
             (run["id"], run["created"], run["created"], run["id"], m["head_sha"], m["owner"], m["repo"])).fetchone()
         return row[0] if row else None
 
+    def run_of_commit(self, owner: str, repo: str, sha: str) -> str | None:
+        """The latest run of a PR head commit that didn't fail, if any."""
+        row = self.db.execute(
+            "SELECT id FROM runs WHERE status != 'error' AND json_extract(meta, '$.head_sha') = ?"
+            " AND lower(json_extract(meta, '$.owner')) = lower(?) AND lower(json_extract(meta, '$.repo')) = lower(?)"
+            " ORDER BY created DESC LIMIT 1", (sha, owner, repo)).fetchone()
+        return row[0] if row else None
+
+    def count_targets(self, since: float, suffix: str) -> int:
+        """Runs created since a time whose target label ends with `suffix` (e.g. webhook runs)."""
+        return self.db.execute("SELECT COUNT(*) FROM runs WHERE created >= ? AND target LIKE ?",
+                               (since, "%" + suffix)).fetchone()[0]
+
     def count_runs(self, since: float, user: str | None = None, exclude: frozenset[str] = frozenset()) -> int:
         """Runs created since a time, for one submitter, or for everyone not in `exclude` (case-insensitive)."""
         rows = self.db.execute("SELECT LOWER(COALESCE(submitted_by, '')) FROM runs WHERE created >= ?", (since,)).fetchall()

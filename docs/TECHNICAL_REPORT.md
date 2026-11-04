@@ -270,7 +270,18 @@ Installed on selected repositories only, with:
 | Pull requests | write | Reading the PR, its files and diff; posting the evidence comment |
 | Commit statuses | write | Posting the `airlock` status that branch protection requires |
 
-It cannot push code, merge, change settings or read secrets. It does not subscribe to webhooks yet: a run starts when someone pastes a PR URL (section 14.2 covers automatic triggers).
+It cannot push code, merge, change settings or read secrets.
+
+### Automatic runs (webhook)
+
+The App subscribes to **Pull request** events and delivers them to `/api/github/webhook`. A run starts by itself when a PR is `opened`, `reopened` or pushed to (`synchronize`); every other action is ignored. The push case matters most: a new head commit has no `airlock` status, so branch protection blocks it, and without the webhook every push would need someone to start a run by hand.
+
+- **Authenticated by signature, not by login.** GitHub can't sign in, so this one path skips the login check. Instead every delivery must carry `X-Hub-Signature-256`, an HMAC-SHA256 of the raw body made with the App's webhook secret, compared in constant time. A bad or missing signature gets 401 and starts nothing. With no secret configured, the endpoint answers 404: it is off, not open.
+- **Only enabled repos.** Deliveries from other repos the App might be installed on are acknowledged and ignored, so a stranger's install can't spend VM time or inference. Today that is the demo repo (`AIRLOCK_GUEST_REPOS`).
+- **One run per commit.** GitHub redelivers when it times out, so each delivery id is used once, and a head commit that already has a run that didn't fail isn't analysed again.
+- **Its own cap:** 50 automatic runs per rolling 24 hours (`AIRLOCK_WEBHOOK_DAILY_RUNS`), so a burst of pushes can't run up the bill.
+- **Answers at once.** The handler replies 202 with the run's URL and the analysis runs afterwards; GitHub stops waiting after 10 seconds and a run takes 12–31 s.
+- **Same run, same gate.** It starts exactly the run the UI would, attributed to the GitHub user who caused the event and marked `(webhook)`. The App posts `pending`, and the decision is still a person's, with the write-access check below.
 
 ### How a token is minted
 
@@ -342,7 +353,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 ## 11. How we tested it
 
-- **Unit tests:** 111, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
+- **Unit tests:** 117, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
 - **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 10 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs. **30/30 correct**, exfiltration proven by payload on 15/15 malicious runs, zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
 - **Live self-test** on the public site: five fixtures, pass only if stealers are malicious *with payload-proven exfil* and benign ones have zero containment. 5/5 on 4 Nov.
 - **Probes** for specific holes: the DNS gateway probe (failed before the DNS guard, passes after), a malformed-DNS probe, the egress probe, the image probe.
@@ -394,7 +405,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy, and there is no backpressure on event queues.
 - **GitHub fetch limits.** The changed-file list stops at 100 files and the diff at 200,000 characters without a completeness marker. Files and diff are fetched by PR number while the archive is fetched by head SHA, so a push mid-run could mismatch.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
-- **No webhooks.** Runs start only when someone submits a PR URL; a new push to the PR isn't picked up automatically.
+- **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3. Redelivery de-duplication is in memory, so a redelivery that arrives across a restart is caught only by the one-run-per-commit check.
 - **Share links can't be revoked one by one,** and sessions can't be killed individually; both rely on the allowlist check or rotating the shared secret.
 - **No retry for a failed GitHub post** after a decision; the PR stays safely at `pending` but needs a new run.
 - **Self-hosting** still depends on personal defaults (domain, SSH key, 1Password item names) and lacks a complete `.env.example` and App setup guide.
@@ -418,7 +429,7 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 
 - **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour, and **Approve / Reject buttons on the check itself** (Check Run requested actions), so reviewers decide inside GitHub and GitHub's own permissions say who may.
 - **One GitHub App for everything:** sign users in through the GitHub App (user-to-server tokens) instead of a separate OAuth App, and let an org admin install it once and pick repos, with no allowlist file.
-- **Automatic triggers:** subscribe the App to `pull_request` webhooks and run on every PR (and every new push) that touches a lockfile, a manifest or a vendored archive, including Dependabot/Renovate PRs, without anyone pasting a URL.
+- **Smarter automatic triggers:** the webhook already runs every PR and push in an enabled repo. Next: enable it per installation, and skip PRs that touch no lockfile, manifest or vendored archive, so Dependabot/Renovate bumps are covered without detonating documentation changes.
 - **Policy as code.** Teams decide what may auto-approve: e.g. "no new behaviours and no containment → approve", "any PROVEN exfil → block and page security", "new network host → require a security reviewer". Humans then look only at what matters.
 - **Allowlists per repo** for known, expected behaviour (a package that legitimately downloads a binary from its own CDN), versioned and reviewed like code.
 - **A cache of results by package hash.** The same `left-pad@1.3.0` tarball doesn't need to be detonated again for every repo; reuse the evidence, re-detonate on a schedule.

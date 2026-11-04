@@ -532,3 +532,9 @@ Tags: #decision
 **Result:** 111 tests pass (5 new: admin, write, read, none, GitHub down). Deployed; on the host the App's token returns `admin` for Darkflib and `none` for a non-collaborator on `Darkflib/airlock-demo`, so the existing Metadata permission is enough.
 **So:** judges can still run the demo PRs and see the verdict, but only the repo owner can approve or reject them on GitHub. The video is unaffected (Darkflib decides). Report section 9 updated; the gap is off the weaknesses list.
 Tags: #decision #win
+
+### 14:55 — GitHub webhook: PRs run themselves
+**Tried:** added `POST /api/github/webhook` so the App's Pull request events start runs: `opened`, `reopened`, `synchronize` on repos in `AIRLOCK_GUEST_REPOS`. Public path, authenticated by `X-Hub-Signature-256` (HMAC-SHA256 with the App's webhook secret, constant-time compare); 404 when no secret is configured. One run per delivery id and per head commit, 50 automatic runs per rolling 24 h, 202 at once with the run URL. Same run and gate as the UI; the decision stays human. Secret is the `webhook-secret` field of the 1Password App item; `deploy.sh` passes it when present.
+**Result:** 117 tests pass (6 new: signed start held at pending, bad/missing signature, disabled without secret, ping and ignored events, redelivery and same commit, daily cap). Live: unsigned POST → 401; signed ping → 200 `{"ok": true}`.
+**So:** a push to a demo PR now starts a run with nobody pasting a URL; F11 done. Don't push to PR #1 before the gate shot, or it starts a run.
+Tags: #win #demo

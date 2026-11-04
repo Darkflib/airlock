@@ -74,7 +74,7 @@ One run per submitted change. The PR flow is the headline:
 | F8 | Human approval gate before any outward action; commit status and PR comment via GitHub App | P0 | Done |
 | F9 | Behaviour diff: merge base vs PR head, each detonated in its own microVM (`airlock/behaviour.py`) | P1 | Done |
 | F10 | Playwright screenshot verification (Pattern B) | P1 | Descoped (4 Nov): the demo repo has no UI to check |
-| F11 | Automatic trigger on PR open (App webhook) | P2 | Not started |
+| F11 | Automatic trigger on PR open (App webhook) | P2 | Done 4 Nov: `opened`/`reopened`/`synchronize` on `AIRLOCK_GUEST_REPOS`, signed, 50/day; needs the `webhook-secret` field in 1Password + App settings |
 | F12 | PyPI support: sdist upload and `pypi:name==version`, installed from source so `setup.py` runs | P2 | Done |
 | F13 | Language-agnostic observation: in-guest watcher (fanotify, DNS, TCP), package runs unprivileged | Added | Done |
 | F14 | Sinkhole: fake DNS into a per-run /24, mitmproxy answers and logs, exfil **proven** with the payload | Added | Done |

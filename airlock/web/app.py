@@ -4,6 +4,8 @@ reject the verdict. Untrusted code never runs here, only in the run's microVM.""
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -14,7 +16,7 @@ from contextlib import asynccontextmanager
 from typing import Awaitable, Callable
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -31,6 +33,8 @@ GUEST_REPOS = frozenset(r.strip().lower() for r in
 SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~=*-]+)?$", re.I)  # no shell syntax
 MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
+WEBHOOK_ACTIONS = {"opened", "synchronize", "reopened"}  # a new PR, a new push to it, a PR back from closed
+WEBHOOK_LABEL = " (webhook)"
 FIXTURES = Path(os.environ.get("AIRLOCK_FIXTURES", Path(__file__).parents[2] / "evals" / "fixtures"))
 # The containment self-test: known packages, and what a correct run must show for each.
 SELFTEST = [
@@ -126,7 +130,7 @@ class Decision(BaseModel):
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
                auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
                github: GitHubApp | None = None, user_daily: int | None = None,
-               global_daily: int | None = None,
+               global_daily: int | None = None, webhook_secret: str | None = None,
                reap: Callable[[], Awaitable[tuple[list[str], list[str]]]] | None = None) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config.
 
@@ -176,6 +180,9 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
     owners = auth.allowed if auth else frozenset()
+    webhook_secret = webhook_secret if webhook_secret is not None else os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    webhook_daily = int(os.environ.get("AIRLOCK_WEBHOOK_DAILY_RUNS", 50))
+    deliveries: set[str] = set()  # GitHub redelivers on timeouts; one run per delivery
 
     def is_owner(user: str | None) -> bool:
         return not auth or (user or "").lower() in owners
@@ -294,6 +301,39 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                                     "a PyPI spec like pypi:requests==2.32.3, or upload a package")
             run_id = runner.start(spec, spec, user, demo=True)  # public registry packages only
         return {"id": run_id, "url": f"/runs/{run_id}"}
+
+    @app.post("/api/github/webhook")
+    async def github_webhook(request: Request):
+        """Runs a PR automatically when it is opened, reopened or pushed to. Public (GitHub can't
+        sign in), so every delivery must carry GitHub's HMAC signature made with our webhook
+        secret. Acts only on AIRLOCK_GUEST_REPOS, under its own daily cap; the decision stays human."""
+        if not webhook_secret or github is None:
+            raise HTTPException(404)
+        body = await request.body()
+        sig = "sha256=" + hmac.new(webhook_secret.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, request.headers.get("x-hub-signature-256", "")):
+            raise HTTPException(401, "bad signature")
+        event = request.headers.get("x-github-event", "")
+        if event == "ping":
+            return {"ok": True}
+        payload = json.loads(body)
+        if event != "pull_request" or payload.get("action") not in WEBHOOK_ACTIONS:
+            return {"ignored": f"{event}/{payload.get('action')}"}
+        slug, pr = payload["repository"]["full_name"], payload["pull_request"]
+        if slug.lower() not in GUEST_REPOS:
+            return {"ignored": f"{slug} is not enabled for automatic runs"}
+        delivery = request.headers.get("x-github-delivery", "")
+        owner, repo = slug.split("/", 1)
+        seen = bool(delivery) and delivery in deliveries
+        if seen or (done := store.run_of_commit(owner, repo, pr["head"]["sha"])):
+            return {"ignored": "already analysed", "run": None if seen else done}
+        if store.count_targets(time.time() - 86400, WEBHOOK_LABEL) >= webhook_daily:
+            raise HTTPException(429, f"daily limit of {webhook_daily} automatic runs reached")
+        if delivery:
+            deliveries.add(delivery)
+        url = f"https://github.com/{slug}/pull/{pr['number']}"
+        run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True)
+        return JSONResponse({"id": run_id, "url": f"{public_url}/runs/{run_id}"}, status_code=202)
 
     @app.get("/selftests/{test_id}")
     async def selftest_page(test_id: str):
