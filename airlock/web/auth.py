@@ -261,6 +261,22 @@ def _safe_next(path: str | None) -> str:
     return path if path and path.startswith("/") and not path.startswith("//") else "/"
 
 
+def credentials(cfg: AuthConfig, request: Request) -> tuple[str | None, dict | None]:
+    """(signed-in login, share grant) from the request's cookies, each checked against the current
+    allowlist and revocations. Re-run by long-lived responses (the event stream) to notice revocation."""
+    session = verify_kind(cfg.session_secret, request.cookies.get(SESSION_COOKIE), None)
+    user = (session["login"] if session and session.get("login") and cfg.is_allowed(session["login"])
+            and cfg.session_ok(session) else None)
+    share = verify_kind(cfg.session_secret, request.cookies.get(SHARE_COOKIE), "share")
+    return user, (share if share and not cfg.share_revoked(share) else None)
+
+
+def still_allowed(cfg: AuthConfig, request: Request) -> bool:
+    """Whether the request's credentials still open its path (for a response that outlives the check)."""
+    user, share = credentials(cfg, request)
+    return bool(user) or bool(share and share_allows(share, request.method, request.url.path))
+
+
 def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     router = APIRouter()
 
@@ -335,15 +351,14 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     @app.middleware("http")
     async def require_login(request: Request, call_next):
         path = request.url.path
-        session = verify_kind(cfg.session_secret, request.cookies.get(SESSION_COOKIE), None)
-        if session and session.get("login") and cfg.is_allowed(session["login"]) and cfg.session_ok(session):
-            request.state.user = session["login"]
-            return await call_next(request)
-        share = verify_kind(cfg.session_secret, request.cookies.get(SHARE_COOKIE), "share")
-        if share and not cfg.share_revoked(share):
+        user, share = credentials(cfg, request)
+        if share:  # also for a signed-in guest: a share adds read access to its runs, never write
             request.state.share = share
-            if share_allows(share, request.method, path):
-                return await call_next(request)
+        if user:
+            request.state.user = user
+            return await call_next(request)
+        if share and share_allows(share, request.method, path):
+            return await call_next(request)
         if any(path.startswith(p) for p in PUBLIC_PATHS):
             return await call_next(request)
         if path.startswith("/api/"):

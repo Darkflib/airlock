@@ -1,4 +1,6 @@
 import hashlib
+import time
+from datetime import datetime, timezone
 import hmac
 import json
 
@@ -95,21 +97,25 @@ def test_daily_cap(make, monkeypatch):
 
 class CommentGitHub(PermGitHub):
     """Knows each login's access, and the PR's current head commit."""
-    def __init__(self, perms=None, head=META["head_sha"]):
+    def __init__(self, perms=None, head=META["head_sha"], author="Darkflib"):
         super().__init__(perms or {"Darkflib": "admin", "dev-writer": "write", "reader": "read"})
-        self.head = head
+        self.head, self.author = head, author
 
     async def pull_request(self, owner, repo, number):
-        return SimpleNamespace(head_sha=self.head)
+        return SimpleNamespace(head_sha=self.head, author=self.author)
 
     def replies(self):
         return [x[2] for x in self.calls if x[0] == "comment" and x[2].startswith("@")]
 
 
-def pr_comment(body, login="Darkflib", kind="User", number=3):
+def now_iso(offset=0.0):
+    return datetime.fromtimestamp(time.time() + offset, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def pr_comment(body, login="Darkflib", kind="User", number=3, at=None):
     return {"action": "created", "repository": {"full_name": "Darkflib/airlock-demo"},
             "issue": {"number": number, "pull_request": {"url": "x"}},
-            "comment": {"body": body}, "sender": {"login": login, "type": kind}}
+            "comment": {"body": body, "created_at": at or now_iso(1)}, "sender": {"login": login, "type": kind}}
 
 
 def analysed(c):
@@ -185,7 +191,8 @@ def test_command_in_a_pr_review_body(make):
     with make(gh=gh) as c:
         run_id = analysed(c)
         review = {"action": "submitted", "repository": {"full_name": "Darkflib/airlock-demo"},
-                  "pull_request": {"number": 3}, "review": {"body": "/airlock approve ok", "state": "commented"},
+                  "pull_request": {"number": 3}, "review": {"body": "/airlock approve ok", "state": "commented",
+                                                            "commit_id": META["head_sha"], "submitted_at": now_iso(1)},
                   "sender": {"login": "dev-writer", "type": "User"}}
         assert "ignored" in deliver(c, {**review, "action": "edited"}, event="pull_request_review", delivery="r0").json()
         assert deliver(c, review, event="pull_request_review", delivery="r1").json() == {"decided": "approved", "run": run_id}

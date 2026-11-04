@@ -598,3 +598,15 @@ Tags: #bug #demo
 **Result:** delivered at 23:05:38; the run was approved by @Darkflib, the `airlock` status went `success` ("approved by @Darkflib (verdict: benign)") and the run's existing comment was rewritten in place to "BENIGN, approved by @Darkflib", six seconds after the comment.
 **So:** the whole loop now happens inside GitHub: push → placeholder comment → evidence comment with how to decide → `/airlock approve` → green check.
 Tags: #win #demo
+
+### 23:16 — Independent authentication and authority review
+**Tried:** rechecked the earlier reviews against `cd889d5`, traced OAuth/session/share and web/GitHub decision authority, and exercised temporary databases with fake GitHub clients; no live writes or package execution.
+**Result:** 138 existing tests pass in 5.66 s with loopback enabled. Six safe reproductions confirm decision/supersession races, an old review approving the current head, cross-PR run selection, legacy upload labels migrated to guest-visible demos, and share access failing for signed-in guests. Details and prior-fix disposition: [AUTH_REVIEW-2026-11-04.md](AUTH_REVIEW-2026-11-04.md); reproductions: `spikes/auth_review_20261104.py`.
+**So:** the main earlier fixes are present, but serialize gate transitions, bind commands to the intended PR/commit, and make legacy visibility default private before relying on private analysis and merge approval. Review artifacts only; no application fix or deployment performed.
+Tags: #security #decision
+
+### 23:45 — Authority review fixed: atomic decisions, commands bound to PR, commit and time
+**Tried:** fixed all of AUTH_REVIEW-2026-11-04: atomic decision claim plus per-commit serialized GitHub writes (A1); review commit and comment time must match the result decided (A2); legacy runs private unless self-test or guest-repo PR (A3); runs selected by PR number, self-approval against the PR's current author (A4); shares readable by signed-in guests (read only), streams recheck credentials every 15 s, PR comments admit when the pending status couldn't be set.
+**Result:** 148 tests pass (10 new in `tests/test_auth_review.py`, one per reproduction plus the gaps). Production checked for A3: the only guest-visible non-PR, non-self-test runs are `left-pad@1.3.0`; nothing to repair. Fix table appended to the review.
+**So:** a decision now applies only to the run, PR, commit and result its author acted on, and an older write can't overwrite a newer one. Constraint: one uvicorn worker.
+Tags: #security #fix

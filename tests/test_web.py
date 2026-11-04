@@ -192,11 +192,13 @@ def test_backfill_marks_only_demo_material(tmp_path):
     from airlock.store import Store
     store = Store(tmp_path / "b.db")
     for i, target in enumerate(["self-test: Node credential stealer", "Darkflib/airlock-demo#3", "acme/private#9",
-                                "left-pad@1.3.0", "@scope/pkg@1.0.0", "acme-internal.tgz"]):
+                                "left-pad@1.3.0", "@scope/pkg@1.0.0", "acme-internal.tgz", "acme-internal",
+                                "acme-internal.tar.gz"]):
         store.create_run(str(i), target)
     store.db.execute("UPDATE runs SET demo = NULL")
     store.backfill_demo(frozenset({"darkflib/airlock-demo"}))
-    assert [bool(store.get_run(str(i))["demo"]) for i in range(6)] == [True, True, False, True, True, False]
+    # old uploads kept their original filename as the label, so a package-looking label stays private
+    assert [bool(store.get_run(str(i))["demo"]) for i in range(8)] == [True, True, False, False, False, False, False, False]
 
 
 @pytest.mark.parametrize("broken", [False, True])

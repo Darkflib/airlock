@@ -6,30 +6,36 @@ from __future__ import annotations
 MAX_ITEMS = 8
 
 
-def how_to_decide(run_url: str) -> list[str]:
-    return ["**Waiting for a decision.** The `airlock` check stays pending and this PR can't merge until someone "
-            "with write access to the repository comments `/airlock approve` or `/airlock reject` (a note after "
-            f"it is kept with the decision), or decides on the [run page]({run_url}).", ""]
+NOT_HELD = ("⚠ **Airlock could not set the `airlock` check on GitHub**, so the check may still show an earlier "
+            "result for this commit, possibly a pass. Don't merge on it until it reads pending or shows a decision.")
 
 
-def build_progress(run: dict, run_url: str, failed: str | None = None) -> str:
+def how_to_decide(run_url: str, held: bool = True) -> list[str]:
+    gate = ("The `airlock` check stays pending and this PR can't merge" if held else NOT_HELD + " Nothing is final")
+    return [f"**Waiting for a decision.** {gate} until someone with write access to the repository comments "
+            "`/airlock approve` or `/airlock reject` (a note after it is kept with the decision), or decides on the "
+            f"[run page]({run_url}).", ""]
+
+
+def build_progress(run: dict, run_url: str, failed: str | None = None, held: bool = True) -> str:
     """The comment while the run is in progress, or after it failed."""
     head = run["meta"].get("head_sha", "")[:7]
     if failed:
         return "\n".join([
             "### Airlock: run failed", "",
             f"Airlock couldn't finish testing this PR's head (`{head}`): {failed[:300]}", "",
-            "The `airlock` check is set to error, so this PR can't merge on Airlock's word. Push again, or rerun "
-            "it from Airlock, before merging.", "", f"[Run timeline]({run_url})"])
+            ("The `airlock` check is set to error, so this PR can't merge on Airlock's word." if held else NOT_HELD)
+            + " Push again, or rerun it from Airlock, before merging.", "", f"[Run timeline]({run_url})"])
     return "\n".join([
         "### Airlock: testing this PR…", "",
         f"Airlock is installing and testing this PR's head (`{head}`) in a disposable microVM with fake "
         "credentials and no internet access beyond the package registries. This comment updates with the "
-        "results, usually within a minute; the `airlock` check stays pending meanwhile.", "",
+        "results, usually within a minute; " + ("the `airlock` check stays pending meanwhile." if held else "")
+        + ("" if held else "\n\n" + NOT_HELD), "",
         f"[Watch it live]({run_url})"])
 
 
-def build_comment(run: dict, events: list[dict], run_url: str) -> str:
+def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True) -> str:
     verdict, decision, who = run["verdict"] or "inconclusive", run["decision"], run.get("decided_by") or "a reviewer"
     head = run["meta"].get("head_sha", "")[:7]
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
@@ -77,7 +83,7 @@ def build_comment(run: dict, events: list[dict], run_url: str) -> str:
     if run.get("evidence"):
         lines += ["**Reviewer's evidence**", ""] + [f"- {p}" for p in run["evidence"][:MAX_ITEMS]] + [""]
     if not decision:
-        lines += how_to_decide(run_url)
+        lines += how_to_decide(run_url, held)
     if run.get("decision_note"):
         lines += [f"> {run['decision_note']}", ""]
     lines.append(f"[Full run timeline]({run_url}) · reviewer model `{run.get('model') or '?'}`")

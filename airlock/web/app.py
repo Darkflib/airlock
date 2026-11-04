@@ -13,6 +13,7 @@ import secrets
 import time
 from pathlib import Path
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Awaitable, Callable
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -131,6 +132,14 @@ class Decision(BaseModel):
     note: str = ""
 
 
+def github_time(ts: str | None) -> float | None:
+    """GitHub's ISO 8601 timestamps (`2026-11-04T23:05:32Z`) as epoch seconds."""
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp() if ts else None
+    except ValueError:
+        return None
+
+
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
                auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
                github: GitHubApp | None = None, user_daily: int | None = None,
@@ -160,18 +169,25 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         m = run["meta"]
         if m.get("kind") != "pr" or not github:
             return
-        if newer := store.newer_run_of_commit(run):
-            log.emit("github_status", f"not updating the GitHub status: run {newer} of the same commit is newer",
-                     superseded_by=newer, source="github")
-            return
         if phase == "verdict" and auto_reject and store.proven_exfil(run_id):
             # Deterministic, not the model's word: a payload captured on the host carried this run's
             # canary token. Reject at once; anything short of proof still waits for a person.
             reason = "exfiltration proven by a captured payload"
-            store.update_run(run_id, decision="rejected", decided=time.time(), decided_by=None,
-                             meta={**m, "auto_decision": reason})
-            log.emit("decision", f"rejected automatically: {reason}", source="airlock")
-            await post_to_pr(store.get_run(run_id))
+            if store.claim_decision(run_id, "rejected", None, meta_patch={"auto_decision": reason}):
+                log.emit("decision", f"rejected automatically: {reason}", source="airlock")
+                await post_to_pr(store.get_run(run_id))
+                return
+        async with commit_lock(m):
+            await gate_writes(run_id, phase, log)
+
+    async def gate_writes(run_id: str, phase: str, log: EventLog) -> None:
+        """gate_pr's GitHub writes, under the commit's lock: re-checked here, so a write for an older
+        run can't land after a newer run's."""
+        run = store.get_run(run_id)
+        m = run["meta"]
+        if newer := store.newer_run_of_commit(run):
+            log.emit("github_status", f"not updating the GitHub status: run {newer} of the same commit is newer",
+                     superseded_by=newer, source="github")
             return
         state, desc = {
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
@@ -190,9 +206,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             gate = {"state": state, "synced": False, "error": f"{type(e).__name__}: {e}"[:200]}
         # One comment per run, rewritten as it goes, so the PR itself shows progress and how to decide.
         run_url, extra = f"{public_url}/runs/{run_id}", {}
-        body = (build_progress(run, run_url) if phase == "started"
-                else build_progress(run, run_url, failed=run.get("error") or "unknown error") if phase == "error"
-                else build_comment(run, store.events(run_id), run_url))
+        held = gate["synced"]  # the comment must not claim the merge is held when the status write failed
+        body = (build_progress(run, run_url, held=held) if phase == "started"
+                else build_progress(run, run_url, failed=run.get("error") or "unknown error", held=held)
+                if phase == "error" else build_comment(run, store.events(run_id), run_url, held=held))
         try:
             extra["comment_url"] = await github.comment(m["owner"], m["repo"], m["number"], body,
                                                         edit=m.get("comment_url"))
@@ -201,6 +218,12 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                      f"{type(e).__name__}: {str(e)[:150]}")
         store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate, **extra})
     auto_reject = os.environ.get("AIRLOCK_AUTO_REJECT", "1") != "0"
+    # Outbound writes per commit are serialized in this process: statuses are per repo/SHA, so the
+    # latest-run check and the write must happen together. One uvicorn worker (see airlock-web.service).
+    locks: dict[tuple[str, str, str], asyncio.Lock] = {}
+
+    def commit_lock(m: dict) -> asyncio.Lock:
+        return locks.setdefault((m["owner"].lower(), m["repo"].lower(), m["head_sha"]), asyncio.Lock())
     self_approval = os.environ.get("AIRLOCK_SELF_APPROVAL", "1") != "0"
     runner = Runner(store, analyse, gate=gate_pr)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
@@ -217,9 +240,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return (run.get("submitted_by") or "").lower() == (user or "").lower()
 
     def readable(run: dict, request: Request) -> bool:
-        """Share-link viewers were already limited to their runs by the auth middleware."""
+        """Share-link viewers were already limited to their runs by the auth middleware. A signed-in
+        guest holding a share link may also read the runs it names (reads only: every mutation checks
+        ownership separately)."""
         user = authmod.current_user(request)
         if user is None or is_owner(user):
+            return True
+        if run["id"] in ((authmod.current_share(request) or {}).get("runs") or []):
             return True
         # An owner's run is shown to guests only when it is demo material: a self-test, a public
         # npm package or a PR from AIRLOCK_GUEST_REPOS. Uploads and other repos stay private.
@@ -355,7 +382,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         delivery = request.headers.get("x-github-delivery", "")
         owner, repo = slug.split("/", 1)
         seen = bool(delivery) and delivery in deliveries
-        if seen or (done := store.run_of_commit(owner, repo, pr["head"]["sha"])):
+        if seen or (done := store.run_of_commit(owner, repo, pr["head"]["sha"], pr["number"])):
             return {"ignored": "already analysed", "run": None if seen else done}
         if store.count_targets(time.time() - 86400, WEBHOOK_LABEL) >= webhook_daily:
             raise HTTPException(429, f"daily limit of {webhook_daily} automatic runs reached")
@@ -398,14 +425,29 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             return {"refused": text}
 
         try:
-            head = (await github.pull_request(owner, repo, number)).head_sha
+            current = await github.pull_request(owner, repo, number)
         except Exception as e:  # noqa: BLE001
             return await reply(f"Airlock couldn't read this pull request from GitHub ({type(e).__name__}); try again.")
-        run_id = store.run_of_commit(owner, repo, head)
+        head = current.head_sha
+        # Bind the command to what its author saw: a review names the commit it reviewed, and any
+        # command must be written after the verdict it decides was published. A delivery that arrives
+        # after a new push and analysis must not approve a commit its author never looked at.
+        reviewed = (payload.get("review") or {}).get("commit_id")
+        if reviewed and reviewed != head:
+            return await reply(f"not recorded: your review is of `{reviewed[:7]}`, but this PR's head is now "
+                               f"`{head[:7]}`. Review the latest commit and decide again.")
+        run_id = store.run_of_commit(owner, repo, head, number)
         if not run_id:
             return await reply(f"Airlock hasn't analysed the head commit `{head[:7]}` yet, so there's nothing to decide.")
+        run = store.get_run(run_id)
+        written = github_time((payload.get("review") or {}).get("submitted_at")
+                              or (payload.get("comment") or {}).get("created_at"))
+        if run["status"] == "done" and (written is None or not run.get("finished") or written < run["finished"]):
+            return await reply(f"not recorded: Airlock's result for `{head[:7]}` was published after your comment, "
+                               "so it may not be what you meant to decide. Read the updated result and comment again.")
         try:
-            run = await apply_decision(store.get_run(run_id), decision, user, cmd.group(2).strip(), via="github")
+            run = await apply_decision(run, decision, user, cmd.group(2).strip(), via="github",
+                                       author=getattr(current, "author", None))
         except HTTPException as e:
             return await reply(f"not recorded: {e.detail}.")
         return {"decided": run["decision"], "run": run_id}
@@ -504,7 +546,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                 for ev in store.events(run_id):
                     sent = ev["id"]
                     yield f"event: ev\ndata: {json.dumps(ev)}\n\n"
+                checked = time.monotonic()
                 while q is not None:
+                    if auth and time.monotonic() - checked > 15:
+                        # A revoked session or share link, or an allowlist removal, ends a live stream too.
+                        if not authmod.still_allowed(auth, request):
+                            return
+                        checked = time.monotonic()
                     try:
                         ev = await asyncio.wait_for(q.get(), timeout=15)
                     except asyncio.TimeoutError:
@@ -533,8 +581,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can decide it")
         return await apply_decision(run, body.decision, user, body.note, via="web")
 
-    async def apply_decision(run: dict, decision: str, user: str | None, note: str, via: str) -> dict:
-        """The decision rules shared by the run page and `/airlock` PR comments."""
+    async def apply_decision(run: dict, decision: str, user: str | None, note: str, via: str,
+                             author: str | None = None) -> dict:
+        """The decision rules shared by the run page and `/airlock` PR comments. `author` is the PR's
+        current author when the caller fetched it from GitHub (the run's cached one otherwise)."""
         run_id = run["id"]
         if run["status"] != "done":
             raise HTTPException(409, "no verdict yet")
@@ -546,10 +596,14 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(400, "decision must be approved or rejected")
         if newer := store.newer_run_of_commit(run):
             raise HTTPException(409, f"run {newer} reviewed the same commit later; decide that one instead")
-        no_self_approval(run, decision, user)
+        no_self_approval(run, decision, user, author)
         await require_write(run, user, force=via == "github")
-        store.update_run(run_id, decision=decision, decision_note=note[:500], decided=time.time(), decided_by=user,
-                         meta={**(run["meta"] or {}), "decided_via": via})
+        # The checks above ran before an await; the claim re-checks undecided + latest atomically.
+        if not store.claim_decision(run_id, decision, user, note, meta_patch={"decided_via": via}):
+            latest = store.get_run(run_id)
+            raise HTTPException(409, f"already {latest['decision']} by @{latest['decided_by']}" if latest["decision"]
+                                else f"run {store.newer_run_of_commit(latest)} reviewed the same commit later; "
+                                     "decide that one instead")
         store.append_event(run_id, "decision", f"{decision} by @{user}" + (" in a GitHub comment" if via == "github" else ""),
                            source="github" if via == "github" else "airlock")
         run = store.get_run(run_id)
@@ -574,8 +628,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(403, f"deciding this PR sets its merge check, so it needs write access to "
                                      f"{slug} on GitHub; @{user} has {perm}")
 
-    def no_self_approval(run: dict, decision: str, user: str | None) -> None:
-        author = ((run["meta"] or {}).get("author") or "").lower()
+    def no_self_approval(run: dict, decision: str, user: str | None, author: str | None = None) -> None:
+        author = (author or (run["meta"] or {}).get("author") or "").lower()
         if decision == "approved" and not self_approval and author and author == (user or "").lower():
             raise HTTPException(403, "the PR's author can't approve their own change here; ask another maintainer")
 
@@ -598,7 +652,18 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return store.get_run(run_id)
 
     async def post_to_pr(run: dict) -> None:
-        """The outward action, only after a human decision: commit status + comment as the App's bot."""
+        """The outward action, only after a human decision: commit status + comment as the App's bot.
+        Under the commit's lock, and only while this run is still the latest of its commit."""
+        async with commit_lock(run["meta"]):
+            run = store.get_run(run["id"])
+            if newer := store.newer_run_of_commit(run):
+                store.update_run(run["id"], meta={**run["meta"], "posted": {"error": f"superseded by run {newer}"}})
+                store.append_event(run["id"], "github_status", f"not posting: run {newer} of the same commit is newer",
+                                   superseded_by=newer, source="github")
+                return
+            await post_writes(run)
+
+    async def post_writes(run: dict) -> None:
         m, run_url = run["meta"], f"{public_url}/runs/{run['id']}"
         state = "success" if run["decision"] == "approved" else "failure"
         desc = (f"rejected automatically: {m['auto_decision']}" if m.get("auto_decision")

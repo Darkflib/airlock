@@ -74,12 +74,13 @@ class Store:
         self.db.commit()
 
     def backfill_demo(self, guest_repos: frozenset[str]) -> None:
-        """Runs from before the demo flag: only self-tests, npm specs and guest-repo PRs are demo."""
+        """Runs from before the demo flag: only self-tests and guest-repo PRs are demo. Everything else
+        stays private: an old upload kept its original filename as the label, so `acme-internal` can't
+        be told apart from an npm package name, and an ambiguous run must not become guest-visible."""
         rows = self.db.execute("SELECT id, target FROM runs WHERE demo IS NULL").fetchall()
         for run_id, target in rows:
             t = target.lower()
-            demo = t.startswith("self-test:") or t.split("#")[0] in guest_repos or (
-                "#" not in t and "/" not in t.lstrip("@").split("/", 1)[-1] and not t.endswith(".tgz"))
+            demo = t.startswith("self-test:") or t.split("#")[0] in guest_repos
             self.db.execute("UPDATE runs SET demo = ? WHERE id = ?", (int(demo), run_id))
         self.db.commit()
 
@@ -131,13 +132,36 @@ class Store:
             (run["id"], run["created"], run["created"], run["id"], m["head_sha"], m["owner"], m["repo"])).fetchone()
         return row[0] if row else None
 
-    def run_of_commit(self, owner: str, repo: str, sha: str) -> str | None:
-        """The latest run of a PR head commit that didn't fail, if any."""
+    def run_of_commit(self, owner: str, repo: str, sha: str, number: int | None = None) -> str | None:
+        """The latest run of a PR head commit that didn't fail, if any; of that PR when `number` is given
+        (two PRs can share a head commit, but each run belongs to one PR, its author and its base)."""
         row = self.db.execute(
             "SELECT id FROM runs WHERE status != 'error' AND json_extract(meta, '$.head_sha') = ?"
             " AND lower(json_extract(meta, '$.owner')) = lower(?) AND lower(json_extract(meta, '$.repo')) = lower(?)"
-            " ORDER BY created DESC LIMIT 1", (sha, owner, repo)).fetchone()
+            " AND (? IS NULL OR json_extract(meta, '$.number') = ?)"
+            " ORDER BY created DESC LIMIT 1", (sha, owner, repo, number, number)).fetchone()
         return row[0] if row else None
+
+    def claim_decision(self, run_id: str, decision: str, decided_by: str | None, note: str = "",
+                       meta_patch: dict | None = None) -> bool:
+        """Record a decision only if the run is still undecided and still the latest run of its commit,
+        in one conditional UPDATE. Checks made before an await (e.g. asking GitHub about permissions)
+        can be stale by the time it returns; this is the check that counts."""
+        run = self.get_run(run_id)
+        if not run:
+            return False
+        meta = {**(run["meta"] or {}), **(meta_patch or {})}
+        cur = self.db.execute(
+            "UPDATE runs SET decision = ?, decision_note = ?, decided = ?, decided_by = ?, meta = ?"
+            " WHERE id = ? AND decision IS NULL AND NOT EXISTS (SELECT 1 FROM runs n WHERE n.id != runs.id"
+            "   AND (n.created > runs.created OR (n.created = runs.created AND n.id > runs.id))"
+            "   AND json_extract(runs.meta, '$.head_sha') IS NOT NULL"
+            "   AND json_extract(n.meta, '$.head_sha') = json_extract(runs.meta, '$.head_sha')"
+            "   AND lower(json_extract(n.meta, '$.owner')) = lower(json_extract(runs.meta, '$.owner'))"
+            "   AND lower(json_extract(n.meta, '$.repo')) = lower(json_extract(runs.meta, '$.repo')))",
+            (decision, note[:500], time.time(), decided_by, json.dumps(meta), run_id))
+        self.db.commit()
+        return cur.rowcount == 1
 
     def count_targets(self, since: float, suffix: str) -> int:
         """Runs created since a time whose target label ends with `suffix` (e.g. webhook runs)."""
