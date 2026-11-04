@@ -610,3 +610,9 @@ Tags: #security #decision
 **Result:** 148 tests pass (10 new in `tests/test_auth_review.py`, one per reproduction plus the gaps). Production checked for A3: the only guest-visible non-PR, non-self-test runs are `left-pad@1.3.0`; nothing to repair. Fix table appended to the review.
 **So:** a decision now applies only to the run, PR, commit and result its author acted on, and an older write can't overwrite a newer one. Constraint: one uvicorn worker.
 Tags: #security #fix
+
+### 23:33 — Comment approval rechecked after the review fixes (PR #7)
+**Tried:** opened PR #7 on the deployed `aebf7ef` build and commented `/airlock approve` after the result was published.
+**Result:** webhook run at 23:32:02, evidence comment by 23:32:06 (written in place), `/airlock approve` at 23:32:57, `success` "approved by @Darkflib (verdict: benign)" at 23:33:00 and the comment rewritten to "BENIGN, approved by @Darkflib". The new time and PR binding accepted it as intended.
+**So:** the gate shot's `/airlock approve` works on the hardened build.
+Tags: #win #demo
