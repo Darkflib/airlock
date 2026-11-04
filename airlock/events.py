@@ -251,11 +251,16 @@ def events_from_sinkhole(records: list[dict], canary_token: str) -> list[tuple[s
         body, host, url = rec.get("body", ""), rec.get("host", "?"), rec.get("url", "?")
         data = {"host": host, "url": url, "method": rec.get("method"), "bytes": rec.get("bytes", 0),
                 "payload": body[:2000], "user_agent": rec.get("user_agent", ""), "source_kind": "sinkhole"}
-        if "AIRLOCKCANARY" in body:
+        if canary_token in body:
             out.append(("canary_exfil",
                         f"{rec.get('method')} {url} carried the canary credentials: captured by Airlock's sinkhole, "
                         "never reached the internet",
-                        {**data, "proven": True, "this_run": canary_token in body}))
+                        {**data, "proven": True, "this_run": True}))
+        elif "AIRLOCKCANARY" in body:  # a canary, but not this run's: suspicious, never proof
+            out.append(("canary_exfil",
+                        f"{rec.get('method')} {url} carried a canary token that isn't this run's (not counted as proof): "
+                        "answered by Airlock's sinkhole, never reached the internet",
+                        {**data, "proven": False, "this_run": False}))
         else:
             out.append(("egress_blocked",
                         f"{rec.get('method')} {url} ({rec.get('bytes', 0)} bytes): answered by Airlock's sinkhole, "

@@ -85,7 +85,7 @@ async def fixture_analyse(target, *, events, **_):
         events.emit("verdict", "verdict: benign", verdict="benign")
         return SimpleNamespace(verdict="benign", evidence=[], model="fake-model")
     stage = "agent" if "agent-only" in target else "detonate"
-    events.emit("canary_exfil", "POST carried the canary", proven=True, stage=stage)
+    events.emit("canary_exfil", "POST carried the canary", proven=True, this_run=True, source_kind="sinkhole", stage=stage)
     return SimpleNamespace(verdict="malicious", evidence=["exfil [E1]"], model="fake-model")
 
 
@@ -153,7 +153,19 @@ def test_judge_probe_requires_proof_not_just_a_verdict():
 def test_exfil_proven_only_by_the_agent_does_not_count(tmp_path):
     store = Store(tmp_path / "t.db")
     store.create_run("r1", "x")
-    store.add_event("r1", Event(kind="canary_exfil", summary="agent re-run", data={"proven": True, "stage": "agent"}, id=1))
+    proof = {"proven": True, "this_run": True, "source_kind": "sinkhole"}
+    store.add_event("r1", Event(kind="canary_exfil", summary="agent re-run", data={**proof, "stage": "agent"}, id=1))
     assert not store.proven_exfil("r1")
-    store.add_event("r1", Event(kind="canary_exfil", summary="install", data={"proven": True, "stage": "detonate"}, id=2))
+    store.add_event("r1", Event(kind="canary_exfil", summary="other run's token",
+                                data={**proof, "this_run": False, "stage": "detonate"}, id=2))
+    store.add_event("r1", Event(kind="canary_exfil", summary="guest tracer",
+                                data={**proof, "source_kind": "node", "stage": "detonate"}, id=3))
+    assert not store.proven_exfil("r1")
+    store.add_event("r1", Event(kind="canary_exfil", summary="install", data={**proof, "stage": "detonate"}, id=4))
     assert store.proven_exfil("r1")
+
+
+def test_spec_validation_rejects_shell_syntax_and_overlong_specs(client):
+    for bad in ("left-pad@1|id|cat", "left-pad@>1", "left-pad@1<2", "a" * 215):
+        assert client.post("/api/runs", data={"spec": bad}).status_code == 400, bad
+    assert client.post("/api/runs", data={"spec": "@scope/pkg@^1.2.3"}).status_code == 200

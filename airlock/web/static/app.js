@@ -137,9 +137,14 @@ const Airlock = (() => {
   // ---------------------------------------------------------------- self-test
   function selftest() {
     const id = location.pathname.split('/').pop();
-    shareButton($('share'), `/api/selftests/${id}/share`);
+    let shareWired = false;
     const load = async () => {
       const t = await (await fetch(`/api/selftests/${id}`)).json();
+      const me = await meP;
+      if (!shareWired && (me.owner || (me.login && (t.submitted_by || '').toLowerCase() === me.login.toLowerCase()))) {
+        shareButton($('share'), `/api/selftests/${id}/share`);
+        shareWired = true;
+      }
       const head = $('score');
       head.className = `verdict-big ${t.done ? (t.passed === t.total ? 'benign' : 'malicious') : 'pending'}`;
       head.textContent = t.done ? `${t.passed}/${t.total} passed` : `Running… ${t.passed}/${t.total} passed so far`;
@@ -240,8 +245,10 @@ const Airlock = (() => {
       li.append(s);
       if (ev.kind === 'guard_flagged' && ev.data.text) li.append(el('div', 'detail', `“${ev.data.text}”`));
       if (ev.kind === 'canary_exfil') {
-        const proven = ev.data.proven || ev.data.source_kind === 'node';
-        s.append(el('span', `proof ${proven ? 'proven' : 'inferred'}`, proven ? 'PROVEN' : 'INFERRED'));
+        // PROVEN only for a host-captured payload with this run's token; the Node tracer runs in the
+        // guest, where the package could forge its log, so its reports are OBSERVED.
+        const label = ev.data.proven ? 'PROVEN' : ev.data.source_kind === 'node' ? 'OBSERVED' : 'INFERRED';
+        s.append(el('span', `proof ${ev.data.proven ? 'proven' : 'inferred'}`, label));
       }
       if (ev.data.payload) {
         // Captured request body: untrusted text, built with text nodes; canary tokens highlighted.
@@ -340,10 +347,12 @@ const Airlock = (() => {
     function renderGate(r) {
       const g = $('gate');
       g.replaceChildren();
-      if (readOnly && !r.decision) {
-        g.append(el('p', '', r.status === 'done'
-          ? 'Read-only shared view. A signed-in reviewer approves or rejects this run.'
-          : 'Nothing leaves Airlock until a human decides. Waiting for the verdict…'));
+      const viewOnly = readOnly || (me.login && !me.owner && (r.submitted_by || '').toLowerCase() !== me.login.toLowerCase());
+      if (viewOnly && !r.decision) {
+        g.append(el('p', '', r.status !== 'done'
+          ? 'Nothing leaves Airlock until a human decides. Waiting for the verdict…'
+          : readOnly ? 'Read-only shared view. A signed-in reviewer approves or rejects this run.'
+            : 'This run belongs to the Airlock team, so only they can approve or reject it. Submit your own run to try the gate.'));
         return;
       }
       if (r.decision) {
@@ -380,11 +389,15 @@ const Airlock = (() => {
       g.append(note, row);
     }
 
-    let readOnly = false;
-    shareButton($('share'), `/api/runs/${id}/share`);
+    let readOnly = false, me = {};
     (async () => {
-      readOnly = !!(await meP).share;
-      renderHead(await (await fetch(`/api/runs/${id}`)).json());
+      me = await meP;
+      readOnly = !!me.share;
+      const first = await (await fetch(`/api/runs/${id}`)).json();
+      if (me.owner || (me.login && (first.submitted_by || '').toLowerCase() === me.login.toLowerCase())) {
+        shareButton($('share'), `/api/runs/${id}/share`);
+      }
+      renderHead(first);
       const es = new EventSource(`/api/runs/${id}/events`);
       es.addEventListener('ev', (m) => addEvent(JSON.parse(m.data)));
       es.addEventListener('done', (m) => {

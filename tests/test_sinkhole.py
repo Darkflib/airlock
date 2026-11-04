@@ -16,3 +16,11 @@ def test_payload_without_canary_is_contained_egress():
     out = events_from_sinkhole([{"dest": "198.18.7.9", "host": "t.evil.invalid", "method": "GET",
                                  "url": "http://t.evil.invalid/ping", "bytes": 0, "body": ""}], TOKEN)
     assert out[0][0] == "egress_blocked" and "GET http://t.evil.invalid/ping" in out[0][1]
+
+
+def test_another_runs_canary_is_never_proof():
+    from airlock.events import events_from_sinkhole
+    [(kind, _, data)] = events_from_sinkhole([{"body": "token=AIRLOCKCANARYDEADBEEF00000000", "host": "x.invalid",
+                                              "url": "http://x.invalid/", "method": "POST"}],
+                                             "AIRLOCKCANARY1111111111111111")
+    assert kind == "canary_exfil" and data["proven"] is False and data["this_run"] is False

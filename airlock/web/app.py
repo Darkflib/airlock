@@ -24,7 +24,10 @@ from ..store import Store, data_dir
 from . import auth as authmod
 
 STATIC = Path(__file__).parent / "static"
-SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~<>=*|-]+)?$", re.I)
+GUEST_REPOS = frozenset(r.strip().lower() for r in
+                        os.environ.get("AIRLOCK_GUEST_REPOS", "Darkflib/airlock-demo").split(",") if r.strip())
+SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~=*-]+)?$", re.I)  # no shell syntax
+MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
 FIXTURES = Path(os.environ.get("AIRLOCK_FIXTURES", Path(__file__).parents[2] / "evals" / "fixtures"))
 # The containment self-test: known packages, and what a correct run must show for each.
@@ -111,8 +114,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                global_daily: int | None = None) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config.
 
-    Run caps (per rolling 24 h) apply to everyone except the owners in AIRLOCK_ALLOWED_USERS,
-    so an invite link that spreads can't run up the bill."""
+    Owners are the logins in AIRLOCK_ALLOWED_USERS; everyone else signed in is a guest (e.g. a
+    judge admitted by an invite). Guests see their own runs and the owners' runs, decide and share
+    only their own, may submit PRs only from AIRLOCK_GUEST_REPOS, and are capped per rolling 24 h,
+    so an invite link that spreads can't run up the bill or speak for a repo through the App."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
@@ -124,8 +129,27 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
     owners = auth.allowed if auth else frozenset()
 
+    def is_owner(user: str | None) -> bool:
+        return not auth or (user or "").lower() in owners
+
+    def mine(run: dict, user: str | None) -> bool:
+        return (run.get("submitted_by") or "").lower() == (user or "").lower()
+
+    def readable(run: dict, request: Request) -> bool:
+        """Share-link viewers were already limited to their runs by the auth middleware."""
+        user = authmod.current_user(request)
+        if user is None or is_owner(user):
+            return True
+        return mine(run, user) or (run.get("submitted_by") or "").lower() in owners
+
+    def get_readable(run_id: str, request: Request) -> dict:
+        run = store.get_run(run_id)
+        if not run or not readable(run, request):
+            raise HTTPException(404)
+        return run
+
     def check_quota(user: str | None, n: int) -> None:
-        if user and user.lower() in owners:
+        if is_owner(user):
             return
         since = time.time() - 86400
         if user and store.count_runs(since, user=user) + n > user_daily:
@@ -157,7 +181,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
 
     @app.get("/api/me")
     async def me(request: Request):
-        return {"login": authmod.current_user(request), "auth": bool(auth),
+        user = authmod.current_user(request)
+        return {"login": user, "auth": bool(auth), "owner": bool(user) and is_owner(user),
                 "share": authmod.current_share(request) is not None and not authmod.current_user(request)}
 
     @app.get("/")
@@ -190,10 +215,12 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             if github is None:
                 raise HTTPException(400, "GitHub App not configured on this server")
             owner, repo, number = parse_pr_url(spec)
+            if not is_owner(user) and f"{owner}/{repo}".lower() not in GUEST_REPOS:
+                raise HTTPException(403, f"guest accounts can analyse PRs from {', '.join(sorted(GUEST_REPOS))} only")
             run_id = runner.start(spec.strip(), f"{owner}/{repo}#{number}", user)
         else:
             spec = spec.strip()
-            if not SPEC.match(spec):
+            if len(spec) > MAX_SPEC or not SPEC.match(spec):
                 raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, or upload a .tgz")
             run_id = runner.start(spec, spec, user)
         return {"id": run_id, "url": f"/runs/{run_id}"}
@@ -235,33 +262,34 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return selftest_summary(store, test)
 
     @app.post("/api/selftests/{test_id}/share")
-    async def share_selftest(test_id: str):
+    async def share_selftest(test_id: str, request: Request):
         test = store.get_selftest(test_id)
         if not test:
             raise HTTPException(404)
+        user = authmod.current_user(request)
+        if not is_owner(user) and (test.get("submitted_by") or "").lower() != (user or "").lower():
+            raise HTTPException(403, "you can share only self-tests you started")
         return share_url([p["run_id"] for p in test["probes"]], test_id)
 
     @app.post("/api/runs/{run_id}/share")
-    async def share_run(run_id: str):
-        if not store.get_run(run_id):
-            raise HTTPException(404)
+    async def share_run(run_id: str, request: Request):
+        run = get_readable(run_id, request)
+        if not is_owner(authmod.current_user(request)) and not mine(run, authmod.current_user(request)):
+            raise HTTPException(403, "you can share only runs you submitted")
         return share_url([run_id])
 
     @app.get("/api/runs")
-    async def list_runs():
-        return store.list_runs()
+    async def list_runs(request: Request):
+        return [r for r in store.list_runs() if readable(r, request)]
 
     @app.get("/api/runs/{run_id}")
-    async def get_run(run_id: str):
-        run = store.get_run(run_id)
-        if not run:
-            raise HTTPException(404)
+    async def get_run(run_id: str, request: Request):
+        run = get_readable(run_id, request)
         return {**run, "events": store.events(run_id)}
 
     @app.get("/api/runs/{run_id}/events")
     async def stream(run_id: str, request: Request):
-        if not store.get_run(run_id):
-            raise HTTPException(404)
+        get_readable(run_id, request)
 
         async def gen():
             log = runner.live.get(run_id)
@@ -294,9 +322,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
 
     @app.post("/api/runs/{run_id}/decision")
     async def decide(run_id: str, body: Decision, request: Request):
-        run = store.get_run(run_id)
-        if not run:
-            raise HTTPException(404)
+        run = get_readable(run_id, request)
+        user = authmod.current_user(request)
+        if not is_owner(user) and not mine(run, user):
+            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can decide it")
         if run["status"] != "done":
             raise HTTPException(409, "no verdict yet")
         if run["decision"]:

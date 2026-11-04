@@ -33,6 +33,7 @@ WATCHER = Path(__file__).parent / "guest" / "watch.py"
 TRACE_LOG = "/tmp/airlock-trace.jsonl"     # written by the Node tracer, as the package user
 WATCH_LOG = "/opt/airlock/watch.jsonl"     # written by the root watcher; unreadable to the package user
 PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user
+ACTIVE_SUBNETS: set[int] = set()  # sinkhole /24s held by live Workspaces in this process
 DEFAULT_ALLOW = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
 SINKHOLE_ADDR = os.environ.get("AIRLOCK_SINKHOLE", "127.0.0.1:1080")
 SINKHOLE_CA = Path.home() / ".mitmproxy" / "mitmproxy-ca-cert.pem"
@@ -87,7 +88,8 @@ class Workspace:
                  cpus: int = 2, memory_mb: int = 2048, max_duration_s: int = 480, label: str = "run"):
         self.events, self.image, self.allow_hosts = events, image, allow_hosts
         self.cpus, self.memory_mb, self.max_duration_s = cpus, memory_mb, max_duration_s
-        self.name = re.sub(r"[^a-z0-9-]", "-", f"airlock-{label}-{secrets.token_hex(3)}".lower())[:60]
+        # Truncate the label, never the random suffix, so concurrent runs can't share a VM name.
+        self.name = re.sub(r"[^a-z0-9-]", "-", f"airlock-{label}".lower())[:50] + f"-{secrets.token_hex(4)}"
         self.canary_token = "AIRLOCKCANARY" + secrets.token_hex(8).upper()
         self._trace_seen = 0
         self._watch_seen = 0
@@ -96,7 +98,10 @@ class Workspace:
         self._proven_exfil: set[str] = set()
         self.sinkhole = None
         if sinkhole_available():
-            n = secrets.randbelow(512)  # one /24 out of 198.18.0.0/15
+            # One /24 out of 198.18.0.0/15, never shared with a live run, so sinkhole records can't mix.
+            n = secrets.choice([i for i in range(512) if i not in ACTIVE_SUBNETS])
+            ACTIVE_SUBNETS.add(n)
+            self._subnet = n
             self.sinkhole = str(ipaddress.ip_network("198.18.0.0/15").network_address + n * 256) + "/24"
 
     async def __aenter__(self) -> "Workspace":
@@ -125,6 +130,7 @@ class Workspace:
         try:
             await self._cm.__aexit__(*exc)
         finally:
+            ACTIVE_SUBNETS.discard(getattr(self, "_subnet", None))
             self.events.emit("vm_destroyed", f"microVM {self.name} destroyed")
 
     async def _seed_canaries(self) -> None:

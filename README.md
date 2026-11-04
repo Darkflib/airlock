@@ -104,11 +104,11 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 
 | Focus area | Control | Code | What you see in a run |
 | --- | --- | --- | --- |
-| **Process isolation** | Untrusted code only ever runs in a microVM with its own kernel, never on the control plane. The package installs and tests as the unprivileged `node` user, so it can't reach the root watcher or its log | `airlock/sandbox.py:107` (VM), `:168` (`runuser`), `:146` (root-only watcher) | `vm_created` opens every timeline; the watcher keeps reporting after the package has run |
+| **Process isolation** | Untrusted code only ever runs in a microVM with its own kernel, never on the control plane. The package installs and tests as the unprivileged `node` user, and so does every command the AI agent chooses, so neither can reach the root watcher or its log | `airlock/sandbox.py:107` (VM), `:168` (`runuser`), `:146` (root-only watcher) | `vm_created` opens every timeline; the watcher keeps reporting after the package has run |
 | **Secret hygiene** | No real secret enters the VM. The inference key, GitHub App key and OAuth secret stay on the control plane. The VM gets only canary credentials with a per-run token, and untrusted text passes a prompt-injection guard before the model sees it | `airlock/sandbox.py:130` (canaries), `airlock/agent.py:81` (guard) | `canary_read` / `canary_exfil` show the fake token; `guard_flagged` when text is redacted |
 | **Resource limits** | 2 vCPU, 2 GB RAM and a 480 s wall clock per VM; per-command timeouts; a 12-turn agent budget whose last turn forces a verdict; 2 concurrent runs | `airlock/sandbox.py:87`, `:176`; `airlock/agent.py:77`; `airlock/web/app.py:36` | `limit_hit` when a command is killed; turn count on the verdict |
 | **Lifecycle discipline** | One fresh VM per run, destroyed in a `finally` whatever the outcome; each run gets its own fake /24 and canary token | `airlock/sandbox.py:124` | `vm_destroyed` closes every timeline |
-| **Egress** | Default-deny. Only the registries and this run's fake /24 are allowed; the sinkhole answers that /24 itself and never connects upstream | `airlock/sandbox.py:69`, `airlock/sinkhole/addon.py` | **PROVEN** exfil with the captured request body |
+| **Egress** | Default-deny. Only the registries and this run's own fake /24 (never shared with a concurrent run) are allowed; the sinkhole answers that /24 itself and never connects upstream | `airlock/sandbox.py:69`, `airlock/sinkhole/addon.py` | **PROVEN** exfil: a request body captured on the host carrying *this run's* canary token. Reports from the in-guest Node tracer are shown as OBSERVED, because the package could forge them |
 
 **Check it yourself:** **Run self-test** on the home page detonates a Node stealer, a shell stealer and a benign package with a postinstall. A probe passes only if the stealers get a malicious verdict *with exfil proven by payload*, and the benign package gets a benign verdict with zero containment events.
 
@@ -144,7 +144,10 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 **Access.**
 - `scripts/allow.sh add <github-login>` allows a known account.
 - `scripts/invite.sh new --days 30 --max 50 --id lablab` prints a sign-up link for people whose logins you don't know. Anyone who signs in through it is added to the allowlist tagged with the invite, and `scripts/invite.sh revoke lablab` removes them all.
-- Accounts other than the owners are capped at 15 runs a day each and 150 a day between them (`AIRLOCK_USER_DAILY_RUNS`, `AIRLOCK_GLOBAL_DAILY_RUNS`).
+- Accounts other than the owners are **guests**:
+  - They see their own runs and the owners' runs, but approve, reject and share only their own.
+  - They can analyse PRs only from `Darkflib/airlock-demo` (`AIRLOCK_GUEST_REPOS`), so an invite never lets anyone speak for another repo through the GitHub App.
+  - They're capped at 15 runs a day each and 150 a day between them (`AIRLOCK_USER_DAILY_RUNS`, `AIRLOCK_GLOBAL_DAILY_RUNS`).
 - **Share read-only link** on a run or self-test page mints a signed link, valid for 60 days, that opens only that run (or that self-test and its probe runs), with no sign-in and no approve or reject buttons.
 
 ## Repository map

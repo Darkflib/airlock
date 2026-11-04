@@ -114,9 +114,11 @@ class Store:
         return sum(n not in exclude for n in names)
 
     def proven_exfil(self, run_id: str) -> bool:
-        """Whether the package itself (not the agent's re-runs) had exfiltration proven by payload."""
+        """Whether the package itself (not the agent's re-runs) had exfiltration proven by a payload the
+        host sinkhole captured carrying this run's canary token. Guest-side telemetry never counts."""
         return self.db.execute(
             "SELECT 1 FROM events WHERE run_id = ? AND json_extract(data, '$.proven') = 1"
+            " AND json_extract(data, '$.this_run') = 1 AND json_extract(data, '$.source_kind') = 'sinkhole'"
             " AND COALESCE(json_extract(data, '$.stage'), '') != 'agent' LIMIT 1", (run_id,)).fetchone() is not None
 
     def create_selftest(self, test_id: str, probes: list[dict], submitted_by: str | None = None) -> None:

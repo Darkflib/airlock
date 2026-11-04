@@ -100,6 +100,7 @@ Tags: #metric #decision #demo
 **So:** the demo's core story works today, a day ahead of plan. Next: the web UI (live timeline over SSE) and the approval gate.
 Tags: #win #demo #metric
 
+
 ### 18:48 — Tracer now flags canary payloads, not just connections
 **Tried:** wrapped `http.ClientRequest.prototype.write/end` and `fetch` bodies to look for the per-run canary token.
 **Result:** a POST carrying the token logs `net_payload_canary`, which becomes a `canary_exfil` event separate from `egress_blocked`.
@@ -328,3 +329,21 @@ Tags: #fail #decision
 - Checked signed out against the live site: each share link opens its page and API (200) but not the run list or submit (401). The invite redirects to GitHub OAuth.
 **So:** the submission can link straight to the money shot. The links are bearer tokens: store them in 1Password, never in this repo (it goes public).
 Tags: #win #demo #metric
+
+## 4 November 2026
+
+### 00:00 — Review follow-up: live browser verification
+**Tried:** opened airlock.darkflib.dev through the browser after the review's shell DNS lookup failed.
+**Result:** the authenticated homepage loads; existing self-test `20261103-234726-8e911e` shows 3/3 passed, with 5 Node-stealer events, 6 shell-stealer events and zero benign events. No new run or outward action was triggered.
+**So:** corrected the review's deployment uncertainty; the DNS failure was tool-specific. Guest authorization and evidence-integrity findings remain open.
+Tags: #win #metric
+
+### 00:02 — Fixes from the Codex review: guest privileges, root agent, proof, npm spec
+**Tried:** checked Codex's review (`docs/REVIEW-2026-11-03.md`) against the code. All nine findings were real. Fixed the four that most affect what judges can do and what we claim:
+- **Guests** could approve the owners' runs (posting a green status to the PR) and see every run. Now they see their own runs and the owners' runs, decide and share only their own, and submit PRs only from `AIRLOCK_GUEST_REPOS`. The invite was minted but hadn't been shared, so nothing was exposed.
+- **The agent's commands ran as guest root.** They now always run as `node`, and `/work` is chowned so it can still re-run installs. The prompts no longer mention `runuser`.
+- **PROVEN** accepted any `AIRLOCKCANARY` string. It now needs this run's token in a host-captured body; another run's token is reported but never counted as proof. The UI labels Node-tracer exfil OBSERVED. Sinkhole /24s are reserved per live run, so concurrent runs can't mix records.
+- **npm spec**: `left-pad@1|id|cat` passed validation and reached a root shell in the VM. The regex now rejects `|<>`, specs are capped at 214 characters, and the spec is shell-quoted. Also fixed: long labels no longer truncate away the VM name's random suffix.
+59 tests pass.
+**So:** the invite is safe to hand out. Still open from the review: the watcher failing open, cleanup after a failed setup, a pending status for the merge gate, the DNS-to-gateway check, and claim wording.
+Tags: #fail #decision

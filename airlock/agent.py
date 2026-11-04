@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 
 from . import guard
 from .events import EventLog
-from .sandbox import Workspace
+from .sandbox import PKG_USER, Workspace
 
 OUTPUT_TAIL = 4000
 
@@ -26,7 +26,7 @@ Be efficient: inspect, run what you need, then call finish."""
 TOOLS = [
     {"type": "function", "function": {
         "name": "exec",
-        "description": "Run a shell command in the sandbox. Returns exit code, stdout and stderr.",
+        "description": "Run a shell command in the sandbox as the unprivileged user node. Returns exit code, stdout and stderr.",
         "parameters": {"type": "object", "properties": {
             "cmd": {"type": "string"}, "cwd": {"type": "string", "description": "default /work"}},
             "required": ["cmd"]}}},
@@ -94,7 +94,9 @@ class TriageAgent:
 
     async def _tool(self, name: str, args: dict) -> str:
         if name == "exec":
-            r = await self.ws.exec(args["cmd"], cwd=args.get("cwd") or "/work", timeout=120, trace=True)
+            # Never root: package code the agent re-runs must not be able to touch the watcher or its log.
+            r = await self.ws.exec(args["cmd"], cwd=args.get("cwd") or "/work", timeout=120, trace=True,
+                                   as_user=PKG_USER)
             body = f"exit={r.exit_code}\nstdout:\n{_tail(r.stdout)}\nstderr:\n{_tail(r.stderr)}"
             return self._screen(body, f"exec: {args['cmd'][:60]}")
         if name == "read_file":

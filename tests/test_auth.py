@@ -228,3 +228,64 @@ def test_selftest_share_link_opens_its_probe_runs(make_client, tmp_path, monkeyp
         assert anon.get(f"/api/selftests/{test_id}").status_code == 200
         assert all(anon.get(f"/api/runs/{p['run_id']}").status_code == 200 for p in probes)
         assert anon.post("/api/selftests").status_code == 401
+
+
+
+class FakeGitHub:
+    def __init__(self):
+        self.posts = []
+
+    async def status(self, *a):
+        self.posts.append(("status", a))
+
+    async def comment(self, *a):
+        self.posts.append(("comment", a))
+        return "https://github.test/c/1"
+
+
+def test_guests_cannot_act_for_owners_or_each_other(tmp_path, monkeypatch):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+    store, gh = Store(tmp_path / "g.db"), FakeGitHub()
+    (tmp_path / "allowed_users").write_text("judge-a\njudge-b\n")
+
+    def client(login):
+        async def exchange(_cfg, code):
+            return login
+        c = TestClient(create_app(store=store, analyse=fake_analyse, auth=cfg(tmp_path), exchange=exchange, github=gh),
+                       base_url="http://airlock.test")
+        return c
+
+    with client("Darkflib") as owner:
+        sign_in(owner)
+        owner_run = owner.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(owner, owner_run)
+        store.update_run(owner_run, meta={"kind": "pr", "owner": "Darkflib", "repo": "airlock-demo", "number": 3,
+                                          "head_sha": "abc"})
+    with client("judge-a") as a:
+        sign_in(a)
+        a_run = a.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(a, a_run)
+        assert a.get(f"/api/runs/{owner_run}").status_code == 200          # owners' runs are the demo
+        assert a.post(f"/api/runs/{owner_run}/decision", json={"decision": "approved"}).status_code == 403
+        assert a.post(f"/api/runs/{owner_run}/share").status_code == 403
+        assert a.post(f"/api/runs/{a_run}/decision", json={"decision": "rejected"}).status_code == 200
+        assert a.post(f"/api/runs/{a_run}/share").status_code == 200
+        r = a.post("/api/runs", data={"spec": "https://github.com/Darkflib/airlock/pull/1"})
+        assert r.status_code == 403 and "airlock-demo" in r.json()["detail"]
+    assert gh.posts == []   # nothing was posted on the owner's PR
+    with client("judge-b") as b:
+        sign_in(b)
+        assert b.get(f"/api/runs/{a_run}").status_code == 404              # another guest's run
+        assert a_run not in [r["id"] for r in b.get("/api/runs").json()]
+        assert owner_run in [r["id"] for r in b.get("/api/runs").json()]
+    with client("Darkflib") as owner:
+        sign_in(owner)
+        assert owner.get(f"/api/runs/{a_run}").status_code == 200          # owners see everything
+
+
+def test_vm_names_stay_unique_for_long_labels(monkeypatch):
+    monkeypatch.setenv("AIRLOCK_SINKHOLE", "off")
+    from airlock.events import EventLog
+    from airlock.sandbox import Workspace
+    a, b = (Workspace(EventLog(), label="x" * 80) for _ in range(2))
+    assert a.name != b.name and len(a.name) <= 63
