@@ -87,7 +87,7 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
         seen.add(key)
         script = argv.split("/")[-1] or argv
         pid = rec.get("pid")
-        if ev == "file_read" and (path.endswith(".npmrc") or "/.aws/" in path):
+        if ev == "file_read" and (path.endswith(CANARY_SUFFIXES) or "/.aws/" in path):
             out.append(("canary_read", f"{script} read canary {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "file_read":
             out.append(("file_read", f"{script} read {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))

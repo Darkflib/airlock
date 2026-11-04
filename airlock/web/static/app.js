@@ -203,6 +203,7 @@ const Airlock = (() => {
     const stageOf = (ev) => {
       if (['verdict', 'vm_destroyed', 'error'].includes(ev.kind)) return 'verdict';
       if (ev.kind === 'agent_start' || ev.kind === 'guard_flagged') return 'agent';
+      if (ev.kind === 'behaviour_diff') return 'detonate';
       const src = ev.data.source || ev.data.stage;
       if (src === 'agent') return 'agent';
       if (src === 'detonate') return 'detonate';
@@ -228,7 +229,7 @@ const Airlock = (() => {
       li.id = `E${ev.id}`;
       const repro = ev.containment && ev.data.stage === 'agent';
       if (ev.containment) li.classList.add('contain');
-      if (ev.kind !== 'exec') stageSignals++;
+      if (ev.kind !== 'exec' && ev.kind !== 'behaviour_diff') stageSignals++;
       if (repro) li.classList.add('repro');
       if (ev.kind === 'exec') {
         li.classList.add('exec');
@@ -243,6 +244,7 @@ const Airlock = (() => {
       s.append(el('span', 'sum', ev.summary));
       if (ev.containment) s.append(el('span', 'flag', repro ? 'REPRODUCED BY AGENT' : 'CONTAINED'));
       li.append(s);
+      if (ev.kind === 'behaviour_diff') showDiff(li, ev.data);
       if (ev.kind === 'guard_flagged' && ev.data.text) li.append(el('div', 'detail', `“${ev.data.text}”`));
       if (ev.kind === 'canary_exfil') {
         // PROVEN only for a host-captured payload with this run's token; the Node tracer runs in the
@@ -283,6 +285,40 @@ const Airlock = (() => {
       if (ev.kind === 'agent_start') { $('verdict').textContent = 'Agent investigating…'; fact('agent', ev.data.model); }
       if (ev.kind === 'verdict') showVerdict(ev.data.verdict, ev.data.evidence || [], ev.data.turns, ev.data.forced);
       if (ev.kind === 'vm_destroyed') fact('lifecycle', 'VM destroyed after run');
+    }
+
+    // Base vs head: tag the head's events as new or unchanged, list what's new, offer a filter.
+    function showDiff(li, d) {
+      li.classList.add('diff');
+      if (!d.available) return;
+      for (const id of d.new_ids || []) {
+        const e = $(`E${id}`);
+        if (e && !e.classList.contains('is-new')) {
+          e.classList.add('is-new');
+          e.querySelector('div').append(el('span', 'flag-new', 'NEW IN THIS PR'));
+        }
+      }
+      for (const id of d.unchanged_ids || []) $(`E${id}`)?.classList.add('is-same');
+      const box = el('div', 'detail diff-box');
+      const ul = el('ul');
+      for (const item of d.new || []) {
+        const row = el('li', item.containment ? 'risky' : '');
+        row.append(document.createTextNode(item.label + ' '));
+        for (const id of (item.ids || []).slice(0, 3)) {
+          const a = el('a', 'ref', `[E${id}]`); a.href = `#E${id}`; row.append(a, document.createTextNode(' '));
+        }
+        ul.append(row);
+      }
+      if (!(d.new || []).length) ul.append(el('li', '', 'Nothing new: the head behaves like its merge base.'));
+      box.append(ul);
+      const pre = (d.unchanged || []).filter((x) => x.containment).length;
+      if (pre) box.append(el('p', 'risky', `${pre} risky behaviour${pre > 1 ? 's are' : ' is'} already in the base branch: not introduced by this PR, but still there.`));
+      const label = el('label', 'only-new');
+      const cb = el('input'); cb.type = 'checkbox';
+      cb.addEventListener('change', () => document.body.classList.toggle('only-new', cb.checked));
+      label.append(cb, document.createTextNode(` only what this PR adds (hides ${(d.unchanged_ids || []).length} events the base also showed)`));
+      box.append(label);
+      li.append(box);
     }
 
     function showVerdict(verdict, evidence, turns, forced) {

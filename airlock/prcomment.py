@@ -12,10 +12,27 @@ def build_comment(run: dict, events: list[dict], run_url: str) -> str:
     lines = [
         f"### Airlock: **{verdict.upper()}**, {decision} by @{who}",
         "",
-        f"Airlock installed this PR's head (`{head}`) in a disposable microVM with fake credentials and no "
-        "internet access, recorded everything it did, then had an AI reviewer investigate.",
+        f"Airlock installed and tested this PR's head (`{head}`) in a disposable microVM with fake credentials "
+        "and no internet access beyond the package registries, recorded what it did, then had an AI reviewer "
+        "investigate.",
         "",
     ]
+    changes = next((e["data"] for e in events if e["kind"] == "behaviour_diff"), None)
+    if changes and changes.get("available"):
+        base = (changes.get("base_sha") or "")[:7]
+        lines += [f"**New behaviour introduced by this PR** (compared with its merge base `{base}`, "
+                  "run the same way in a separate microVM)", ""]
+        new = changes.get("new") or []
+        lines += [f"- {'⚠ ' if e['containment'] else ''}{e['label']}" for e in new[:MAX_ITEMS]] or ["- none"]
+        if len(new) > MAX_ITEMS:
+            lines.append(f"- …and {len(new) - MAX_ITEMS} more")
+        pre = [e for e in changes.get("unchanged") or [] if e["containment"]]
+        if pre:
+            lines += ["", f"{len(pre)} risky behaviour{'s' if len(pre) != 1 else ''} already present in the base "
+                      "branch: not introduced by this PR, but still there."]
+        lines.append("")
+    elif changes:
+        lines += [f"_Behaviour diff against the base unavailable: {changes.get('reason')}._", ""]
     if found:
         lines += ["**What it did during install and test**", ""]
         lines += [f"- {'**PROVEN** ' if e['data'].get('proven') else ''}{e['summary']}" for e in found[:MAX_ITEMS]]

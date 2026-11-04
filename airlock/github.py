@@ -97,6 +97,13 @@ class GitHubApp:
             r.raise_for_status()
             return r.content
 
+    async def merge_base(self, owner: str, repo: str, base: str, head: str) -> str:
+        """The commit the PR branched from: comparing against it isolates what the PR itself adds
+        (the base branch tip may have moved on since)."""
+        async with await self._client(owner, repo) as c:
+            r = (await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", params={"per_page": 1})).raise_for_status()
+            return r.json()["merge_base_commit"]["sha"]
+
     async def diff(self, owner: str, repo: str, number: int, limit: int = 200_000) -> str:
         async with await self._client(owner, repo) as c:
             r = await c.get(f"/repos/{owner}/{repo}/pulls/{number}", headers={"Accept": "application/vnd.github.diff"})
