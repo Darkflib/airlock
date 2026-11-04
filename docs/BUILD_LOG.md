@@ -436,3 +436,9 @@ Tags: #metric
 **Result:** `docs/SUBMISSION.md` now covers PyPI, the merge-base behaviour diff, the 30/30 regression (`product-20261104T030613Z`: exfil proven 15/15, medians 12–31 s) and the five-package self-test. `scripts/check-submission.py` passes; the long description is at 1977 of 2000 characters.
 **So:** any further addition to the long description has to replace something.
 Tags: #demo
+
+### 08:45 — Plan for the remaining four days
+**Tried:** compared the PRD against the build log to find what's left before Sun 8 Nov 23:00 GMT.
+**Result:** three gaps between claims and measurements: the five-fixture self-test has never run live (only 3/3 on 3 Nov); no PR run since the behaviour diff deployed; stale-run cleanup fails runs at startup but never destroys their microVMs. Also: `Darkflib/airlock-demo` is private, so PR links would 404 for judges.
+**So:** PRD build plan rewritten day by day: live checks today, cleanup and judge-access verification Thursday, story Friday, freeze and record Saturday, audit and publish Sunday. Pattern B gets half a day at most; it's first to cut.
+Tags: #decision

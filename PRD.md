@@ -10,7 +10,7 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
 - **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
-- **Remaining work:** presentation (video, slides, PRD), plus optional depth: the Pattern B browser check. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
+- **Remaining work** (plan as of 4 Nov 08:45): live checks of the five-fixture self-test and PR #4 with the behaviour diff, stale-VM cleanup, a timeboxed Pattern B decision, then presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
 
@@ -149,24 +149,38 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Harder demo PR: payload hidden in plain sight (PR #4, `tinystamp`) — install-time credential theft smuggled through innocuous "install analytics" + a home-dir "config discovery" helper, with the collector host assembled from fragments, so the diff reads like an ordinary dependency bump. No encoding or obfuscation tooling; detonation still catches it. (Codex caught the readable PR #3.)
 - [x] PyPI support (F12): sdist upload and `pypi:name==version`, installed from source in `python:3.12-slim` so `setup.py` runs under the watcher; two Python fixtures (stealer + benign) added to the regression and self-test
 - [x] Behaviour diff, base vs head (F9): the merge base is detonated in a second VM in parallel; fingerprints drop run noise (pids, tokens, sinkhole IPs, checkout paths); the agent, the PR comment and the run page see what the PR adds; pre-existing risky behaviour is flagged, never hidden; the diff never lowers a verdict
-- [ ] Pattern B: Playwright before/after screenshots checked by a vision model (F10)
+- [ ] Live five-fixture self-test on the host. The README and submission copy describe five packages, but the only live result is the 3/3 from 3 Nov 23:47. Mint a new share link; update the README's "what we measured" list
+- [ ] Fresh run of PR #4 with the behaviour diff (every existing PR run predates F9, deployed 08:08). Leave it pending for the camera; mint a share link
+- [ ] Decide Pattern B (F10): at most half a day on Thursday, and only if an on-screen check fits the demo repo (`status-api` has no UI). Otherwise descope it here, with that reason
 
 **Thu 5 Nov: hardening and judge access**
 
 - [x] Per-user and global daily run caps for guests (owners exempt)
-- [ ] Clean up stale VMs after a crash
 - [x] Judge access: signed invite link (`scripts/invite.sh`) that adds whoever signs in through it to the allowlist, tagged and revocable; signed read-only share links for runs and self-tests
-- [ ] Mint the lablab invite and share links on the host after deploy; README and PRD final pass
+- [ ] Clean up stale VMs after a crash. `store.fail_stale_runs()` fails leftover runs at startup, but nothing destroys their microVMs: list them by name prefix and remove them; test by killing the service mid-run
+- [ ] Close F6: the pattern guard is the guard; the model-based guard is descoped (`nemotron-3.5-content-safety` answers "safe" to everything)
+- [ ] Judge access end to end with a second GitHub account: invite sign-up, guest visibility (demo runs only), the 15-run daily cap, signed-out share links (not independently verified by the review)
+- [ ] PRD final pass: status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
 
 **Fri 6 Nov: story**
 
-- [ ] Video script built from build-log `#demo` moments; slides; cover image
+- [ ] Demo script reworked: PR #3 (readable stealer) → PR #4 (hidden stealer caught at runtime, with "new in this PR" vs the merge base) → the gate, with PR #1's greyed-out merge button (left pending for this shot); PyPI as one line under "under the hood"
+- [ ] Video script built from build-log `#demo` moments; slides (including the $1.45 inference spend); cover image
 
-**Sat 7 – Sun 8 Nov: freeze and submit**
+**Sat 7 Nov: freeze and record**
 
-- [ ] Record the video from real runs
-- [ ] Make `Darkflib/airlock` public (MIT); submit on lablab.ai; on-site demo in Salt Lake City
+- [ ] Feature freeze; one regression on the frozen commit
+- [ ] Record the video from real runs on the host
 - [ ] Region: stay in London unless latency is a problem; a US rebuild takes about 10 minutes plus a DNS change
+
+**Sun 8 Nov: publish and submit (deadline 23:00 GMT)**
+
+- [ ] Pre-publish audit: scan git history for secrets and share-link tokens; `.env` holds only `op://` references
+- [ ] Make `Darkflib/airlock` public (MIT)
+- [ ] `Darkflib/airlock-demo` is private, so PR links in bot comments and slides 404 for judges: make it public, or rely on share links only
+- [ ] `scripts/check-submission.py` passes (long description at 1977/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
+
+**If anything slips,** cut in this order: Pattern B, the second-account access check, slide polish. Never the video or the pre-publish audit.
 
 ## Demo script (3 minutes)
 
