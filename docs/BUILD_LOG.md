@@ -550,3 +550,9 @@ Tags: #demo
 **Result:** deck artifact version 9; the other slides are unchanged. Not checked visually.
 **So:** deck, script and report now tell the same story about the webhook and the write-access check.
 Tags: #demo
+
+### 18:58 — First real webhook run
+**Tried:** a push to PR #4 on `Darkflib/airlock-demo` with the App webhook configured.
+**Result:** run `20261104-185752-301541` started by itself (`(webhook)`, attributed to Darkflib, head `bc14f23`): malicious, exfil to `telemetry.tinystamp.invalid` proven by payload, behaviour diff 10 new (5 containment), 4 unchanged; `pending` posted at start and again with the verdict, gate synced. Same figures as the hand-started run on 4 Nov 08:50.
+**So:** the push-to-run path in the video script works end to end; PR #4 is left undecided at `pending`.
+Tags: #win #demo
