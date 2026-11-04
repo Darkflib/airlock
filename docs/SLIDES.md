@@ -19,8 +19,8 @@ A green test run doesn't tell you what the install script did.
 
 ## 3. What Airlock does
 
-Paste a PR, an npm or PyPI package, or a tarball → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
-*Visual:* four-step strip: Submit → Detonate → Explain → Gate.
+A push to a PR starts it by itself (or paste an npm or PyPI package, or upload a tarball) → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
+*Visual:* four-step strip: Start → Run → Explain → Decide.
 
 ## 4. The money shot: proven exfiltration
 
@@ -39,8 +39,8 @@ Reads like a routine dependency bump; the theft is split across "install analyti
 
 ## 6. The gate
 
-- The GitHub App holds the PR at a pending `airlock` status; branch protection requires it.
-- Only a human Approve or Reject sets the final status and posts the evidence comment.
+- A push starts a run (App webhook); the GitHub App holds the PR at a pending `airlock` status; branch protection requires it.
+- Only a human Approve or Reject sets the final status and posts the evidence comment, and only someone with write access to the repo on GitHub may give it.
 - The AI explains; it never merges.
 *Visual:* greyed-out merge button beside the bot's evidence comment.
 

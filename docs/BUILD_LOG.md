@@ -544,3 +544,9 @@ Tags: #win #demo
 **Result:** narration 408 words (was 407): added "nobody has to paste anything…" (18 words), cut the host-from-pieces clause and "It works for npm and PyPI". Checklist gains a practice push and a Recent Deliveries check; fallback is pasting the URL and dropping that line.
 **So:** the video shows the product working without a human starting it; the gate shot now rejects the run that push started.
 Tags: #demo
+
+### 15:20 — Deck: a push starts a run; only repo writers decide
+**Tried:** updated slide 3 (step 01 is now "Start": a push to a PR starts a run by itself) and slide 6 ("Waiting" says a push starts the run; footer says only people with write access on GitHub can approve or reject), plus `docs/SLIDES.md`.
+**Result:** deck artifact version 9; the other slides are unchanged. Not checked visually.
+**So:** deck, script and report now tell the same story about the webhook and the write-access check.
+Tags: #demo
