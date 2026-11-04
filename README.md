@@ -84,18 +84,18 @@ flowchart LR
 
 ## Results
 
-The full product pipeline (microVM, watcher, sinkhole, agent) run three times on each target ([`evals/results/product-20261103T224543Z`](evals/results/product-20261103T224543Z/summary.md)):
+The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T014526Z`](evals/results/product-20261104T014526Z/summary.md)):
 
 | Target | Expected | Correct | Containment during install | Exfil proven by payload | Median time |
 | --- | --- | --- | --- | --- | --- |
-| Node credential stealer (tarball) | malicious | 3/3 | 4 | 3/3 | 9.7 s |
-| Shell credential stealer, no Node code (tarball) | malicious | 3/3 | 6 | 3/3 | 11.1 s |
-| Benign package with a postinstall (tarball) | benign | 3/3 | 0 | – | 9.4 s |
-| `left-pad@1.3.0` from npm | benign | 3/3 | 0 | – | 9.7 s |
-| Demo PR #1: left-pad bump | benign | 3/3 | 0 | – | 17.2 s |
-| Demo PR #3: vendored stealer, tests pass | malicious | 3/3 | 6 | 3/3 | 12.4 s |
+| Node credential stealer (tarball) | malicious | 3/3 | 4 | 3/3 | 11.2 s |
+| Shell credential stealer, no Node code (tarball) | malicious | 3/3 | 6 | 3/3 | 12.4 s |
+| Benign package with a postinstall (tarball) | benign | 3/3 | 0 | – | 10.7 s |
+| `left-pad@1.3.0` from npm | benign | 3/3 | 0 | – | 15.2 s |
+| Demo PR #1: left-pad bump | benign | 3/3 | 0 | – | 17.0 s |
+| Demo PR #3: vendored stealer, tests pass | malicious | 3/3 | 6 | 3/3 | 14.1 s |
 
-**18/18 correct**, zero false-positive containment events on benign targets, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
+**18/18 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 

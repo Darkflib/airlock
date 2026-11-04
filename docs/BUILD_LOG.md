@@ -359,3 +359,9 @@ Tags: #metric #win
 **Also:** the watcher must report ready for watcher, DNS and fanotify, or the run fails. A failed install or watcher error turns "benign" into "inconclusive". A setup failure destroys the VM, and `vm_destroyed` is only reported once destruction succeeds. README and submission claims reworded (no "no real internet", "records everything" or "most supply-chain attacks"). 67 tests pass.
 **So:** the containment claim now covers DNS, and it was verified on the host, not assumed. Deploy is pending a 1Password approval.
 Tags: #fail #win #demo
+
+### 01:48 — Deployed the DNS guard and fail-closed checks; regression still 18/18
+**Tried:** deployed `a214ffa` once 1Password approved, re-ran `spikes/dns_gateway_probe.py` and the product regression on the host.
+**Result:** probe against the live code: registry resolves, `example.com` and the unique probe name get NXDOMAIN, both recorded as `dns_blocked`. Regression (`evals/results/product-20261104T014526Z`): **18/18**, exfil proven 9/9, 0 containment on benign targets, none downgraded to inconclusive, 0 forced, 0 invalid tool calls; median 10.7–17.0 s. A first attempt without `web.env` sourced failed the two PR targets with "GitHub App not configured": a harness setup slip, not a product fault.
+**So:** the stricter checks cost no accuracy and no false "inconclusive"s. README results table now points at this run.
+Tags: #metric #win
