@@ -1,4 +1,5 @@
-"""The verdict as a pull request comment, posted only after a human decision."""
+"""The verdict as a pull request comment, posted after a human decision (or an automatic
+rejection when exfiltration is proven by a captured payload)."""
 
 from __future__ import annotations
 
@@ -10,7 +11,9 @@ def build_comment(run: dict, events: list[dict], run_url: str) -> str:
     head = run["meta"].get("head_sha", "")[:7]
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
     lines = [
-        f"### Airlock: **{verdict.upper()}**, {decision} by @{who}",
+        f"### Airlock: **{verdict.upper()}**, "
+        + (f"{decision} automatically: {run['meta']['auto_decision']}" if run["meta"].get("auto_decision")
+           else f"{decision} by @{who}"),
         "",
         f"Airlock installed and tested this PR's head (`{head}`) in a disposable microVM with fake credentials "
         "and no internet access beyond the package registries, recorded what it did, then had an AI reviewer "

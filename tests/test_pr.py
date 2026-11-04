@@ -178,3 +178,40 @@ def test_deciding_a_pr_needs_github_write_access(tmp_path, monkeypatch, perm, co
     else:
         assert run["decision"] is None and "success" not in statuses  # still held at pending
         assert "Darkflib/airlock-demo" in r.json()["detail"]
+
+
+async def proven_pr_analyse(target, *, events, on_pr=None, **_):
+    """Like fake_pr_analyse, but the exfil is proven the way the sinkhole proves it."""
+    if on_pr:
+        await on_pr(META)
+    events.emit("canary_exfil", "POST https://t.evil.invalid/v1 carried this run's canary token", stage="detonate",
+                proven=True, this_run=True, source_kind="sinkhole", url="https://t.evil.invalid/v1")
+    await asyncio.sleep(0.01)
+    return SimpleNamespace(verdict="malicious", evidence=["exfil [E1]"], model="m", meta=META)
+
+
+@pytest.mark.parametrize("switch, auto", [("1", True), ("0", False)])
+def test_proven_theft_is_rejected_automatically(tmp_path, monkeypatch, switch, auto):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+    monkeypatch.setenv("AIRLOCK_AUTO_REJECT", switch)
+    gh = FakeGitHub()
+    with TestClient(create_app(store=Store(tmp_path / "p.db"), analyse=proven_pr_analyse, github=gh)) as c:
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        run = wait_done(c, run_id)
+        statuses = [x[2:4] for x in gh.calls if x[0] == "status"]
+        if auto:
+            assert run["decision"] == "rejected" and run["decided_by"] is None
+            assert statuses[-1] == ("failure", "rejected automatically: exfiltration proven by a captured payload")
+            comment = next(x[2] for x in gh.calls if x[0] == "comment")
+            assert "rejected automatically" in comment and "@" not in comment.splitlines()[0]
+            assert c.post(f"/api/runs/{run_id}/decision", json={"decision": "approved"}).status_code == 409
+        else:
+            assert run["decision"] is None and [s for s, _ in statuses] == ["pending", "pending"]
+
+
+def test_unproven_exfil_still_waits_for_a_person(make):
+    gh = FakeGitHub()
+    with make(gh) as c:  # fake_pr_analyse's exfil isn't host-captured with this run's token
+        run = wait_done(c, c.post("/api/runs", data={"spec": PR}).json()["id"])
+    assert run["decision"] is None and [x[2] for x in gh.calls if x[0] == "status"] == ["pending", "pending"]
+    assert not any(x[0] == "comment" for x in gh.calls)

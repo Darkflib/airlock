@@ -402,7 +402,8 @@ const Airlock = (() => {
       if (r.decision) {
         const d = el('div', 'done');
         d.append(pill(r.decision), document.createTextNode(
-          ` ${r.decided_by ? 'by @' + r.decided_by + ' · ' : ''}${new Date(r.decided * 1000).toLocaleString()}`));
+          ` ${(r.meta || {}).auto_decision ? 'automatically: ' + r.meta.auto_decision + ' · '
+            : r.decided_by ? 'by @' + r.decided_by + ' · ' : ''}${new Date(r.decided * 1000).toLocaleString()}`));
         g.append(d);
         if (r.decision_note) g.append(el('p', '', r.decision_note));
         return;
@@ -415,7 +416,7 @@ const Airlock = (() => {
           ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
-        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide.`));
+        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Proven theft is rejected automatically. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
       const refused = el('p', 'warn'); refused.hidden = true;

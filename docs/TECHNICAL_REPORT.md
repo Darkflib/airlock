@@ -36,7 +36,7 @@ Airlock runs the change somewhere it can't do harm, and watches. For each run:
 - Three independent sources record what happens: a host-side **sinkhole** that answers all non-registry traffic and keeps the request bodies, a root **watcher** inside the guest, and a Node **tracer**.
 - Deterministic code turns those records into typed events. If a captured request carries this run's token, the theft is **PROVEN**.
 - An AI agent on Vultr Serverless Inference investigates inside the same VM and writes a verdict that cites event ids. It explains the evidence; it does not create it.
-- For a GitHub PR, a GitHub App holds the PR at a `pending` status that branch protection requires. Only a person's Approve or Reject sets the final status.
+- For a GitHub PR, a GitHub App holds the PR at a `pending` status that branch protection requires. Proven theft is rejected automatically; otherwise only a person's Approve or Reject sets the final status, and nothing is ever approved automatically.
 
 The core idea is **evidence over opinion**. A static reviewer (human or model) reads code and forms a view. Airlock runs the code and shows what it did, with the strongest claims backed by data the guest can't forge.
 
@@ -72,7 +72,7 @@ What happens when someone pastes `https://github.com/Darkflib/airlock-demo/pull/
 8. **Triage.** The agent gets the task, the events and the behaviour diff, investigates with `exec` and `read_file` (as `node`, inside the same VM), and must call `finish` with a verdict and cited event ids within 12 turns.
 9. **Recheck.** Observation is checked again after the agent, since the agent's own commands could have broken it.
 10. **Destroy.** The VM is destroyed in a `finally`. `vm_destroyed` is emitted only if destruction succeeded.
-11. **Gate.** The status stays `pending`, now with the verdict in its description. A person decides on the run page; the App then posts `success` or `failure` and an evidence comment.
+11. **Gate.** If exfiltration was proven by a captured payload, the App rejects at once: `failure` and the evidence comment. Otherwise the status stays `pending`, now with the verdict in its description, until a person decides on the run page; the App then posts `success` or `failure` and the comment.
 
 Every step streams to the browser over Server-Sent Events as it happens, and is stored in SQLite so a reload replays it.
 
@@ -295,9 +295,10 @@ The private key comes from 1Password at deploy time and exists only in the web s
 ### The gate, step by step
 
 1. **Head fetched:** the App posts `airlock: pending` ("Detonating in a microVM; merge waits for a human decision") on the head commit. From this moment, branch protection blocks the merge.
-2. **Verdict ready:** `pending` again, now carrying the verdict ("Verdict: malicious; waiting for a human decision"). The AI's verdict never turns the check green or red.
-3. **Run failed:** `error`. Still not mergeable.
-4. **Person decides** on the run page: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green.
+2. **Verdict ready, theft proven:** if the run has exfiltration proven by a payload the host captured with this run's token, the run is rejected automatically: `failure` ("rejected automatically: exfiltration proven by a captured payload") and the evidence comment, with no click.
+3. **Verdict ready, anything else:** `pending` again, now carrying the verdict ("Verdict: malicious; waiting for a human decision"). The AI's verdict never turns the check green or red.
+4. **Run failed:** `error`. Still not mergeable.
+5. **Person decides** on the run page: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green.
 
 Details that matter:
 
@@ -307,9 +308,17 @@ Details that matter:
 - **A failed decision post doesn't undo the decision.** The decision is stored first; if GitHub then fails, the error is logged as an event on the run. The PR stays at `pending`, so it fails safe, but there is no retry button yet: a new run is the way out.
 - **The comment** leads with what the PR adds, then containment, then the captured request (collapsed, labelled as canaries), then the agent's cited evidence.
 
+### Why reject automatically, but never approve
+
+A person reviewing proven theft has nothing to weigh: the host captured a request carrying this run's canary token, which the guest can't forge (section 6). Waiting for a click only leaves the PR sitting at `pending` with a known stealer in it. So that one case is decided by code, at once.
+
+The rule reads the evidence, not the AI. It fires only when `proven_exfil` is true for the package's own activity, the same test the self-test uses; the model's verdict plays no part, so prompt injection can't trigger or prevent it. An automatic rejection appears on the run page and on GitHub as "rejected automatically", never under a person's name. It is final for that commit; a new push starts a new run.
+
+Approval stays human on purpose. "No new behaviour and nothing blocked" is strong evidence, but not proof: sandbox-aware or delayed malware looks exactly like that (section 13). Automatic approval is a policy choice for each team to make (section 14.2), not a default. `AIRLOCK_AUTO_REJECT=0` turns automatic rejection off.
+
 ### Who may decide
 
-Two checks, both required. First, Airlock's own rule: an owner, or the person who submitted the run. Second, for a PR run, **GitHub's rule**: at decision time, Airlock asks GitHub (with the App's installation token) what access the signed-in login has to the repository, and accepts the decision only for `admin` or `write` (GitHub reports `maintain` as `write`). Anyone else gets HTTP 403 with the reason, and the PR stays at `pending`. If GitHub can't answer, the decision is refused with 503: it fails closed.
+Apart from the automatic rejection above, two checks, both required. First, Airlock's own rule: an owner, or the person who submitted the run. Second, for a PR run, **GitHub's rule**: at decision time, Airlock asks GitHub (with the App's installation token) what access the signed-in login has to the repository, and accepts the decision only for `admin` or `write` (GitHub reports `maintain` as `write`). Anyone else gets HTTP 403 with the reason, and the PR stays at `pending`. If GitHub can't answer, the decision is refused with 503: it fails closed.
 
 The reasoning: the decision sets the check that branch protection requires, so it is effectively a merge approval. The people who may give it should be the people GitHub already trusts to change that repo, not whoever has an Airlock account. The login being checked is the one GitHub itself confirmed at sign-in, so it can't be typed in. A side effect for the hackathon: judges can run the demo PRs and see the verdict, but only the repo's owner can approve or reject them on GitHub. Their own npm and PyPI runs they can still decide.
 
@@ -353,7 +362,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 ## 11. How we tested it
 
-- **Unit tests:** 117, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
+- **Unit tests:** 120, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
 - **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 10 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs. **30/30 correct**, exfiltration proven by payload on 15/15 malicious runs, zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
 - **Live self-test** on the public site: five fixtures, pass only if stealers are malicious *with payload-proven exfil* and benign ones have zero containment. 5/5 on 4 Nov.
 - **Probes** for specific holes: the DNS gateway probe (failed before the DNS guard, passes after), a malformed-DNS probe, the egress probe, the image probe.
@@ -375,7 +384,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 | Pattern-based injection guard | Fast, free, predictable | Bypassable by paraphrase; it's a speed bump, not a wall |
 | Merge-base diff in a second VM | Shows what the PR adds; less noise for real repos | Doubles VM cost per PR; PR #1 takes 24 s instead of ~13 s |
 | `inconclusive` on any coverage gap | Never a false "safe" | More runs need a human look |
-| Human approval on every PR | No silent auto-merge on a model's word | Friction; at scale this needs policy (section 14) |
+| Automatic rejection on proof only; approval always human | Proven theft is blocked with no wait, and no model's word ever merges code | Everything short of proof (suspicious but unproven, and every clean change) still needs a person; at scale this needs policy (section 14) |
 | One host, SQLite, in-process runners | Simple, fast to build, easy to rebuild | No horizontal scale; max 2 concurrent runs |
 | One small, cheap model | About $1.45 of inference for the whole build; a fraction of a cent per review | Less depth on unusual cases than a large model |
 
@@ -430,7 +439,7 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 - **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour, and **Approve / Reject buttons on the check itself** (Check Run requested actions), so reviewers decide inside GitHub and GitHub's own permissions say who may.
 - **One GitHub App for everything:** sign users in through the GitHub App (user-to-server tokens) instead of a separate OAuth App, and let an org admin install it once and pick repos, with no allowlist file.
 - **Smarter automatic triggers:** the webhook already runs every PR and push in an enabled repo. Next: enable it per installation, and skip PRs that touch no lockfile, manifest or vendored archive, so Dependabot/Renovate bumps are covered without detonating documentation changes.
-- **Policy as code.** Teams decide what may auto-approve: e.g. "no new behaviours and no containment → approve", "any PROVEN exfil → block and page security", "new network host → require a security reviewer". Humans then look only at what matters.
+- **Policy as code.** Today one rule is built in: proven theft is rejected automatically (`AIRLOCK_AUTO_REJECT`), and nothing is approved automatically. A product makes this configurable per repo. Teams decide what may auto-approve: e.g. "no new behaviours and no containment → approve", "any PROVEN exfil → block and page security", "new network host → require a security reviewer". Humans then look only at what matters.
 - **Allowlists per repo** for known, expected behaviour (a package that legitimately downloads a binary from its own CDN), versioned and reviewed like code.
 - **A cache of results by package hash.** The same `left-pad@1.3.0` tarball doesn't need to be detonated again for every repo; reuse the evidence, re-detonate on a schedule.
 - **GitLab, Bitbucket and a plain CI step** (a container that calls the API and fails the job), for teams not on GitHub.

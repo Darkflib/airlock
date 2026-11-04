@@ -160,6 +160,15 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             log.emit("github_status", f"not updating the GitHub status: run {newer} of the same commit is newer",
                      superseded_by=newer, source="github")
             return
+        if phase == "verdict" and auto_reject and store.proven_exfil(run_id):
+            # Deterministic, not the model's word: a payload captured on the host carried this run's
+            # canary token. Reject at once; anything short of proof still waits for a person.
+            reason = "exfiltration proven by a captured payload"
+            store.update_run(run_id, decision="rejected", decided=time.time(), decided_by=None,
+                             meta={**m, "auto_decision": reason})
+            log.emit("decision", f"rejected automatically: {reason}", source="airlock")
+            await post_to_pr(store.get_run(run_id))
+            return
         state, desc = {
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
             "verdict": ("pending", f"Verdict: {run['verdict']}; waiting for a human decision"),
@@ -176,6 +185,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                      f"it keeps any earlier airlock status, which may be a success. {type(e).__name__}: {str(e)[:150]}")
             gate = {"state": state, "synced": False, "error": f"{type(e).__name__}: {e}"[:200]}
         store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate})
+    auto_reject = os.environ.get("AIRLOCK_AUTO_REJECT", "1") != "0"
     runner = Runner(store, analyse, gate=gate_pr)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
@@ -468,7 +478,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         """The outward action, only after a human decision: commit status + comment as the App's bot."""
         m, run_url = run["meta"], f"{public_url}/runs/{run['id']}"
         state = "success" if run["decision"] == "approved" else "failure"
-        desc = f"{run['decision']} by @{run['decided_by']} (verdict: {run['verdict']})"
+        desc = (f"rejected automatically: {m['auto_decision']}" if m.get("auto_decision")
+                else f"{run['decision']} by @{run['decided_by']} (verdict: {run['verdict']})")
         try:
             await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, run_url)
             url = await github.comment(m["owner"], m["repo"], m["number"],

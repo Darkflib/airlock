@@ -18,7 +18,7 @@ Airlock runs every untrusted code change in its own disposable computer. Paste a
 
 Every other address is answered by a fake server that Airlock controls on the host, and nothing is forwarded. So when malicious code sends the fake passwords out, Airlock captures the full request: the theft is proven, not guessed. For a pull request, Airlock also runs the code from before the change in a second machine and shows only what is new.
 
-An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then looks inside the same machine and writes a verdict. Every claim links to the event that proves it. During the run, the Airlock GitHub App keeps the pull request at "pending", and the repository requires this check, so it cannot be merged. Only a person clicking Approve or Reject sets the final result and posts the evidence on the pull request.
+An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then looks inside the same machine and writes a verdict. Every claim links to the event that proves it. During the run, the Airlock GitHub App keeps the pull request at "pending", and the repository requires this check, so it cannot be merged. If the theft is proven, Airlock rejects the pull request by itself and posts the evidence. Otherwise a person decides, and only a person can approve.
 
 In our test set, 10 npm and PyPI packages ran through the real system 3 times each: 30 of 30 correct. The stolen data was captured on all 15 malicious runs, and the 15 safe runs had no false alarms. A typical run takes 12 to 31 seconds. The AI cost for the whole project was about $1.45 (4 November).
 

@@ -40,7 +40,7 @@ Reads like a routine dependency bump; the theft is split across "install analyti
 ## 6. The gate
 
 - A push starts a run (App webhook); the GitHub App holds the PR at a pending `airlock` status; branch protection requires it.
-- Only a human Approve or Reject sets the final status and posts the evidence comment, and only someone with write access to the repo on GitHub may give it.
+- Proven theft (a captured payload with this run's token) is rejected automatically: red check and evidence comment, no click. Everything else waits for a human Approve or Reject, from someone with write access to the repo on GitHub.
 - The AI explains; it never merges.
 *Visual:* greyed-out merge button beside the bot's evidence comment.
 

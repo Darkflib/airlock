@@ -556,3 +556,9 @@ Tags: #demo
 **Result:** run `20261104-185752-301541` started by itself (`(webhook)`, attributed to Darkflib, head `bc14f23`): malicious, exfil to `telemetry.tinystamp.invalid` proven by payload, behaviour diff 10 new (5 containment), 4 unchanged; `pending` posted at start and again with the verdict, gate synced. Same figures as the hand-started run on 4 Nov 08:50.
 **So:** the push-to-run path in the video script works end to end; PR #4 is left undecided at `pending`.
 Tags: #win #demo
+
+### 19:30 — Proven theft is rejected automatically
+**Tried:** for the demo, decide automatically where the evidence leaves nothing to weigh. When a PR run's verdict is in and `store.proven_exfil` is true (a host-captured payload carrying this run's token; the model's verdict plays no part), `gate_pr` records `rejected` with `meta.auto_decision` and posts `failure` plus the evidence comment itself. Nothing is ever approved automatically. `AIRLOCK_AUTO_REJECT=0` turns it off.
+**Result:** 120 tests pass (3 new: auto-reject on, off, unproven exfil still waits). Deployed (on by default). Not yet seen on a real PR push. Script narration back to 407 words; deck slides 3 and 6 (v10), README, SUBMISSION (1903/2000 chars, check passes), PRD, report and AGENTS updated.
+**So:** the tagline "nothing merges until a person approves" stays true; the video's gate shot shows PR #4 already red with no click, then a person approving PR #1. Considered and rejected: auto-approving clean runs (sandbox-aware malware looks clean) and following the AI verdict (lets the model's word merge code).
+Tags: #decision #demo

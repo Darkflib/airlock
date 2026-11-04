@@ -1,6 +1,6 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 408 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. PR #4 is now started on camera by a push (the GitHub webhook); to make room, the 2:33 block no longer says "npm and PyPI" (the numbers slide still does) and PR #4 no longer mentions the host built from pieces.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 407 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. PR #4 is now started on camera by a push (the GitHub webhook); to make room, the 2:33 block no longer says "npm and PyPI" (the numbers slide still does) and PR #4 no longer mentions the host built from pieces. PR #4 is now rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's Approve is still a person's.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
@@ -66,19 +66,19 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 ### 2:15–2:33 The gate
 
-**[SCREEN]** GitHub PR #4: merge button greyed out, `airlock` check pending. Back on the run page, click **Reject**. On GitHub: red `airlock` status and the `airlocksandbox[bot]` evidence comment.
+**[SCREEN]** The run page already shows REJECTED, "automatically: exfiltration proven by a captured payload". Nobody clicked. On GitHub, PR #4: red `airlock` status with the same reason, merge blocked, and the `airlocksandbox[bot]` evidence comment.
 
-> "During all of this, the pull request cannot be merged. The repository requires the Airlock check, and it stays pending until a person decides. I click Reject, and Airlock posts the evidence on the pull request."
+> "During the test, the pull request cannot be merged. The repository requires the Airlock check. Here the theft is proven, so Airlock rejects it by itself and posts the evidence on the pull request."
 
 **[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Click **Approve**. GitHub: green status, merge button unlocks.
 
-> "This one is a safe update: nothing new, nothing blocked. I click Approve, and now it can be merged."
+> "This one is a safe update: nothing new, nothing blocked. Approval is a person's job. I click Approve, and now it can be merged."
 
 ### 2:33–2:50 Under the hood
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models to choose the agent. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
+> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
 
 ### 2:50–3:00 Close
 
@@ -101,6 +101,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | Shell stealer, proven exfil, `cat`/`curl`/raw-IP | BUILD_LOG 3 Nov 22:37; self-test `20261104-084347-33a1a2` |
 | PR #4: 10 new, 5 containment, proven | BUILD_LOG 4 Nov 08:50, run `20261104-084529-f40401` (recheck on the live run) |
 | A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
+| Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 30/30, proven 15/15 | `product-20261104T030613Z` (rerun on the frozen commit) |
