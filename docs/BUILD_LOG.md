@@ -442,3 +442,9 @@ Tags: #demo
 **Result:** three gaps between claims and measurements: the five-fixture self-test has never run live (only 3/3 on 3 Nov); no PR run since the behaviour diff deployed; stale-run cleanup fails runs at startup but never destroys their microVMs. Also: `Darkflib/airlock-demo` is private, so PR links would 404 for judges.
 **So:** PRD build plan rewritten day by day: live checks today, cleanup and judge-access verification Thursday, story Friday, freeze and record Saturday, audit and publish Sunday. Pattern B gets half a day at most; it's first to cut.
 Tags: #decision
+
+### 08:50 — Live five-fixture self-test 5/5; PR #4 with the behaviour diff
+**Tried:** ran the self-test and PR #4 from the live site (first runs since the behaviour diff was deployed).
+**Result:** self-test `20261104-084347-33a1a2` **5/5**: Node, shell and Python stealers malicious, each with exfil proven by payload during install (4, 6 and 13 containment events; the Python stealer reads all three canaries from several processes); benign npm and benign Python sdist 0. PR #4 `20261104-084529-f40401`: malicious in 20.2 s, POST to `telemetry.tinystamp.invalid` PROVEN, behaviour diff "10 new (5 containment), 4 unchanged", the same as an 08:08 run and the regression. The homepage still described a three-package self-test; copy fixed and a PR #4 example chip added (not deployed yet).
+**So:** the five-package claim in the README and submission copy is now measured live. PR #4 is left pending for the camera.
+Tags: #metric #win #demo

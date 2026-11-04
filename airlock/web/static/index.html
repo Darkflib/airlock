@@ -39,6 +39,7 @@
         <div class="examples">Try:
           <button class="chip" data-spec="https://github.com/Darkflib/airlock-demo/pull/1" type="button">airlock-demo PR #1</button>
           <button class="chip" data-spec="https://github.com/Darkflib/airlock-demo/pull/3" type="button">airlock-demo PR #3</button>
+          <button class="chip" data-spec="https://github.com/Darkflib/airlock-demo/pull/4" type="button">airlock-demo PR #4</button>
           <button class="chip" data-spec="left-pad@1.3.0" type="button">left-pad@1.3.0</button>
           <button class="chip" data-spec="pypi:six==1.17.0" type="button">pypi:six==1.17.0</button>
         </div>
@@ -49,9 +50,10 @@
     <div class="panel selftest" style="margin-top:20px">
       <h2>Containment self-test</h2>
       <div class="body">
-        <p class="muted">Detonate three known packages through the same path as any run: a Node credential stealer,
-          a shell credential stealer, and a benign package with a postinstall. A stealer passes only if its exfiltration
-          is proven by the captured payload; the benign package passes only with zero containment events.</p>
+        <p class="muted">Detonate five known packages through the same path as any run: a Node credential stealer,
+          a shell credential stealer, a benign package with a postinstall, a Python <code>setup.py</code> credential
+          stealer and a benign Python sdist. A stealer passes only if its exfiltration is proven by the captured payload;
+          a benign package passes only with zero containment events.</p>
         <div class="selftest-row">
           <button type="button" id="selftest-go">Run self-test</button>
           <span id="selftest-last" class="muted"></span>

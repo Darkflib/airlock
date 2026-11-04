@@ -25,10 +25,10 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
 
 - **4 Nov, 03:06. Full regression 30/30** ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR.
-- **4 Nov, 02:35. Hidden stealer (PR #4) caught in 13.4 s.** The sinkhole captured the POST carrying this run's canary token, though the diff reads like a routine bump.
+- **4 Nov, 08:45. Live self-test 5/5** (`20261104-084347-33a1a2`): Node, shell and Python stealers malicious with exfil proven by payload (4, 6 and 13 containment events); benign npm and benign Python sdist 0.
+- **4 Nov, 08:45. Hidden stealer (PR #4) with the behaviour diff, 20.2 s** (`20261104-084529-f40401`): 10 behaviours new in this PR versus its merge base (5 of them containment), 4 unchanged. The sinkhole captured the POST carrying this run's canary token, though the diff reads like a routine bump. The first PR #4 run (02:35, no diff yet) took 13.4 s.
 - **4 Nov, 02:12. Malformed DNS can't blind the watcher.** A real VM sent truncated queries as `node`; both were logged as `dns_malformed` and the next lookup was still recorded.
 - **4 Nov, 00:29. DNS-label exfil path found and closed.** Before the fix, raw DNS to the gateway resolver went out unrecorded. After it, only registry names resolve and everything else is NXDOMAIN plus a `dns_blocked` event. DNS over TCP is refused but not recorded.
-- **3 Nov, 23:47. Live self-test 3/3** (Node stealer 5 events, shell stealer 6, benign 0).
 - **3 Nov. Model choice benchmarked**, not assumed: all 13 catalogue models, about 700 agent calls.
 - **Cost: $1.45** of Serverless Inference for the whole build up to 4 Nov 08:25, including that benchmark and every regression (inference only; the VM is billed separately). One review costs a fraction of a cent.
 
