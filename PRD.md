@@ -1,6 +1,6 @@
 # Airlock — Dependency Detonation Chamber (PRD)
 
-Nov 3, 2026 · @Mike Preston, which is the source of truth
+Nov 3, 2026 · @Mike Preston · this file is the source of truth
 
 ## Summary
 
