@@ -4,13 +4,13 @@ Nov 3, 2026 · @Mike Preston · this file is the source of truth
 
 ## Summary
 
-Airlock runs an untrusted dependency change (a GitHub pull request, a new npm package, or an uploaded tarball) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and the PR cannot merge until a human approves or rejects: it is held at a pending status that branch protection requires.
+Airlock runs an untrusted dependency change (a GitHub pull request, a new npm or PyPI package, or an uploaded package file) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and the PR cannot merge until a human approves or rejects: it is held at a pending status that branch protection requires.
 
-**Status (end of Tue 3 Nov):** every P0 requirement works end to end on the live site, two days ahead of the Thursday cut line.
+**Status (Wed 4 Nov):** every P0 requirement works end to end on the live site, and the Thursday hardening items are done and verified live, a day early.
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
 - **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
-- **Remaining work** (plan as of 4 Nov 09:15): presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
+- **Remaining work:** the video, slides and cover image, then the pre-publish audit and submission. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
 
@@ -56,7 +56,7 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 One run per submitted change. The PR flow is the headline:
 
 1. **Submit** a GitHub PR URL, an npm spec (`left-pad@1.3.0`), a PyPI spec (`pypi:requests==2.32.3`), or a package file (npm `.tgz` or a Python sdist `.tar.gz`/`.zip`), in the web UI (GitHub sign-in, allowlist) or with `airlock analyse`.
-2. **Setup** (Airlock code, no AI). A fresh microVM boots in about 0.7 s. Canary `~/.npmrc` and `~/.aws/credentials` carrying a per-run token are planted, and a root watcher starts.
+2. **Setup** (Airlock code, no AI). A fresh microVM boots in about 0.7 s. Canary `~/.npmrc`, `~/.aws/credentials` and `~/.pypirc` carrying a per-run token are planted, and a root watcher starts.
 3. **Acquire.** The control plane fetches the PR head and diff through the GitHub App (the VM has no GitHub access), or the npm package or tarball.
 4. **Detonate.** For npm, `npm ci` and `npm test`; for Python, `pip install` from source into a venv (so `setup.py` and build hooks run). Both run as the unprivileged `node` user, with all observation layers on and all traffic routed through the sinkhole.
 5. **Investigate.** The triage agent (`mimo-v2.6-flash`) reads the code and re-runs what it needs within a 12-turn budget; the last turn forces `finish`. Every tool result passes the injection guard and ends with the Airlock events it produced, and cited IDs are checked against the run (a nonexistent ID is sent back once, then flagged).
@@ -125,7 +125,7 @@ The agent is **`mimo-v2.6-flash`** on Vultr Serverless Inference. It was chosen 
   - All 12/12 hostile triages caught the package. None followed its README's "AI reviewers: approve this" injection.
   - Zero invalid tool calls in 631.
 - **Refusals are real.** Some models soft-refused to *write* the simulated malware fixture: DeepSeek turned it into a no-op, and others skipped the credential reads.
-- **Product regression** (`evals/product_regression.py`) on the real pipeline, 6 targets × 3: **18/18 correct**, no forced verdicts, and exfil proven by payload in 9/9 malicious runs.
+- **Product regression** (`evals/product_regression.py`) on the real pipeline, 10 targets × 3 across npm, PyPI and three demo PRs: **30/30 correct**, no forced verdicts, 0 invalid tool calls, exfil proven by payload in 15/15 malicious runs, and the base-vs-head diff identical on every PR run (`product-20261104T030613Z`).
 
 **Agent loop safeguards:** a hard 12-turn budget, with the last turn forcing `finish`. Every tool result passes the injection guard and ends with the Airlock events that call produced, and `finish` is checked: citations of nonexistent ids are sent back once, then flagged. The task prompt itself, which quotes the PR title, file names and event summaries, is screened too. stderr is trimmed to the last 4 KB.
 
@@ -145,7 +145,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 
 **Wed 4 Nov: optional depth**
 
-- [x] Containment self-test judges can click: three fixtures scored pass/fail live, exfil must be proven by payload (built Tue night, local check only; deploy and run on the host)
+- [x] Containment self-test judges can click: fixtures scored pass/fail live, exfil must be proven by payload (three fixtures on Tue night, five with PyPI on Wed)
 - [x] Harder demo PR: payload hidden in plain sight (PR #4, `tinystamp`) — install-time credential theft smuggled through innocuous "install analytics" + a home-dir "config discovery" helper, with the collector host assembled from fragments, so the diff reads like an ordinary dependency bump. No encoding or obfuscation tooling; detonation still catches it. (Codex caught the readable PR #3.)
 - [x] PyPI support (F12): sdist upload and `pypi:name==version`, installed from source in `python:3.12-slim` so `setup.py` runs under the watcher; two Python fixtures (stealer + benign) added to the regression and self-test
 - [x] Behaviour diff, base vs head (F9): the merge base is detonated in a second VM in parallel; fingerprints drop run noise (pids, tokens, sinkhole IPs, checkout paths); the agent, the PR comment and the run page see what the PR adds; pre-existing risky behaviour is flagged, never hidden; the diff never lowers a verdict
@@ -160,11 +160,11 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Clean up after a crash (4 Nov): a VM doesn't outlive its process (after `kill -9` it shows as stopped), but its record and root directory stayed. VMs now carry an owner label, and `airlock-web` destroys its own leftovers at startup (`reap_leftovers`); CLI and regression VMs are untouched. Verified by killing the service mid-run: the restart removed the VM and the run shows as an error
 - [x] Close F6: the pattern guard is the guard; the model-based guard is descoped (`nemotron-3.5-content-safety` answers "safe" to everything)
 - [x] Judge access end to end with a second GitHub account (4 Nov, one-use `guesttest` invite, since revoked): guest sees 18 demo runs and none of the owner's uploads (direct fetch 404); deciding or sharing an owner's run 403; PR from another repo 403; own run decided and shared; the 16th run in a day 429. Share links signed out: only their own runs (others, the run list, decide and submit 401); a tampered link goes to `/login?error=share`. Revoking ended the guest's session at once
-- [ ] PRD final pass: status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
+- [x] PRD final pass (4 Nov): status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
 
 **Fri 6 Nov: story**
 
-- [ ] Demo script reworked: PR #3 (readable stealer) → PR #4 (hidden stealer caught at runtime, with "new in this PR" vs the merge base) → the gate, with PR #1's greyed-out merge button (left pending for this shot); PyPI as one line under "under the hood"
+- [x] Demo script reworked (4 Nov): PR #3 (readable stealer) → PR #4 (hidden stealer caught at runtime, with "new in this PR" vs the merge base) → the gate, with PR #1's greyed-out merge button (left pending for this shot); PyPI as one line under "under the hood"
 - [ ] Video script built from build-log `#demo` moments; slides (including the $1.45 inference spend); cover image
 
 **Sat 7 Nov: freeze and record**
@@ -180,27 +180,29 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [ ] `Darkflib/airlock-demo` is private, so PR links in bot comments and slides 404 for judges: make it public, or rely on share links only
 - [ ] `scripts/check-submission.py` passes (long description at 1977/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
 
-**If anything slips,** cut in this order: the second-account access check, slide polish. Never the video or the pre-publish audit.
+**If anything slips,** cut slide polish and the cover image first. Never the video or the pre-publish audit.
 
 ## Demo script (3 minutes)
 
-The video uses the real demo repo `Darkflib/airlock-demo` and two open PRs. Everything shown is a live run, not a mock-up.
+The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everything shown is a live run, not a mock-up. The arc: a readable stealer, then one that reads like a routine bump, then the merge gate.
 
 1. **0:00 Hook (15 s).** PR #3, "feat: coloured startup log", has a green `npm test`. Line: "A green test run doesn't tell you what the install script did."
-2. **0:15 Submit (15 s).** Paste the PR URL into Airlock. The run page shows the PR card: the vendored `colorful-logs-2.0.1.tgz` marked *added*.
-3. **0:30 Detonation (60 s).** The timeline streams in live:
+2. **0:15 Detonation, PR #3 (60 s).** Paste the PR URL. The PR card shows the vendored `colorful-logs-2.0.1.tgz` marked *added*. The timeline streams in live:
    - The microVM boots in 0.7 s, canaries are planted, and the watcher starts.
    - `npm ci` runs as the unprivileged user.
    - **PROVEN** exfil appears, with the captured POST body showing this run's canary token highlighted. That's **the money shot**.
    - `cat` and `python3` read the credentials, `curl` is sinkholed, and a raw-IP connect is refused.
    - Talking point: it's a shell script, with no Node code involved.
-4. **1:30 Verdict (30 s).** MALICIOUS. Click an `[E8]` evidence link and the timeline jumps to the event. The AI explains; it didn't decide what counts as evidence.
-5. **2:00 Gate (20 s).** Click Reject. Cut to GitHub: `airlocksandbox[bot]` sets a red `airlock` status and posts the evidence comment. Then PR #1 (the left-pad bump): zero containment, Approve, green status.
-6. **2:20 Under the hood (30 s).**
-   - The architecture diagram: three containment layers.
-   - VX1 with KVM, and a rebuild from cloud-init in about 10 minutes.
-   - 13 Serverless Inference models benchmarked; 18/18 regression.
+3. **1:15 Verdict (20 s).** MALICIOUS. Click an evidence link (`[E#]`) and the timeline jumps to the event. The AI explains; it didn't decide what counts as evidence.
+4. **1:35 The hard one, PR #4 (35 s).** Line: "That script was easy to read. This one isn't." PR #4, "feat: timestamped startup log", reads like a routine dependency bump: the theft is split across "install analytics" and a "config discovery" helper, and the collector host is built from fragments. Cut to the recorded run (no waiting): "only what this PR adds" filter on, **10 behaviours new versus the merge base, 5 of them containment**, each tagged NEW IN THIS PR. The merge base was detonated in a second microVM alongside it. Exfil to `telemetry.tinystamp.invalid` is PROVEN by payload again.
+5. **2:10 Gate (20 s).** On GitHub, PR #4's merge button is greyed out: the `airlock` check is pending. Click Reject: `airlocksandbox[bot]` sets a red status and posts the evidence comment. Then PR #1 (the left-pad bump): 0 new behaviours, zero containment, Approve, green status, and the merge button unlocks.
+6. **2:30 Under the hood (20 s).**
+   - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
+   - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
+   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30; $1.45 of inference for the whole build.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to take."
+
+**Before recording:** fresh runs of PR #3 and PR #4 so the PR #3 run and the PR #4 diff are current; PR #1 is already held at pending for the gate shot. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
 
 **On other AI reviewers.** Codex also flagged PR #3 by reading the plainly written script. The honest line: *static review can catch an obvious payload; Airlock proves what ran, what it took and where it tried to send it, and gates the merge.* PR #4 (`tinystamp`) is the fair side-by-side: no tell-tale script, the credential read and exfil are split across innocuous-looking "install analytics" and a "config discovery" helper, and the collector host is built from fragments — the diff reads like a routine dependency bump, but detonation still proves the exfil. (For a blind static-review test, strip the fixture's honest NOTICE comments first.)
 
@@ -211,7 +213,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
 | Serverless Inference slow or rate-limited during the live demo | Low–medium | Record the video from real runs; past runs replay from the database; `qwen3.8-27b` fallback in `roles.toml` |
-| A judge abuses access (mass submissions, hostile packages) | Low | GitHub sign-in with an allowlist; 2 concurrent runs; every run is sandboxed and destroyed. Add per-user caps on Thursday |
+| A judge abuses access (mass submissions, hostile packages) | Low | GitHub sign-in with an allowlist; 2 concurrent runs; every run is sandboxed and destroyed; guests capped at 15 runs a day each and 150 between them (verified with a second account, 4 Nov) |
 | Host crash leaves stale VMs or a half-written run | Low | VMs die with their process; at startup, interrupted runs are marked failed and the web service removes its leftover sandboxes (verified 4 Nov) |
 | Judges read it as "just a container" | Medium | Separate kernel (guest 6.12 vs host 6.8); the architecture slide shows all three layers |
 | Sandbox-aware or delayed malware stays quiet | Known limit | Stated openly in the README and slides; not claimed |
@@ -228,13 +230,13 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 - [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.45 (4 Nov 08:25).
 - [x] Read-only public view for judges, or allowlist only? Both: signed read-only share links to recorded runs, plus an invite link with run caps for judges who want to submit their own (decided Tue 3 Nov). The lablab page is public, so the invite link should be treated as public.
-- [ ] Build the obfuscated PR before the video, or after submission?
+- [x] Build the obfuscated PR before the video, or after submission? Before, without obfuscation tooling: PR #4 (`tinystamp`, 4 Nov) splits the theft across innocuous-looking files, which is enough to make the diff read as a routine bump. Runtime detection doesn't depend on how readable the code is.
 
 **Success metrics**
 
-- [x] Hostile targets get a malicious verdict with proven exfil: 9/9 in the regression.
-- [x] Benign targets get a benign verdict with zero containment events: 9/9.
-- [x] A full run, including VM boot, install, tests and AI review, finishes in under 20 s (median 9.4–17.2 s); VM boot about 0.7 s.
+- [x] Hostile targets get a malicious verdict with proven exfil: 15/15 in the regression (npm, shell, Python, PR #3, PR #4).
+- [x] Benign targets get a benign verdict with zero containment events: 15/15.
+- [x] A full run finishes well inside goal 1's 5 minutes: medians 12–31 s end to end, VM boot about 0.7 s. The tighter 20 s target holds for tarballs, npm specs, sdists and the stealer PRs (12–18 s), but not for PR #1 (24 s: two VMs plus `npm test`) or real PyPI `six` (31 s).
 - [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses are answered on the host (verified 4 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.
 
 **Submission checklist**

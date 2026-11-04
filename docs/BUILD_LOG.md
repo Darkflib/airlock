@@ -472,3 +472,9 @@ Tags: #fail #win #decision #descope
 - `invite.sh revoke guesttest` removed the account, and the guest's open session got 401 on its next request.
 **So:** the reviewer's unverified items (invite, quota, signed-out share) are now verified live. Every Thursday item is done a day early; what's left is the story.
 Tags: #win #metric
+
+### 09:25 — PRD final pass and the demo script reworked
+**Tried:** went through the PRD for claims that had drifted since Tuesday.
+**Result:** fixed the status line, the regression figure (18/18 → 30/30, proven 15/15), success metrics, the risk table and the answered obfuscated-PR question. One metric no longer holds as written: "a full run in under 20 s" is true for tarballs, specs, sdists and the stealer PRs (12–18 s), not for PR #1 (24 s, two VMs plus `npm test`) or real PyPI `six` (31 s); the PRD now says so, against goal 1's 5 minutes. Demo script rebuilt as PR #3 (readable) → PR #4 (reads like a bump, 10 new behaviours vs the merge base) → the gate on PR #4 and PR #1, with $1.45 and 30/30 in "under the hood".
+**So:** the PRD matches what's measured. Friday's work is the video script, slides and cover image from this script.
+Tags: #decision #demo
