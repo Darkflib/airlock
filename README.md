@@ -172,6 +172,7 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 **Access.**
 - `scripts/allow.sh add <github-login>` allows a known account.
 - `scripts/invite.sh new --days 30 --max 50 --id lablab` prints a sign-up link for people whose logins you don't know. Anyone who signs in through it is added to the allowlist tagged with the invite, and `scripts/invite.sh revoke lablab` removes them all.
+- Share links are listed on the run or self-test page they open, and each can be revoked there by whoever made it or an owner. **Sign out everywhere** (top right) ends every session of your account.
 - Accounts other than the owners are **guests**:
   - They see their own runs and the owners' demo runs (self-tests, npm packages, PRs from the demo repo), but not the owners' uploads or other repos. They approve, reject and share only their own.
   - They can analyse PRs only from `Darkflib/airlock-demo` (`AIRLOCK_GUEST_REPOS`), so an invite never lets anyone speak for another repo through the GitHub App.

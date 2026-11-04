@@ -1,13 +1,16 @@
 """GitHub OAuth sign-in with an allowlist of GitHub logins.
 
-Sessions are stateless signed cookies (HMAC-SHA256). The allowlist is re-read
-on every request, so removing a login from the file revokes access at once.
+Sessions are signed cookies (HMAC-SHA256). The allowlist is re-read on every
+request, so removing a login from the file revokes access at once. Each session
+carries an id: signing out revokes that one, "sign out everywhere" revokes every
+session of the login issued so far (files `revoked_sessions` beside the allowlist).
 Allowlist: AIRLOCK_ALLOWED_USERS (comma-separated) plus one login per line in
 AIRLOCK_ALLOWED_USERS_FILE (default ~/.config/airlock/allowed_users).
 
 Two more signed tokens share the session secret, each tagged with a kind `k` so
 one can never stand in for another:
-- share: read-only access to named runs (and a self-test), no sign-in needed.
+- share: read-only access to named runs (and a self-test), no sign-in needed. Each
+  link is recorded in `shares.jsonl` and can be revoked on its own (`revoked_shares`).
 - invite: whoever signs in with GitHub through it is appended to the allowlist
   file, tagged `# invite <id>`, so `scripts/allow.sh` still lists and revokes them.
 """
@@ -68,6 +71,68 @@ class AuthConfig:
     def revoked_file(self) -> Path | None:
         return self.allowed_file.with_name("revoked_invites") if self.allowed_file else None
 
+    def _file(self, name: str) -> Path | None:
+        return self.allowed_file.with_name(name) if self.allowed_file else None
+
+    def _lines(self, name: str) -> list[str]:
+        f = self._file(name)
+        return f.read_text().splitlines() if f and f.exists() else []
+
+    # share links: a ledger of what was minted, and the ids revoked since
+
+    def record_share(self, share: dict) -> None:
+        if f := self._file("shares.jsonl"):
+            with f.open("a") as out:
+                out.write(json.dumps({k: share.get(k) for k in ("id", "by", "runs", "selftest", "iat", "exp")}) + "\n")
+
+    def revoke_share(self, share_id: str) -> None:
+        if f := self._file("revoked_shares"):
+            with f.open("a") as out:
+                out.write(share_id + "\n")
+
+    def share_revoked(self, share: dict) -> bool:
+        # Links minted before ids existed can't be revoked one by one (rotate the secret for those).
+        return bool(share.get("id")) and share["id"] in self._lines("revoked_shares")
+
+    def shares(self) -> list[dict]:
+        """Live share links: minted, unexpired and not revoked."""
+        revoked, now = set(self._lines("revoked_shares")), time.time()
+        out = []
+        for line in self._lines("shares.jsonl"):
+            try:
+                s = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if s.get("exp", 0) > now and s.get("id") not in revoked:
+                out.append(s)
+        return out
+
+    # sessions: "sid <id> <exp>" ends one session; "user <login> <ts>" ends all issued before ts
+
+    def session_ok(self, session: dict) -> bool:
+        sid, login, iat = session.get("sid"), session.get("login", "").lower(), session.get("iat", 0)
+        if not sid:
+            return False  # issued before sessions had ids: sign in again
+        for line in self._lines("revoked_sessions"):
+            kind, key, ts = (line.split() + ["", "", ""])[:3]
+            if (kind == "sid" and key == sid) or (kind == "user" and key == login and iat <= float(ts or 0)):
+                return False
+        return True
+
+    def revoke_session(self, session: dict, everywhere: bool = False) -> None:
+        f = self._file("revoked_sessions")
+        if not f:
+            return
+        now = time.time()
+        keep = []
+        for line in self._lines("revoked_sessions"):  # drop entries no live session can match any more
+            kind, _, ts = (line.split() + ["", "", ""])[:3]
+            expires = float(ts or 0) + (SESSION_TTL if kind == "user" else 0)
+            if expires > now:
+                keep.append(line)
+        keep.append(f"user {session['login'].lower()} {now}" if everywhere else f"sid {session['sid']} {session['exp']}")
+        f.write_text("\n".join(keep) + "\n")
+
     def admit(self, login: str, invite: dict) -> bool:
         """Add a login to the allowlist file through a valid, unrevoked invite with uses left."""
         if not self.allowed_file:
@@ -123,8 +188,19 @@ def verify(secret: bytes, token: str | None) -> dict | None:
     return payload if payload.get("exp", 0) > time.time() else None
 
 
+def share_payload(runs: list[str], selftest: str | None = None, by: str | None = None, ttl: int = SHARE_TTL) -> dict:
+    now = time.time()
+    return {"k": "share", "id": secrets.token_urlsafe(9), "by": by, "runs": runs, "selftest": selftest,
+            "iat": now, "exp": now + ttl}
+
+
 def share_token(secret: bytes, runs: list[str], selftest: str | None = None, ttl: int = SHARE_TTL) -> str:
-    return sign(secret, {"k": "share", "runs": runs, "selftest": selftest, "exp": time.time() + ttl})
+    return sign(secret, share_payload(runs, selftest, ttl=ttl))
+
+
+def session_token(secret: bytes, login: str, ttl: int = SESSION_TTL) -> str:
+    now = time.time()
+    return sign(secret, {"login": login, "sid": secrets.token_urlsafe(12), "iat": now, "exp": now + ttl})
 
 
 def invite_token(secret: bytes, invite_id: str, days: float, max_uses: int) -> str:
@@ -211,7 +287,7 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     @router.get("/s/{token}")
     async def shared(token: str):
         share = verify_kind(cfg.session_secret, token, "share")
-        if not share:
+        if not share or cfg.share_revoked(share):
             return RedirectResponse("/login?error=share", status_code=302)
         target = f"/selftests/{share['selftest']}" if share.get("selftest") else f"/runs/{share['runs'][0]}"
         resp = RedirectResponse(target, status_code=302)
@@ -233,16 +309,26 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
             resp.delete_cookie(STATE_COOKIE, path="/")
             return resp
         resp = RedirectResponse(saved.get("next", "/"), status_code=302)
-        cookie(resp, SESSION_COOKIE, sign(cfg.session_secret, {"login": login_name, "exp": time.time() + SESSION_TTL}),
-               SESSION_TTL)
+        cookie(resp, SESSION_COOKIE, session_token(cfg.session_secret, login_name), SESSION_TTL)
         resp.delete_cookie(STATE_COOKIE, path="/")
         return resp
 
-    @router.post("/auth/logout")
-    async def logout():
+    async def end(request: Request, everywhere: bool) -> Response:
+        """Sign out: revoke this session (a copied cookie stops working too), or every session of the login."""
+        session = verify_kind(cfg.session_secret, request.cookies.get(SESSION_COOKIE), None)
+        if session and session.get("sid"):
+            cfg.revoke_session(session, everywhere)
         resp = RedirectResponse("/login", status_code=303)
         resp.delete_cookie(SESSION_COOKIE, path="/")
         return resp
+
+    @router.post("/auth/logout")
+    async def logout(request: Request):
+        return await end(request, everywhere=False)
+
+    @router.post("/auth/logout-everywhere")
+    async def logout_everywhere(request: Request):
+        return await end(request, everywhere=True)
 
     app.include_router(router)
 
@@ -250,11 +336,11 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
     async def require_login(request: Request, call_next):
         path = request.url.path
         session = verify_kind(cfg.session_secret, request.cookies.get(SESSION_COOKIE), None)
-        if session and session.get("login") and cfg.is_allowed(session["login"]):
+        if session and session.get("login") and cfg.is_allowed(session["login"]) and cfg.session_ok(session):
             request.state.user = session["login"]
             return await call_next(request)
         share = verify_kind(cfg.session_secret, request.cookies.get(SHARE_COOKIE), "share")
-        if share:
+        if share and not cfg.share_revoked(share):
             request.state.share = share
             if share_allows(share, request.method, path):
                 return await call_next(request)

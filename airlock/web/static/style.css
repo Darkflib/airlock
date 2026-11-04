@@ -245,3 +245,7 @@ a.fail, .result.fail { color: var(--bad); font-weight: 600; }
 .flag-new { margin-left: 8px; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 700;
   letter-spacing: 0.04em; color: var(--cyan); border: 1px solid var(--cyan); }
 body.only-new .ev.is-same { display: none; }
+
+ul.shares { list-style: none; margin: 6px 0 0; padding: 0; }
+ul.shares li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+ul.shares button { padding: 2px 10px; font-size: 12px; }

@@ -568,3 +568,9 @@ Tags: #decision #demo
 **Result:** webhook run `20261104-191139-8b864c`: malicious, rejected with no click (`decided_by` empty, `auto_decision` "exfiltration proven by a captured payload"); `failure` status and the evidence comment posted to PR #4.
 **So:** push → run → red check → evidence comment works end to end with nobody touching Airlock; this is the video's 1:35–2:33 sequence.
 Tags: #win #demo
+
+### 21:55 — GitHub post retries; share links and sessions revocable one by one
+**Tried:** close two weaknesses from the report. (1) `GitHubApp` status and comment writes retry with `tenacity`: four attempts with exponential backoff (about 7 s) on network errors, 5xx, 429 and rate-limit 403s; never on other 4xx. A comment isn't retried after a read timeout, since it may have landed. If GitHub is still down, the run page offers **Post again** (`POST /api/runs/{id}/post`), which re-checks write access and staleness. (2) Share links get an id and a ledger (`shares.jsonl`); the run and self-test pages list live links with **Revoke** (`DELETE /api/shares/{id}`, maker or owner). Sessions get an id and issue time: Sign out revokes that session (a copied cookie dies too), **Sign out everywhere** revokes every session of the login. Old id-less session cookies are refused (one re-sign-in); old id-less share links still work but can only be ended by rotating the secret.
+**Result:** 131 tests pass (11 new: retry/backoff/no-duplicate-comment against a mock GitHub, post again, share revoke incl. a cookie already set, guest can't revoke an owner's link, sign out with a copied cookie, sign out everywhere, id-less session refused).
+**So:** the report's "no retry" and "can't revoke one by one" weaknesses are gone; PRD line counts and the demo script brought up to date too.
+Tags: #security #decision

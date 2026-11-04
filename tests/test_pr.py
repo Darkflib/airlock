@@ -215,3 +215,23 @@ def test_unproven_exfil_still_waits_for_a_person(make):
         run = wait_done(c, c.post("/api/runs", data={"spec": PR}).json()["id"])
     assert run["decision"] is None and [x[2] for x in gh.calls if x[0] == "status"] == ["pending", "pending"]
     assert not any(x[0] == "comment" for x in gh.calls)
+
+
+def test_failed_post_can_be_posted_again(make):
+    gh = FakeGitHub(fail=True)
+    with make(gh) as c:
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        wait_done(c, run_id)
+        c.post(f"/api/runs/{run_id}/decision", json={"decision": "rejected"})
+        gh.fail = False   # GitHub is back
+        out = c.post(f"/api/runs/{run_id}/post").json()
+        assert out["meta"]["posted"]["comment_url"].endswith("#issuecomment-1")
+        assert [x[2] for x in gh.calls if x[0] == "status"][-1] == "failure"
+        assert c.post(f"/api/runs/{run_id}/post").status_code == 409   # posted once only
+
+
+def test_nothing_to_post_before_a_decision(make):
+    with make(FakeGitHub()) as c:
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        wait_done(c, run_id)
+        assert c.post(f"/api/runs/{run_id}/post").status_code == 409

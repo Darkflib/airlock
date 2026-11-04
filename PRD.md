@@ -182,7 +182,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [ ] Pre-publish audit: scan git history for secrets and share-link tokens; `.env` holds only `op://` references
 - [ ] Make `Darkflib/airlock` public (MIT)
 - [ ] `Darkflib/airlock-demo` is private, so PR links in bot comments and slides 404 for judges: make it public, or rely on share links only
-- [ ] `scripts/check-submission.py` passes (long description at 1977/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
+- [ ] `scripts/check-submission.py` passes (long description at 1903/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
 
 **If anything slips,** cut slide polish and the cover image first. Never the video or the pre-publish audit.
 
@@ -198,15 +198,15 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
    - `cat` and `python3` read the credentials, `curl` is sinkholed, and a raw-IP connect is refused.
    - Talking point: it's a shell script, with no Node code involved.
 3. **1:15 Verdict (20 s).** MALICIOUS. Click an evidence link (`[E#]`) and the timeline jumps to the event. The AI explains; it didn't decide what counts as evidence.
-4. **1:35 The hard one, PR #4 (35 s).** Line: "That script was easy to read. This one isn't." PR #4, "feat: timestamped startup log", reads like a routine dependency bump: the theft is split across "install analytics" and a "config discovery" helper, and the collector host is built from fragments. Cut to the recorded run (no waiting): "only what this PR adds" filter on, **10 behaviours new versus the merge base, 5 of them containment**, each tagged NEW IN THIS PR. The merge base was detonated in a second microVM alongside it. Exfil to `telemetry.tinystamp.invalid` is PROVEN by payload again.
-5. **2:10 Gate (20 s).** On GitHub, PR #4's merge button is greyed out: the `airlock` check is pending. The run is already rejected automatically (proven theft): `airlocksandbox[bot]` has set a red status and posted the evidence comment, with no click. Then PR #1 (the left-pad bump): 0 new behaviours, zero containment, Approve, green status, and the merge button unlocks.
-6. **2:30 Under the hood (20 s).**
+4. **1:35 The hard one, PR #4 (40 s).** Line: "That script was easy to read. This one isn't." PR #4, "feat: timestamped startup log", reads like a routine dependency bump: the theft is split across "install analytics" and a "config discovery" helper, and the collector host is built from fragments. Commit a one-line README change to the PR #4 branch in GitHub's web editor: the webhook starts a `(webhook)` run by itself and the `airlock` check turns pending. Cut the wait to the finished run: "only what this PR adds" filter on, **10 behaviours new versus the merge base, 5 of them containment**, each tagged NEW IN THIS PR. The merge base was detonated in a second microVM alongside it. Exfil to `telemetry.tinystamp.invalid` is PROVEN by payload again.
+5. **2:15 Gate (18 s).** On GitHub, PR #4's merge button is greyed out: the `airlock` check is pending. The run is already rejected automatically (proven theft): `airlocksandbox[bot]` has set a red status and posted the evidence comment, with no click. Then PR #1 (the left-pad bump): 0 new behaviours, zero containment, Approve, green status, and the merge button unlocks.
+6. **2:33 Under the hood (17 s).**
    - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
    - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
    - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30; $1.45 of inference for the whole build.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
-**Before recording:** fresh runs of PR #3 and PR #4 so the PR #3 run and the PR #4 diff are current; PR #1 is already held at pending for the gate shot. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
+**Before recording:** a fresh run of PR #3; PR #4's run is started on camera by the push, so prepare the README edit and do one practice push the day before. PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
 
 **On other AI reviewers.** Codex also flagged PR #3 by reading the plainly written script. The honest line: *static review can catch an obvious payload; Airlock proves what ran, what it took and where it tried to send it, and gates the merge.* PR #4 (`tinystamp`) is the fair side-by-side: no tell-tale script, the credential read and exfil are split across innocuous-looking "install analytics" and a "config discovery" helper, and the collector host is built from fragments — the diff reads like a routine dependency bump, but detonation still proves the exfil. (For a blind static-review test, strip the fixture's honest NOTICE comments first.)
 

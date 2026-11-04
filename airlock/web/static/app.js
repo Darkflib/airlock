@@ -28,20 +28,46 @@ const Airlock = (() => {
     nav.append(el('span', 'mono', `@${me.login}`));
     const form = el('form'); form.method = 'post'; form.action = '/auth/logout';
     form.append(el('button', 'ghost', 'Sign out'));
-    nav.append(form);
+    const all = el('form'); all.method = 'post'; all.action = '/auth/logout-everywhere';
+    const allBtn = el('button', 'ghost', 'Sign out everywhere');
+    allBtn.title = 'Ends every session of this account, on every device';
+    all.append(allBtn);
+    nav.append(form, all);
   }
   user();
 
+  // Live share links for this page, each revocable on its own.
+  async function shareList(btn, query) {
+    let ul = btn.nextElementSibling;
+    if (!ul || !ul.classList.contains('shares')) { ul = el('ul', 'shares'); btn.after(ul); }
+    const r = await fetch(`/api/shares?${query}`);
+    const links = r.ok ? await r.json() : [];
+    const day = (ts) => new Date(ts * 1000).toLocaleDateString();
+    ul.replaceChildren(...links.map((s) => {
+      const li = el('li', 'pr-meta', `Read-only link by @${s.by || '?'}, made ${day(s.iat)}, expires ${day(s.exp)} `);
+      const x = el('button', 'ghost', 'Revoke');
+      x.addEventListener('click', async () => {
+        x.disabled = true;
+        const d = await fetch(`/api/shares/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
+        if (d.ok) shareList(btn, query); else { x.disabled = false; x.textContent = 'Revoke failed'; }
+      });
+      li.append(x);
+      return li;
+    }));
+  }
+
   // "Share" button: mints a signed read-only link and copies it.
-  async function shareButton(btn, endpoint) {
+  async function shareButton(btn, endpoint, query) {
     if (!btn || !(await meP).login) return;
     btn.hidden = false;
+    shareList(btn, query);
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       try {
         const r = await fetch(endpoint, { method: 'POST' });
         const j = await r.json();
         if (!r.ok) throw new Error(j.detail || r.statusText);
+        shareList(btn, query);
         try { await navigator.clipboard.writeText(j.url); btn.textContent = 'Link copied'; }
         catch { prompt('Read-only share link:', j.url); btn.textContent = 'Share read-only link'; }
       } catch (e) { btn.textContent = `Share failed: ${e.message}`; }
@@ -142,7 +168,7 @@ const Airlock = (() => {
       const t = await (await fetch(`/api/selftests/${id}`)).json();
       const me = await meP;
       if (!shareWired && (me.owner || (me.login && (t.submitted_by || '').toLowerCase() === me.login.toLowerCase()))) {
-        shareButton($('share'), `/api/selftests/${id}/share`);
+        shareButton($('share'), `/api/selftests/${id}/share`, `selftest=${encodeURIComponent(id)}`);
         shareWired = true;
       }
       const head = $('score');
@@ -375,7 +401,20 @@ const Airlock = (() => {
           const l = el('a', '', `Posted to the PR as a comment + "${m.posted.status}" commit status`);
           l.href = m.posted.comment_url; l.target = '_blank'; l.rel = 'noopener';
           p.append(l);
-        } else p.textContent = `Posting to GitHub failed: ${m.posted.error}`;
+        } else {
+          p.textContent = `Posting to GitHub failed after retries: ${m.posted.error}. The PR stays pending until it's posted. `;
+          if (!readOnly) {
+            const retry = el('button', 'ghost', 'Post again');
+            retry.addEventListener('click', async () => {
+              retry.disabled = true;
+              const resp = await fetch(`/api/runs/${id}/post`, { method: 'POST' });
+              if (resp.ok) { renderHead(await resp.json()); return; }
+              const err = await resp.json().catch(() => ({}));
+              retry.textContent = `Not posted: ${err.detail || resp.statusText}`;
+            });
+            p.append(retry);
+          }
+        }
         b.append(p);
       }
     }
@@ -447,7 +486,7 @@ const Airlock = (() => {
       readOnly = !!me.share;
       const first = await (await fetch(`/api/runs/${id}`)).json();
       if (me.owner || (me.login && (first.submitted_by || '').toLowerCase() === me.login.toLowerCase())) {
-        shareButton($('share'), `/api/runs/${id}/share`);
+        shareButton($('share'), `/api/runs/${id}/share`, `run=${encodeURIComponent(id)}`);
       }
       renderHead(first);
       const es = new EventSource(`/api/runs/${id}/events`);

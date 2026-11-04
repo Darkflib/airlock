@@ -12,6 +12,7 @@ dependencies = [
   "openai>=1.40",
   "pyjwt[crypto]>=2.15.1",
   "python-multipart>=0.0.33",
+  "tenacity>=9.2.1",
   "uvicorn[standard]>=0.54.0",
 ]
 

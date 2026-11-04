@@ -295,3 +295,65 @@ def test_vm_names_stay_unique_for_long_labels(monkeypatch):
     from airlock.sandbox import Workspace
     a, b = (Workspace(EventLog(), label="x" * 80) for _ in range(2))
     assert a.name != b.name and len(a.name) <= 63
+
+
+def test_share_link_can_be_revoked_on_its_own(make_client):
+    with make_client() as c:
+        sign_in(c)
+        a = c.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(c, a)
+        one, two = (c.post(f"/api/runs/{a}/share").json() for _ in range(2))
+        listed = c.get("/api/shares", params={"run": a}).json()
+        assert {s["id"] for s in listed} == {one["id"], two["id"]} and listed[0]["by"] == "Darkflib"
+        assert "url" not in listed[0]   # the list never hands out the bearer token
+        assert c.delete(f"/api/shares/{one['id']}").json() == {"revoked": one["id"]}
+        assert [s["id"] for s in c.get("/api/shares", params={"run": a}).json()] == [two["id"]]
+        assert c.delete(f"/api/shares/{one['id']}").status_code == 404
+    with make_client() as anon:
+        r = anon.get(urlparse(one["url"]).path, follow_redirects=False)
+        assert r.headers["location"] == "/login?error=share"
+        anon.cookies.set(auth.SHARE_COOKIE, urlparse(one["url"]).path.rsplit("/", 1)[1])  # cookie set before revoking
+        assert anon.get(f"/api/runs/{a}").status_code == 401
+        anon.cookies.clear()
+        anon.get(urlparse(two["url"]).path)
+        assert anon.get(f"/api/runs/{a}").status_code == 200          # the other link still works
+        assert anon.get("/api/shares").status_code == 401             # a share holder can't list or revoke
+        assert anon.delete(f"/api/shares/{two['id']}").status_code == 401
+
+
+def test_guest_revokes_only_their_own_share_links(make_client):
+    with make_client() as owner:
+        sign_in(owner)
+        a = owner.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(owner, a)
+        owners_link = owner.post(f"/api/runs/{a}/share").json()
+    with make_client("some-judge") as g:
+        sign_in(g)
+        assert g.get("/api/shares").json() == []
+        assert g.delete(f"/api/shares/{owners_link['id']}").status_code == 404
+
+
+def test_sign_out_ends_that_session_even_for_a_copied_cookie(make_client):
+    with make_client() as c:
+        sign_in(c)
+        stolen = c.cookies.get(auth.SESSION_COOKIE)
+        c.post("/auth/logout", follow_redirects=False)
+        c.cookies.set(auth.SESSION_COOKIE, stolen)
+        assert c.get("/api/runs").status_code == 401
+
+
+def test_sign_out_everywhere_ends_every_session_of_the_login(make_client):
+    with make_client() as laptop, make_client() as phone:
+        sign_in(laptop), sign_in(phone)
+        assert phone.get("/api/runs").status_code == 200
+        laptop.post("/auth/logout-everywhere", follow_redirects=False)
+        assert phone.get("/api/runs").status_code == 401
+        time.sleep(0.01)
+        sign_in(phone)                                                # signing in again works
+        assert phone.get("/api/runs").status_code == 200
+
+
+def test_session_without_an_id_is_refused(make_client):
+    with make_client() as c:
+        c.cookies.set(auth.SESSION_COOKIE, auth.sign(SECRET, {"login": "Darkflib", "exp": time.time() + 60}))
+        assert c.get("/api/runs").status_code == 401

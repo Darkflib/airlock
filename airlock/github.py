@@ -1,6 +1,9 @@
 """GitHub App client: reads pull requests and, after a human decision, posts the
 verdict back as `<app>[bot]`. The server holds only the App private key and mints
-installation tokens scoped to one repository, valid for an hour."""
+installation tokens scoped to one repository, valid for an hour.
+
+Writes (statuses, comments) are retried on network errors, 5xx and rate limits, so a
+GitHub blip doesn't leave a decided PR stuck at pending."""
 
 from __future__ import annotations
 
@@ -12,10 +15,25 @@ from dataclasses import dataclass
 
 import httpx
 import jwt
+from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait_exponential
 
 API = "https://api.github.com"
 PR_URL = re.compile(r"^https://github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)/?(?:[?#].*)?$")
 HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+
+
+def transient(e: BaseException, idempotent: bool = True) -> bool:
+    """Worth another try: the network, GitHub's side, or a rate limit. Not 4xx we caused.
+    A write that isn't idempotent (a comment) is not retried once the request may have landed."""
+    if isinstance(e, (httpx.ReadTimeout, httpx.ReadError, httpx.RemoteProtocolError)):
+        return idempotent
+    if isinstance(e, httpx.TransportError):
+        return True
+    if isinstance(e, httpx.HTTPStatusError):
+        r = e.response
+        return r.status_code >= 500 or r.status_code == 429 or (
+            r.status_code == 403 and r.headers.get("x-ratelimit-remaining") == "0")
+    return False
 
 
 def parse_pr_url(url: str) -> tuple[str, str, int] | None:
@@ -43,9 +61,19 @@ class PullRequest:
 
 
 class GitHubApp:
-    def __init__(self, app_id: str, private_key_pem: str):
+    def __init__(self, app_id: str, private_key_pem: str, attempts: int = 4, wait: float = 1.0,
+                 transport: httpx.AsyncBaseTransport | None = None):
         self.app_id, self.key = app_id, private_key_pem
         self._tokens: dict[str, tuple[str, float]] = {}
+        self.attempts, self.wait, self.transport = attempts, wait, transport  # about 7 s of backoff by default
+
+    async def _retry(self, fn, idempotent: bool = True):
+        """Run a write with backoff on transient failures (also covers minting the token)."""
+        async for attempt in AsyncRetrying(retry=retry_if_exception(lambda e: transient(e, idempotent)), reraise=True,
+                                           stop=stop_after_attempt(self.attempts),
+                                           wait=wait_exponential(multiplier=self.wait, max=10 * self.wait)):
+            with attempt:
+                return await fn()
 
     @classmethod
     def from_env(cls) -> "GitHubApp | None":
@@ -63,12 +91,12 @@ class GitHubApp:
         if cached and cached[1] > time.time() + 300:
             return cached[0]
         auth = {**HEADERS, "Authorization": f"Bearer {self._jwt()}"}
-        async with httpx.AsyncClient(timeout=20) as c:
-            inst = await c.get(f"{API}/repos/{owner}/{repo}/installation", headers=auth)
+        async with httpx.AsyncClient(base_url=API, timeout=20, transport=self.transport) as c:
+            inst = await c.get(f"/repos/{owner}/{repo}/installation", headers=auth)
             if inst.status_code == 404:
                 raise PermissionError(f"the Airlock GitHub App is not installed on {owner}/{repo}")
             inst.raise_for_status()
-            tok = await c.post(f"{API}/app/installations/{inst.json()['id']}/access_tokens", headers=auth,
+            tok = await c.post(f"/app/installations/{inst.json()['id']}/access_tokens", headers=auth,
                                json={"repositories": [repo]})
             tok.raise_for_status()
         token = tok.json()["token"]
@@ -77,7 +105,7 @@ class GitHubApp:
 
     async def _client(self, owner: str, repo: str) -> httpx.AsyncClient:
         token = await self._token(owner, repo)
-        return httpx.AsyncClient(base_url=API, timeout=30, follow_redirects=True,
+        return httpx.AsyncClient(base_url=API, timeout=30, follow_redirects=True, transport=self.transport,
                                  headers={**HEADERS, "Authorization": f"Bearer {token}"})
 
     async def pull_request(self, owner: str, repo: str, number: int) -> PullRequest:
@@ -111,9 +139,11 @@ class GitHubApp:
             return r.text[:limit]
 
     async def comment(self, owner: str, repo: str, number: int, body: str) -> str:
-        async with await self._client(owner, repo) as c:
-            r = (await c.post(f"/repos/{owner}/{repo}/issues/{number}/comments", json={"body": body})).raise_for_status()
-            return r.json()["html_url"]
+        async def post():
+            async with await self._client(owner, repo) as c:
+                r = (await c.post(f"/repos/{owner}/{repo}/issues/{number}/comments", json={"body": body})).raise_for_status()
+                return r.json()["html_url"]
+        return await self._retry(post, idempotent=False)
 
     async def permission(self, owner: str, repo: str, login: str) -> str:
         """The user's access to the repo: admin, write, read or none (maintain counts as write)."""
@@ -124,7 +154,9 @@ class GitHubApp:
             return r.raise_for_status().json()["permission"]
 
     async def status(self, owner: str, repo: str, sha: str, state: str, description: str, target_url: str) -> None:
-        async with await self._client(owner, repo) as c:
-            (await c.post(f"/repos/{owner}/{repo}/statuses/{sha}", json={
-                "state": state, "description": description[:140], "target_url": target_url,
-                "context": "airlock"})).raise_for_status()
+        async def post():  # idempotent: the latest status for the context wins
+            async with await self._client(owner, repo) as c:
+                (await c.post(f"/repos/{owner}/{repo}/statuses/{sha}", json={
+                    "state": state, "description": description[:140], "target_url": target_url,
+                    "context": "airlock"})).raise_for_status()
+        await self._retry(post)

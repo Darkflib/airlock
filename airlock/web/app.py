@@ -224,11 +224,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if store.count_runs(since, exclude=owners) + n > global_daily:
             raise HTTPException(429, "Airlock's daily run limit for guests is used up; try again tomorrow")
 
-    def share_url(runs: list[str], selftest: str | None = None) -> dict:
+    def share_url(runs: list[str], selftest: str | None, by: str | None) -> dict:
         if not auth:
             raise HTTPException(400, "share links need sign-in configured")
-        token = authmod.share_token(auth.session_secret, runs, selftest)
-        return {"url": f"{public_url}/s/{token}", "expires": time.time() + authmod.SHARE_TTL}
+        share = authmod.share_payload(runs, selftest, by)
+        auth.record_share(share)
+        return {"url": f"{public_url}/s/{authmod.sign(auth.session_secret, share)}", "id": share["id"],
+                "expires": share["exp"]}
     uploads = data_dir() / "uploads"
     uploads.mkdir(exist_ok=True)
 
@@ -389,14 +391,34 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         user = authmod.current_user(request)
         if not is_owner(user) and (test.get("submitted_by") or "").lower() != (user or "").lower():
             raise HTTPException(403, "you can share only self-tests you started")
-        return share_url([p["run_id"] for p in test["probes"]], test_id)
+        return share_url([p["run_id"] for p in test["probes"]], test_id, user)
 
     @app.post("/api/runs/{run_id}/share")
     async def share_run(run_id: str, request: Request):
         run = get_readable(run_id, request)
         if not is_owner(authmod.current_user(request)) and not mine(run, authmod.current_user(request)):
             raise HTTPException(403, "you can share only runs you submitted")
-        return share_url([run_id])
+        return share_url([run_id], None, authmod.current_user(request))
+
+    def my_shares(request: Request) -> list[dict]:
+        """Live share links the signed-in user may see and revoke: their own, or all for an owner."""
+        user = authmod.current_user(request)
+        if not auth or not user:
+            raise HTTPException(401, "sign in required")
+        return [s for s in auth.shares() if is_owner(user) or (s.get("by") or "").lower() == user.lower()]
+
+    @app.get("/api/shares")
+    async def list_shares(request: Request, run: str = "", selftest: str = ""):
+        return [{k: s.get(k) for k in ("id", "by", "iat", "exp", "selftest")} for s in my_shares(request)
+                if (run and run in (s.get("runs") or []) and not s.get("selftest"))
+                or (selftest and s.get("selftest") == selftest) or not (run or selftest)]
+
+    @app.delete("/api/shares/{share_id}")
+    async def revoke_share(share_id: str, request: Request):
+        if share_id not in {s["id"] for s in my_shares(request)}:
+            raise HTTPException(404, "no live share link with that id that you can revoke")
+        auth.revoke_share(share_id)
+        return {"revoked": share_id}
 
     @app.get("/api/runs")
     async def list_runs(request: Request):
@@ -454,24 +476,46 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(400, "decision must be approved or rejected")
         if newer := store.newer_run_of_commit(run):
             raise HTTPException(409, f"run {newer} reviewed the same commit later; decide that one instead")
-        m = run["meta"] or {}
-        if m.get("kind") == "pr" and github and auth:
-            # The decision sets the check that branch protection requires, so GitHub decides who may
-            # make it: only people with write access to the repo. Fails closed if GitHub can't say.
-            slug = f"{m['owner']}/{m['repo']}"
-            try:
-                perm = await github.permission(m["owner"], m["repo"], user)
-            except Exception as e:  # noqa: BLE001
-                raise HTTPException(503, f"couldn't confirm your access to {slug} on GitHub ({type(e).__name__}); "
-                                         "try again") from e
-            if perm not in ("admin", "write"):
-                raise HTTPException(403, f"deciding this PR sets its merge check, so it needs write access to "
-                                         f"{slug} on GitHub; @{user} has {perm}")
+        await require_write(run, user)
         store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
                          decided_by=authmod.current_user(request))
         run = store.get_run(run_id)
         if run["meta"].get("kind") == "pr" and github:
             await post_to_pr(run)
+        return store.get_run(run_id)
+
+    async def require_write(run: dict, user: str | None) -> None:
+        """A decision sets the check that branch protection requires, so GitHub decides who may make
+        it: only people with write access to the repo. Fails closed if GitHub can't say."""
+        m = run["meta"] or {}
+        if m.get("kind") != "pr" or not github or not auth:
+            return
+        slug = f"{m['owner']}/{m['repo']}"
+        try:
+            perm = await github.permission(m["owner"], m["repo"], user)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(503, f"couldn't confirm your access to {slug} on GitHub ({type(e).__name__}); "
+                                     "try again") from e
+        if perm not in ("admin", "write"):
+            raise HTTPException(403, f"deciding this PR sets its merge check, so it needs write access to "
+                                     f"{slug} on GitHub; @{user} has {perm}")
+
+    @app.post("/api/runs/{run_id}/post")
+    async def repost(run_id: str, request: Request):
+        """Post a decision again after GitHub failed past the automatic retries (an outage)."""
+        run = get_readable(run_id, request)
+        user = authmod.current_user(request)
+        m = run["meta"] or {}
+        if m.get("kind") != "pr" or not github or not run["decision"]:
+            raise HTTPException(409, "nothing to post: not a decided pull request run")
+        if m.get("posted", {}).get("comment_url"):
+            raise HTTPException(409, "already posted")
+        if not is_owner(user) and not mine(run, user):
+            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can post it")
+        if newer := store.newer_run_of_commit(run):
+            raise HTTPException(409, f"run {newer} reviewed the same commit later; its status stands")
+        await require_write(run, user)
+        await post_to_pr(run)
         return store.get_run(run_id)
 
     async def post_to_pr(run: dict) -> None:

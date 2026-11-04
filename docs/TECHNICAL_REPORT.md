@@ -305,7 +305,8 @@ Details that matter:
 - **Branch protection** on `Darkflib/airlock-demo` `main` requires `airlock` from the App's id, and applies to admins too.
 - **Stale runs can't decide.** If a newer run exists for the same commit, the older one neither updates the status nor accepts a decision (HTTP 409, "decide that one instead"). Otherwise an old approval could overwrite a newer, more worrying result.
 - **A failed `pending` write is loud.** If it fails, the run records "the PR is NOT held" in its timeline and marks its gate as unsynced, because an earlier green status on the same commit would otherwise still stand (`RECHECK` R4).
-- **A failed decision post doesn't undo the decision.** The decision is stored first; if GitHub then fails, the error is logged as an event on the run. The PR stays at `pending`, so it fails safe, but there is no retry button yet: a new run is the way out.
+- **GitHub writes are retried.** Status and comment posts back off and try again (four attempts, about 7 s, via `tenacity`) on network errors, 5xx and rate limits, never on a 4xx Airlock caused. A status is idempotent, so any failure is retried; a comment is not retried once the request may have reached GitHub (a read timeout), so a blip can't post the evidence twice.
+- **A failed decision post doesn't undo the decision.** The decision is stored first; if GitHub is still failing after the retries, the error is logged on the run and the PR stays at `pending`, so it fails safe. The run page then offers **Post again**, which re-checks the same rules as a decision (write access, no newer run of the commit) and posts once.
 - **The comment** leads with what the PR adds, then containment, then the captured request (collapsed, labelled as canaries), then the agent's cited evidence.
 
 ### Why reject automatically, but never approve
@@ -343,7 +344,7 @@ The site is private: every page and API call needs a signed-in, allowlisted user
 3. The code is exchanged for a token, the token reads `/user`, and Airlock gets your login.
 4. If the login is on the allowlist, or you arrived through a valid invite, you get a session cookie and are sent back to where you were going. The "next" path must be a local path, so the login flow can't be used as an open redirect.
 
-**Sessions are stateless.** The session is a cookie holding your login and an expiry, signed with HMAC-SHA256 (HttpOnly, Secure, SameSite=Lax, 7 days). There is no session table. The trade-off: the server can't list or kill individual sessions. We compensate by **re-reading the allowlist on every request**, so removing a login (`scripts/allow.sh rm`) locks that person out on their next click, whatever cookie they hold. The app refuses to start without OAuth configuration, so a missing secret can't silently open the site.
+**Sessions are signed cookies with an id.** The session is a cookie holding your login, a random session id, the issue time and an expiry, signed with HMAC-SHA256 (HttpOnly, Secure, SameSite=Lax, 7 days). There is no session table, only a small revocation file: **Sign out** records that session's id, so a copied cookie stops working too, and **Sign out everywhere** records a cut-off time for the login, ending every session issued before it on every device. Entries are pruned once no live session could match them. On top of that, the allowlist is **re-read on every request**, so removing a login (`scripts/allow.sh rm`) locks that person out on their next click, whatever cookie they hold. Cookies from before session ids existed are refused, so everyone signs in once more. The app refuses to start without OAuth configuration, so a missing secret can't silently open the site.
 
 **One secret, four kinds of token.** Session, OAuth-state, invite and share tokens are all signed with the same secret, but each carries a kind (`k`), and every check asks for a specific kind. A share link can't be presented as a session, and an invite can't be presented as either. Rotating the secret logs everyone out and kills every share link and invite at once: a blunt but useful emergency switch.
 
@@ -356,13 +357,13 @@ The site is private: every page and API call needs a signed-in, allowlisted user
 
 **Invites** solve "we don't know the judges' GitHub logins in advance". `scripts/invite.sh new` mints a signed link with an expiry (default 30 days) and a maximum number of accounts (default 50). Whoever signs in through it is appended to the allowlist file, tagged `# invite <id>`. Revoking the invite does two things: it adds the id to a revocation file, so the link stops admitting people, and it removes every account it admitted, at once. Invited accounts are still ordinary allowlist lines, so `scripts/allow.sh` lists and removes them like any other.
 
-**Share links** (`/s/<token>`) let someone without an account read specific runs or a self-test. The token names the runs, lasts 60 days, and allows only `GET` and `HEAD` of those exact pages and their event streams: no decisions, no new runs, nothing else. It is a bearer token, so anyone holding the link can read those runs. Individual links can't be revoked yet, only all of them at once by rotating the secret. That is why the links live in 1Password and never in the repo, slides or video.
+**Share links** (`/s/<token>`) let someone without an account read specific runs or a self-test. The token names the runs, lasts 60 days, and allows only `GET` and `HEAD` of those exact pages and their event streams: no decisions, no new runs, nothing else. It is a bearer token, so anyone holding the link can read those runs. Each link has an id and is recorded in a ledger on the host (who made it, for which runs, when it expires; never the token itself). The run or self-test page lists its live links, and the person who made one, or an owner, can **Revoke** it: the link and any cookie it already set stop working on the next request, while other links to the same run keep working. Links minted before ids existed can only be ended by rotating the secret. Links still live in 1Password and never in the repo, slides or video.
 
 Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owners' uploads (404), can't decide or share owners' runs (403), can't submit PRs from other repos (403), hit 429 on the 16th run, and lose access immediately on revoke.
 
 ## 11. How we tested it
 
-- **Unit tests:** 120, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
+- **Unit tests:** 131, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
 - **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 10 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs. **30/30 correct**, exfiltration proven by payload on 15/15 malicious runs, zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
 - **Live self-test** on the public site: five fixtures, pass only if stealers are malicious *with payload-proven exfil* and benign ones have zero containment. 5/5 on 4 Nov.
 - **Probes** for specific holes: the DNS gateway probe (failed before the DNS guard, passes after), a malformed-DNS probe, the egress probe, the image probe.
@@ -415,8 +416,6 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **GitHub fetch limits.** The changed-file list stops at 100 files and the diff at 200,000 characters without a completeness marker. Files and diff are fetched by PR number while the archive is fetched by head SHA, so a push mid-run could mismatch.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
 - **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3. Redelivery de-duplication is in memory, so a redelivery that arrives across a restart is caught only by the one-run-per-commit check.
-- **Share links can't be revoked one by one,** and sessions can't be killed individually; both rely on the allowlist check or rotating the shared secret.
-- **No retry for a failed GitHub post** after a decision; the PR stays safely at `pending` but needs a new run.
 - **Self-hosting** still depends on personal defaults (domain, SSH key, 1Password item names) and lacks a complete `.env.example` and App setup guide.
 
 ## 14. From prototype to product
@@ -431,7 +430,6 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 - Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [a day]
 - Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [half a day]
 - Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [half a day]
-- A retry for failed GitHub posts; revocable share links via a small server-side table. [a day]
 - Complete self-hosting docs: `.env.example`, App creation, OAuth callback, branch protection. [half a day]
 
 ### 14.2 Fit into how teams work (2–4 weeks)
