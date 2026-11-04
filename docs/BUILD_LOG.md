@@ -508,3 +508,9 @@ Tags: #demo
 **Result:** narration 425 → 407 words, but at a slower 135 words a minute it now fills the full 3:00 with no slack; the pre-recording checklist adds burned-in captions and pauses after numbers. Lablab copy: short 233/255 chars, long 1860/2000 chars (was 1977), `scripts/check-submission.py` passes.
 **So:** do a timed read-through before Saturday; if it runs over, trim the 0:15 and 2:30 blocks.
 Tags: #demo
+
+### 12:40 — Technical report
+**Tried:** wrote `docs/TECHNICAL_REPORT.md` for readers who want more than the README: threat model, the life of a run, isolation choices (microVM vs container, gVisor, Firecracker), the three detectors and their trust levels, the evidence model (PROVEN / OBSERVED / INFERRED), the behaviour diff, model selection and the agent loop, the merge gate, access control, testing, a trade-offs table, known weaknesses and a staged plan to productise.
+**Result:** about 5,500 words, built from the build log, both reviews and the code; claims checked against `airlock/guard.py`, `events.py` and `behaviour.py`. Linked from the README's Results section.
+**So:** a place to point anyone asking "how does it actually work?" or "what would it take to ship this?".
+Tags: #demo

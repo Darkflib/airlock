@@ -119,6 +119,8 @@ The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run thr
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 
+For how it works in depth, the design trade-offs, its weaknesses and what it would take to make it a product, see the [technical report](docs/TECHNICAL_REPORT.md).
+
 ## Security model and limits
 
 **Containment, mapped to the challenge's four focus areas** (plus egress)
