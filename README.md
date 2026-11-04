@@ -4,7 +4,7 @@
 
 **Every untrusted dependency change gets its own disposable computer.**
 
-Airlock runs a pull request, a new npm package or a version bump inside a throwaway microVM. The VM holds fake credentials and has no real internet. Airlock records everything the change does, and an AI reviewer investigates. Nothing reaches GitHub until a human clicks **Approve** or **Reject**.
+Airlock runs a pull request, a new npm package or a version bump inside a throwaway microVM. The VM holds fake credentials and can reach nothing on the internet except the npm and PyPI registries. Airlock records what the change does (programs run, files opened, DNS lookups, connection attempts) and an AI reviewer investigates. Nothing reaches GitHub until a human clicks **Approve** or **Reject**.
 
 Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
@@ -17,7 +17,7 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. A human approves or rejects before anything is posted to GitHub.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
-- **Proof.** 18/18 correct on the real pipeline ([results](#results)). Click **Run self-test** on the home page to re-run three known packages yourself and see pass/fail live.
+- **Proof.** 18/18 correct on a small fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run three known packages yourself and see pass/fail live.
 - **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm only. See [the security model](#security-model-and-limits).
 
 ## Why
@@ -30,7 +30,7 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 
 - **PROVEN credential exfiltration.** The postinstall POSTed the contents of `~/.npmrc` and `~/.aws/credentials` to `telemetry.colorful-logs.invalid`. Airlock's sinkhole answered the request, captured the body containing this run's canary tokens, and nothing reached the internet.
 - **Who did it.** `cat` read both credential files, `curl` looked up the exfil host, `python3` read the AWS file again, and a raw-IP connection was refused.
-- **An AI verdict that cites this evidence:** MALICIOUS, with each claim linked to the event that proves it.
+- **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. The model is told to cite only events that support a point; that's prompted, not enforced.
 - **A human gate.** On Reject, `airlocksandbox[bot]` sets a failing `airlock` commit status and posts the evidence as a PR comment.
 
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and a BENIGN verdict.
@@ -61,16 +61,17 @@ flowchart LR
 1. **Setup** (Airlock code, no AI). A fresh microVM boots in about 0.7 s, with its own kernel, 2 vCPU and 2 GB RAM. Canary credentials carrying a per-run token are planted, and the root watcher starts.
 2. **Acquire.** The control plane fetches the PR head through the GitHub App, or the npm package or uploaded tarball. The VM itself has no GitHub access.
 3. **Detonate.** `npm ci` and `npm test` run as the unprivileged `node` user, with every observation layer on.
-4. **Investigate.** A tool-calling agent (`mimo-v2.6-flash`) reads the code, re-runs what it needs, and must give a verdict within 12 turns. The last turn forces `finish`. All untrusted text passes a prompt-injection guard before the model sees it.
+4. **Investigate.** A tool-calling agent (`mimo-v2.6-flash`) reads the code, re-runs what it needs, and must give a verdict within 12 turns. The last turn forces `finish`. Tool output passes a prompt-injection guard before the model sees it, and the PR title and file names are presented as untrusted claims. The agent's commands run as the unprivileged `node` user, never root.
 5. **Decide.** A human approves or rejects. Only then does Airlock post to the PR. The VM is destroyed when the run ends, whatever the outcome.
 
-**Three independent containment layers:**
+**How the network is contained, and how the run is observed:**
 
 | Layer | What it does | Where it runs |
 | --- | --- | --- |
-| microsandbox default-deny egress | Real internet destinations are refused. The policy allows only the registries and this run's fake /24 | Host (VMM network stack) |
-| Fake DNS + sinkhole | Every non-allowlisted hostname resolves into the run's private /24. mitmproxy answers those requests itself and logs the full body, which is how exfil is **proven** with the payload | Guest DNS server; mitmproxy on the host |
-| Watchers | The root fanotify watcher records every program run and dotfile read, with its pid. The Node tracer records plaintext bodies. The package runs unprivileged, so it can't reach either log | Inside the VM |
+| **Contains:** microsandbox default-deny egress | Every destination except the registries and this run's fake /24 is refused | Host (VMM network stack) |
+| **Contains and proves:** fake DNS + sinkhole | Every non-allowlisted hostname resolves into the run's private /24. mitmproxy answers those requests itself and logs the full body, which is how exfil is **proven** with the payload | Guest DNS server; mitmproxy on the host |
+| **Contains and proves:** DNS guard | The sandbox gateway's own resolver forwards to a per-run listener on the host, which resolves only registry names. Any other lookup that bypasses the guest resolver gets NXDOMAIN and is recorded; a label carrying the canary is **proven** exfil. Without this, DNS labels were an exfil path (found in review, verified closed on the host) | `airlock/dnsguard.py`, on the host |
+| **Observes:** watchers | The root fanotify watcher records programs run and dotfiles opened, with their pid; DNS lookups and connections are logged too. The Node tracer records plaintext bodies but runs as the package user, so its reports count as observed, not proven. A run only starts once every observer reports ready, and a benign verdict becomes **inconclusive** if the install didn't complete or the watcher logged an error | Inside the VM |
 
 ## Vultr services used
 
@@ -78,7 +79,7 @@ flowchart LR
 - **Vultr Serverless Inference.** All runtime LLM calls go through `https://api.vultrinference.com/v1`. We **benchmarked all 13 catalogue models** before choosing ([`evals/RESULTS.md`](evals/RESULTS.md)):
   - `mimo-v2.6-flash` went 15/15 on the harder agent tasks at n=3, with the fewest tokens.
   - All 12 runs that reviewed the hostile package said malicious, and none followed its README's "approve this package" injection.
-  - Zero invalid tool calls out of 631.
+  - Zero invalid tool calls out of 631 in the n=3 shortlist experiment.
   - Role assignments live in [`roles.toml`](roles.toml).
 
 ## Results
@@ -121,6 +122,10 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 - **No eBPF.** The guest kernel has no kprobes or BTF, so the watcher polls `/proc` rather than hooking syscalls.
 - **Very fast refusals.** A raw-IP connection refused in about 7 ms is *counted* but not attributed to a process.
 - **Pinned TLS** prevents payload capture; we still see the hostname.
+- **Encoded exfil.** Encoded or split canaries are still blocked or captured, but only a verbatim token counts as PROVEN.
+- **DNS over TCP** to the gateway fails closed (SERVFAIL) but isn't recorded as an event.
+- **Coverage.** The connection poller can miss very short-lived activity, and payload bodies are truncated at 2,000 characters.
+- **Abandoned VMs.** If the server process dies mid-run, the VM is left to its 480 s lifetime limit; the run is marked failed when the server restarts.
 - **npm only for now.** The sandbox allows PyPI, but there's no Python install path yet.
 
 ## Try it

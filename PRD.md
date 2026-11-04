@@ -4,7 +4,7 @@ Nov 3, 2026 · @Mike Preston, which is the source of truth
 
 ## Summary
 
-Airlock runs an untrusted dependency change (a GitHub pull request, a new npm package, or an uploaded tarball) inside a disposable microVM with fake credentials and no real internet access. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and nothing reaches GitHub until a human approves or rejects.
+Airlock runs an untrusted dependency change (a GitHub pull request, a new npm package, or an uploaded tarball) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and nothing reaches GitHub until a human approves or rejects.
 
 **Status (end of Tue 3 Nov):** every P0 requirement works end to end on the live site, two days ahead of the Thursday cut line.
 
@@ -171,7 +171,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 
 The video uses the real demo repo `Darkflib/airlock-demo` and two open PRs. Everything shown is a live run, not a mock-up.
 
-1. **0:00 Hook (15 s).** PR #3, "feat: coloured startup log", has a green `npm test`. Line: "CI passed is exactly how most supply-chain attacks get in."
+1. **0:00 Hook (15 s).** PR #3, "feat: coloured startup log", has a green `npm test`. Line: "A green test run doesn't tell you what the install script did."
 2. **0:15 Submit (15 s).** Paste the PR URL into Airlock. The run page shows the PR card: the vendored `colorful-logs-2.0.1.tgz` marked *added*.
 3. **0:30 Detonation (60 s).** The timeline streams in live:
    - The microVM boots in 0.7 s, canaries are planted, and the watcher starts.
@@ -220,7 +220,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 - [x] Hostile targets get a malicious verdict with proven exfil: 9/9 in the regression.
 - [x] Benign targets get a benign verdict with zero containment events: 9/9.
 - [x] A full run, including VM boot, install, tests and AI review, finishes in under 20 s (median 9.4–17.2 s); VM boot about 0.7 s.
-- [x] No canary value leaves the host: the sinkhole never connects upstream.
+- [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses are answered on the host (verified 4 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.
 
 **Submission checklist**
 

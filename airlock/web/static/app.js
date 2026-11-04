@@ -367,7 +367,9 @@ const Airlock = (() => {
       if (r.status !== 'done') { g.append(el('p', '', 'Nothing leaves Airlock until a human decides. Waiting for the verdict…')); return; }
       g.append(el('p', '', r.verdict === 'benign'
         ? 'The agent found nothing harmful. Approve to let this change through.'
-        : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
+        : r.verdict === 'inconclusive'
+          ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
+          : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
         `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as a commit status and a comment from the Airlock GitHub App.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';

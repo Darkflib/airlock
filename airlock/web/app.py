@@ -122,6 +122,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
     store = store or Store()
+    store.fail_stale_runs()  # nothing survives a restart: those runs' VMs and tasks are gone
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
     runner = Runner(store, analyse)

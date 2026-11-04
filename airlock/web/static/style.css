@@ -146,7 +146,7 @@ body.hide-exec .ev.exec:not(.key) { display: none; }
 .verdict-big { font: 700 34px/1.1 var(--sans); letter-spacing: 0.04em; text-transform: uppercase; margin: 2px 0 6px; }
 .verdict-big.malicious { color: var(--bad); }
 .verdict-big.benign { color: var(--good); }
-.verdict-big.suspicious { color: var(--warn); }
+.verdict-big.suspicious, .verdict-big.inconclusive { color: var(--warn); }
 .verdict-big.pending { color: var(--muted); font-size: 20px; }
 .verdict-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
 ul.evidence { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; }

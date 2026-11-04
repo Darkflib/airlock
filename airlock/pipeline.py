@@ -88,6 +88,31 @@ points. Cite event ids only when the cited event directly supports the point, an
 appear above or in your tool results."""
 
 
+async def coverage_gaps(ws: Workspace, install) -> list[str]:
+    """Reasons Airlock may not have seen everything the change does. With any of them, quiet
+    behaviour proves nothing, so a benign verdict becomes inconclusive (see apply_gaps)."""
+    gaps = []
+    if not install.ok:
+        gaps.append("the install timed out" if install.timed_out else
+                    f"the install exited {install.exit_code}, so not all of its scripts may have run")
+    ok, why = await ws.observation_ok()
+    if not ok:
+        gaps.append(why)
+    return gaps
+
+
+def apply_gaps(verdict: str, evidence: list[str], gaps: list[str], events: EventLog) -> tuple[str, list[str]]:
+    if not gaps:
+        return verdict, evidence
+    events.emit("coverage_incomplete", "Airlock's observation of this run was incomplete: " + "; ".join(gaps), gaps=gaps)
+    if verdict == "benign":
+        evidence = [f"Not a clean result: {g}." for g in gaps] + evidence
+        events.emit("verdict", "verdict: inconclusive (the agent found nothing, but Airlock didn't see the whole run)",
+                    verdict="inconclusive", evidence=evidence)
+        return "inconclusive", evidence
+    return verdict, evidence
+
+
 async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int) -> Report:
     """Detonate a GitHub pull request's head: fetched by the control plane (the VM has no
     GitHub access), installed and tested as the unprivileged user, then triaged."""
@@ -108,17 +133,21 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int) 
                     "GitHub App; copied into the VM", source="github", **{k: meta[k] for k in ("html_url", "head_sha")})
         await ws.write("/work/repo.tgz", tarball)
         await ws.write("/work/pr.diff", diff.encode())
-        await ws.exec("mkdir -p repo && tar xzf repo.tgz -C repo --strip-components=1 && rm repo.tgz"
-                      f" && chown -R node:node /work/repo", source="unpack")
+        r = await ws.exec("mkdir -p repo && tar xzf repo.tgz -C repo --strip-components=1 && rm repo.tgz"
+                          " && chown -R node:node /work", source="unpack")
+        if not r.ok:
+            raise RuntimeError(f"unpacking the PR failed: {r.stderr[-300:]}")
         install = "npm ci" if "package-lock.json" in (await ws.exec("ls", cwd="/work/repo", source="unpack")).stdout else "npm install"
-        await ws.exec(f"{install} --no-audit --no-fund", cwd="/work/repo", timeout=240, trace=True,
-                      source="detonate", as_user="node")
+        installed = await ws.exec(f"{install} --no-audit --no-fund", cwd="/work/repo", timeout=240, trace=True,
+                                  source="detonate", as_user="node")
         await ws.exec("npm test --if-present", cwd="/work/repo", timeout=120, trace=True, source="detonate",
                       as_user="node")
+        gaps = await coverage_gaps(ws, installed)
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
         result = await agent.run(PR_GOAL.format(slug=pr.slug, title=pr.title, author=pr.author, files=files,
                                                 observed=observed_summary(events)))
-    return Report(target=url, verdict=result.verdict, evidence=result.evidence, model=model, agent=result,
+        verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
+    return Report(target=url, verdict=verdict, evidence=evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1), meta=meta)
 
 
@@ -141,13 +170,17 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
             if not r.ok:
                 raise RuntimeError(f"npm pack {target} failed: {r.stderr[-300:]}")
 
-        await ws.exec("mkdir -p pkg && tar xzf candidate.tgz -C pkg --strip-components=1 && chown -R node:node /work",
-                      source="unpack")
-        await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
-                      cwd="/tmp/try", timeout=180, trace=True, source="detonate", as_user="node")
+        r = await ws.exec("mkdir -p pkg && tar xzf candidate.tgz -C pkg --strip-components=1 && chown -R node:node /work",
+                          source="unpack")
+        if not r.ok:
+            raise RuntimeError(f"unpacking the package failed: {r.stderr[-300:]}")
+        installed = await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
+                                  cwd="/tmp/try", timeout=180, trace=True, source="detonate", as_user="node")
+        gaps = await coverage_gaps(ws, installed)
 
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
         result = await agent.run(GOAL.format(observed=observed_summary(events)))
+        verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
 
-    return Report(target=target, verdict=result.verdict, evidence=result.evidence, model=model, agent=result,
+    return Report(target=target, verdict=verdict, evidence=evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1))

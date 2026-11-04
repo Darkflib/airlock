@@ -23,7 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from microsandbox import Action, Destination, Network, NetworkPolicy, OutboundProxy, Protocol, Rule, Sandbox
-from microsandbox.types import TlsConfig
+from microsandbox.types import DnsConfig, TlsConfig
+
+from .dnsguard import DnsGuard
 
 from .events import EventLog, WatchTranslator, events_from_sinkhole, events_from_trace
 from .store import data_dir
@@ -33,6 +35,7 @@ WATCHER = Path(__file__).parent / "guest" / "watch.py"
 TRACE_LOG = "/tmp/airlock-trace.jsonl"     # written by the Node tracer, as the package user
 WATCH_LOG = "/opt/airlock/watch.jsonl"     # written by the root watcher; unreadable to the package user
 PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user
+WATCH_READY = ("watcher", "dns", "fanotify")  # every observer must report ready before a run counts
 ACTIVE_SUBNETS: set[int] = set()  # sinkhole /24s held by live Workspaces in this process
 DEFAULT_ALLOW = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
 SINKHOLE_ADDR = os.environ.get("AIRLOCK_SINKHOLE", "127.0.0.1:1080")
@@ -67,7 +70,11 @@ class ExecResult:
         return self.exit_code == 0 and not self.timed_out
 
 
-def egress_network(allow_hosts: tuple[str, ...], sinkhole: str | None = None) -> Network:
+class ObservationError(RuntimeError):
+    """Airlock couldn't observe the run, so no verdict about it can be trusted."""
+
+
+def egress_network(allow_hosts: tuple[str, ...], sinkhole: str | None = None, dns_port: int | None = None) -> Network:
     rules = [*Rule.allow_dns()]
     for host in allow_hosts:
         rules.append(Rule.allow(protocol=Protocol.TCP, port=443, destination=Destination.domain(host)))
@@ -78,7 +85,9 @@ def egress_network(allow_hosts: tuple[str, ...], sinkhole: str | None = None) ->
     else:
         tls = TlsConfig()
     policy = NetworkPolicy(default_egress=Action.DENY, default_ingress=Action.ALLOW, rules=tuple(rules))
-    return Network(policy=policy, tls=tls, strict=True)
+    # The gateway resolver forwards to this run's DnsGuard, never straight to the internet.
+    dns = DnsConfig(nameservers=(f"127.0.0.1:{dns_port}",)) if dns_port else None
+    return Network(policy=policy, tls=tls, strict=True, dns=dns)
 
 
 class Workspace:
@@ -109,29 +118,50 @@ class Workspace:
         extra = {"proxy": OutboundProxy.socks5(SINKHOLE_ADDR)} if self.sinkhole else {}
         log = sinkhole_log()
         self._sink_offset = log.stat().st_size if log.exists() else 0
-        self._cm = await Sandbox.create(
-            self.name, image=self.image, cpus=self.cpus, memory=self.memory_mb,
-            max_duration=self.max_duration_s, replace=True,
-            network=egress_network(self.allow_hosts, self.sinkhole), **extra)
-        self.sb = await self._cm.__aenter__()
-        self.events.emit("vm_created", f"microVM {self.name} up in {time.monotonic() - t0:.2f}s",
-                         image=self.image, cpus=self.cpus, memory_mb=self.memory_mb,
-                         egress="default-deny", allow=list(self.allow_hosts), sinkhole=self.sinkhole)
-        await self.sb.fs.mkdir("/work")
-        await self.sb.fs.mkdir("/opt/airlock")
-        await self.sb.fs.mkdir("/opt/airlock-trace")  # world-readable: the package user's Node loads it
-        await self.sb.fs.write("/opt/airlock-trace/trace.js", TRACER.read_bytes())
-        await self.sb.fs.write("/opt/airlock/watch.py", WATCHER.read_bytes())
-        await self._seed_canaries()
-        await self._start_watcher()
+        self.dns = DnsGuard(self.allow_hosts)
+        try:
+            dns_port = await self.dns.start()
+            self._cm = await Sandbox.create(
+                self.name, image=self.image, cpus=self.cpus, memory=self.memory_mb,
+                max_duration=self.max_duration_s, replace=True,
+                network=egress_network(self.allow_hosts, self.sinkhole, dns_port), **extra)
+            self.sb = await self._cm.__aenter__()
+        except BaseException:
+            self._release()
+            raise
+        # From here a VM exists: any failure must destroy it (Python won't call __aexit__ for us).
+        try:
+            self.events.emit("vm_created", f"microVM {self.name} up in {time.monotonic() - t0:.2f}s",
+                             image=self.image, cpus=self.cpus, memory_mb=self.memory_mb,
+                             egress="default-deny", allow=list(self.allow_hosts), sinkhole=self.sinkhole)
+            await self.sb.fs.mkdir("/work")
+            await self.sb.fs.mkdir("/opt/airlock")
+            await self.sb.fs.mkdir("/opt/airlock-trace")  # world-readable: the package user's Node loads it
+            await self.sb.fs.write("/opt/airlock-trace/trace.js", TRACER.read_bytes())
+            await self.sb.fs.write("/opt/airlock/watch.py", WATCHER.read_bytes())
+            await self._seed_canaries()
+            await self._start_watcher()
+        except BaseException as e:
+            await self.__aexit__(type(e), e, e.__traceback__)
+            raise
         return self
 
     async def __aexit__(self, *exc) -> None:
         try:
             await self._cm.__aexit__(*exc)
-        finally:
-            ACTIVE_SUBNETS.discard(getattr(self, "_subnet", None))
+        except Exception as e:
+            self.events.emit("error", f"microVM {self.name} may not have been destroyed: {type(e).__name__}: {e}"[:300])
+            if exc[0] is None:  # don't mask the run's own failure with the cleanup failure
+                raise
+        else:
             self.events.emit("vm_destroyed", f"microVM {self.name} destroyed")
+        finally:
+            self._release()
+
+    def _release(self) -> None:
+        ACTIVE_SUBNETS.discard(getattr(self, "_subnet", None))
+        if getattr(self, "dns", None):
+            self.dns.close()
 
     async def _seed_canaries(self) -> None:
         npmrc = f"//registry.npmjs.org/:_authToken=npm_{self.canary_token}\n"
@@ -157,14 +187,45 @@ class Workspace:
             + (f" --sinkhole {self.sinkhole} --allow {','.join(self.allow_hosts)}" if self.sinkhole else "")
             + " >/opt/airlock/watch.err 2>&1 </dev/null &)", timeout=20)
         for _ in range(40):
-            out = await self.sb.shell(f"grep -c watch_ready {WATCH_LOG} 2>/dev/null || true", timeout=10)
-            if out.stdout_text.strip() == "2":
+            ready, errors = await self._watch_status()
+            if errors:
+                break
+            if set(WATCH_READY) <= ready:
                 self.events.emit("watcher_started", "in-guest watcher up: programs run, dotfile reads, DNS, connects",
                                  user=PKG_USER)
                 return
             await asyncio.sleep(0.1)
         err = (await self.sb.shell("cat /opt/airlock/watch.err 2>/dev/null", timeout=10)).stdout_text
-        self.events.emit("error", f"in-guest watcher failed to start: {err[-200:]}")
+        detail = "; ".join(errors) if errors else f"not ready: {sorted(set(WATCH_READY) - ready)} {err[-150:]}"
+        self.events.emit("error", f"in-guest watcher failed to start: {detail}"[:300])
+        raise ObservationError(f"in-guest watcher failed to start: {detail}"[:300])
+
+    async def _watch_status(self) -> tuple[set[str], list[str]]:
+        """Which observers reported ready, and any errors the watcher logged."""
+        out = await self.sb.shell(f"grep -E '\"ev\": \"watch_(ready|error)\"' {WATCH_LOG} 2>/dev/null || true", timeout=10)
+        ready, errors = set(), []
+        for line in out.stdout_text.splitlines():
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("ev") == "watch_ready":
+                ready.add(rec.get("what"))
+            else:
+                errors.append(f"{rec.get('what')}: {rec.get('err')}")
+        return ready, errors
+
+    async def observation_ok(self) -> tuple[bool, str]:
+        """After the run: the watcher is still alive and logged no errors. Otherwise a quiet
+        run may just mean Airlock went blind, and a clean verdict can't be trusted."""
+        _, errors = await self._watch_status()
+        alive = (await self.sb.shell("pgrep -f /opt/airlock/watch.py >/dev/null && echo up || echo down",
+                                     timeout=10)).stdout_text.strip() == "up"
+        if errors:
+            return False, "watcher errors: " + "; ".join(errors)[:200]
+        if not alive:
+            return False, "the in-guest watcher stopped during the run"
+        return True, ""
 
     async def exec(self, cmd: str, *, cwd: str = "/work", timeout: float = 120, trace: bool = False,
                    source: str = "agent", as_user: str | None = None) -> ExecResult:
@@ -191,7 +252,7 @@ class Workspace:
         if settle:  # package code ran: the watcher needs ~0.5s to call a dropped connect "blocked"
             await asyncio.sleep(0.6)
         # Sinkhole first: when it captured the request, its report carries the payload.
-        found = self._read_sinkhole()
+        found = self._read_sinkhole() + self._read_dns()
         out = await self.sb.shell(f"cat {TRACE_LOG} 2>/dev/null || true", timeout=10)
         lines = out.stdout_text.splitlines()
         new, self._trace_seen = lines[self._trace_seen:], len(lines)
@@ -212,6 +273,20 @@ class Workspace:
                 continue
             self._emitted.add(key)
             self.events.emit(kind, summary, stage=stage, **data)
+
+    def _read_dns(self) -> list[tuple[str, str, dict]]:
+        """Lookups that bypassed the watcher's resolver and reached this run's DnsGuard."""
+        out = []
+        for rec in self.dns.drain():
+            name = rec["name"]
+            data = {"host": name, "payload": name, "source_kind": "dns"}
+            if self.canary_token.lower() in name.lower():
+                out.append(("canary_exfil", f"DNS lookup of {name[:120]} carried the canary token: answered NXDOMAIN "
+                            "by Airlock, never left the host", {**data, "proven": True, "this_run": True}))
+            else:
+                out.append(("dns_blocked", f"DNS lookup of {name[:120]} went straight to the gateway, bypassing "
+                            "Airlock's resolver: refused, never left the host", data))
+        return out
 
     def _read_sinkhole(self) -> list[tuple[str, str, dict]]:
         """This run's requests captured by the host sinkhole (matched by the run's /24)."""

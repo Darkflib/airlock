@@ -105,9 +105,14 @@ def fanotify_loop() -> None:
         for d in (home, f"{home}/.aws", f"{home}/.ssh", f"{home}/.config"):
             if os.path.isdir(d):
                 marks.append((FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD, d))
+    failed = 0
     for flags, mask, path in marks:
         if libc.fanotify_mark(fd, flags, ctypes.c_uint64(mask), AT_FDCWD, path.encode()) < 0:
             log("watch_error", what=f"fanotify_mark {path}", err=os.strerror(ctypes.get_errno()))
+            failed += 1
+    if failed:  # a missing mark means missed credential reads: never report ready
+        return
+    log("watch_ready", what="fanotify", marks=len(marks))
     while True:
         buf = os.read(fd, 65536)
         off = 0

@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Callable
 
 # Kinds that represent containment (shown highlighted on the timeline).
-CONTAINMENT = {"egress_blocked", "canary_read", "canary_exfil", "guard_flagged", "limit_hit"}
+CONTAINMENT = {"egress_blocked", "canary_read", "canary_exfil", "guard_flagged", "limit_hit", "dns_blocked"}
 
 
 @dataclass
