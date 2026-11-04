@@ -146,7 +146,7 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 - **DNS over TCP** to the gateway fails closed (SERVFAIL) but isn't recorded as an event.
 - **Coverage.** The connection poller can miss very short-lived activity, and payload bodies are truncated at 2,000 characters.
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
-- **Abandoned VMs.** If the server process dies mid-run, the VM is left to its 480 s lifetime limit; the run is marked failed when the server restarts.
+- **Abandoned VMs.** A VM doesn't outlive the server process that started it (checked with kill -9 mid-run). On restart the web service destroys the leftover sandboxes it labelled as its own and marks the run failed; CLI and regression VMs on the same host are left alone.
 - **npm and PyPI only.** Python packages are installed from source with `pip install` so `setup.py` and build hooks run under the watcher; wheels-only releases have nothing to run at install and are reported as such. **Go isn't supported:** Go modules have no install or build hooks (`go get`/`go build` run no package-defined scripts), so there is no install-time code to detonate — the interesting behaviour would only show at `go test` or runtime, which Airlock doesn't drive for Go.
 
 ## Try it
