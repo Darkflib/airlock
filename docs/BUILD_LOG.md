@@ -623,7 +623,7 @@ Tags: #win #demo
 **So:** close the four main findings; recheck run-level read permission, not just authentication, during SSE. Review artifacts only; no application change or production action.
 Tags: #security #decision
 
-### 23:52 — Recheck B1 fixed: streams re-check this run's read rule
+### 23:41 — Recheck B1 fixed: streams re-check this run's read rule
 **Tried:** the authority recheck closed A1–A4 but found B1: the live event stream's recheck only asked whether some session was valid, so a signed-in guest who opened another guest's run through a share kept receiving events after the share was revoked. Now the stream re-reads cookies against current revocations and re-applies the run's read rule (fresh share, not the one cached at open), at most 15 s apart, before sending each received event and before the final `done`.
 **Result:** 150 tests pass (stream tests for a revoked share with a valid session, a revoked session, and a stream that continues while access holds). The recheck's script now stops at the B1 step.
 **So:** revocation ends live streams for every kind of viewer, within 15 s and before any further event is sent.
