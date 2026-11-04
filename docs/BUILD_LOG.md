@@ -628,3 +628,15 @@ Tags: #security #decision
 **Result:** 150 tests pass (stream tests for a revoked share with a valid session, a revoked session, and a stream that continues while access holds). The recheck's script now stops at the B1 step.
 **So:** revocation ends live streams for every kind of viewer, within 15 s and before any further event is sent.
 Tags: #security #fix
+
+### 23:52 — Independent closure of stream finding B1
+**Tried:** rechecked `19a0b96` through `c328dd5`, reran the full suite and the independent revoked-share/outbound-ordering reproduction.
+**Result:** 150 tests pass in 5.90 s. Status order remains `success, pending, pending`; the historical B1 reproduction now ends with `StopAsyncIteration` before the revoked-share event is sent. Fresh run-level authorization replaces the valid-session shortcut, with a forced check before the final payload.
+**So:** B1 is closed for the reproduced case; revocation has a 15-second recheck interval. No remaining finding reproduced in this focused review. Review documentation only; no application changes or production actions.
+Tags: #security #win
+
+### 23:54 — Next hardening priorities
+**Tried:** assessed the runner, GitHub acquisition, event queues, authentication storage and service configuration for improvements beyond the closed authority findings; checked official asyncio cancellation and GitHub webhook guidance.
+**Result:** highest-value follow-ups are bounded run/queue/output budgets and cleanup, consistent PR snapshots with completeness markers, shared authorization types and a role/grant test matrix, durable webhook delivery/outbound-action records, explicit production access defaults, and pinned runtime inputs. Existing documented retention, overall-deadline and snapshot limitations remain.
+**So:** recommend resource bounds and snapshot integrity first; these are proposed follow-ups, not new reproduced findings or implemented changes. No application change or production action.
+Tags: #security #decision
