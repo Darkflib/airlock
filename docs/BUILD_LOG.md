@@ -352,3 +352,10 @@ Tags: #fail #decision
 **Result:** the product regression on the host (`evals/results/product-20261104T000435Z`) is **18/18** correct. Exfil was proven on 9/9 malicious runs under the stricter rule (this run's token, host-captured). Benign targets had 0 containment, there were no forced verdicts and 0 invalid tool calls; median 10.7–19.4 s. The agent now running as `node` changed nothing: median turns 3–5, as before.
 **So:** the fixes cost no accuracy. The README results table can point at this run.
 Tags: #metric #win
+
+### 00:29 — DNS labels were an exfil path; closed. Runs now fail closed when blind
+**Tried:** `spikes/dns_gateway_probe.py` boots a real Workspace and, as `node`, sends raw DNS straight to the gateway resolver (172.16.0.5) instead of the watcher's resolver.
+**Result:** before the fix, the gateway resolved anything, including a never-seen `airlock-probe-<hex>.example.com` (NOERROR from the real authoritative servers), and **Airlock recorded nothing**. A package could have exfiltrated data in DNS labels past the sinkhole. After the fix (`airlock/dnsguard.py`: microsandbox's `Network.dns` points the gateway at a per-run listener on the host that resolves only registry names), `registry.npmjs.org` still resolves, `example.com` and the probe get NXDOMAIN, and both appear as `dns_blocked` containment events. DNS over TCP gets SERVFAIL: closed, but not recorded.
+**Also:** the watcher must report ready for watcher, DNS and fanotify, or the run fails. A failed install or watcher error turns "benign" into "inconclusive". A setup failure destroys the VM, and `vm_destroyed` is only reported once destruction succeeds. README and submission claims reworded (no "no real internet", "records everything" or "most supply-chain attacks"). 67 tests pass.
+**So:** the containment claim now covers DNS, and it was verified on the host, not assumed. Deploy is pending a 1Password approval.
+Tags: #fail #win #demo
