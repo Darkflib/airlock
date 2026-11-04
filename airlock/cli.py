@@ -1,4 +1,4 @@
-"""airlock analyse <file.tgz | npm-spec> — stream events, print the verdict."""
+"""airlock analyse <file.tgz | npm-spec | sdist.tar.gz | pypi:name==version | PR URL> — stream events, print the verdict."""
 
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ async def _main(args: argparse.Namespace) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(prog="airlock")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("analyse", help="detonate and triage an npm package")
-    a.add_argument("target", help="path to a .tgz, or an npm spec like left-pad@1.3.0")
+    a = sub.add_parser("analyse", help="detonate and triage an npm or Python package, or a GitHub PR")
+    a.add_argument("target", help="a .tgz, an npm spec like left-pad@1.3.0, a Python sdist (.tar.gz/.zip), pypi:six==1.17.0, or a PR URL")
     a.add_argument("--model", help="override roles.toml agent model")
     a.add_argument("--max-turns", type=int, default=12)
     a.add_argument("--json", help="write the full report here")

@@ -4,7 +4,9 @@ the agent starts from observed facts rather than guesses."""
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import shlex
 import time
 import tomllib
@@ -17,9 +19,22 @@ from openai import AsyncOpenAI
 from .agent import AgentResult, TriageAgent
 from .github import GitHubApp, parse_pr_url
 from .events import EventLog
-from .sandbox import Workspace
+from .sandbox import IMAGES, Workspace
 
 ROOT = Path(__file__).parent.parent
+PYPI_FETCH = Path(__file__).parent / "guest" / "pypi_fetch.py"
+# pypi:<name>[==<version>]: PEP 508 names and PEP 440 versions only, so no shell syntax gets through
+PYPI_SPEC = re.compile(r"^pypi:([a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?)(?:==([a-z0-9][a-z0-9.!+_-]{0,63}))?$", re.I)
+SDIST_SUFFIXES = (".tar.gz", ".zip")  # npm tarballs are .tgz
+
+
+def parse_pypi_spec(spec: str) -> tuple[str, str | None] | None:
+    m = PYPI_SPEC.match(spec.strip())
+    return (m.group(1), m.group(2)) if m else None
+
+
+def is_python_target(target: str) -> bool:
+    return parse_pypi_spec(target) is not None or target.endswith(SDIST_SUFFIXES)
 
 
 def load_roles() -> dict:
@@ -57,6 +72,22 @@ Confirm what the package does at install time and at runtime by reading its code
 running it again. Your commands run as the unprivileged package user `node` (home /home/node),
 the way a developer would run them, so Airlock's watcher sees everything they do. You can't
 become root. Each of your tool results ends with the Airlock events it produced.
+Then call finish with a verdict and short evidence points. Cite event ids only when the cited
+event directly supports the point, and only ids that appear above or in your tool results."""
+
+
+PY_GOAL = """Review the Python package in /work/{archive} (unpacked at /work/pkg). It is a new
+release of a dependency our app uses. Airlock has already pip-installed it once from source into a
+virtualenv at /tmp/try/venv with tracing, so its setup.py or build backend ran. The run so far, as
+Airlock events (ids in brackets):
+
+{observed}
+
+Confirm what the package does at install time (setup.py, build hooks) and at import time by reading
+its code and, if useful, running it again, e.g. /tmp/try/venv/bin/python -c 'import <module>'. Your
+commands run as the unprivileged package user `node` (home /home/node), the way a developer would
+run them, so Airlock's watcher sees everything they do. You can't become root. Each of your tool
+results ends with the Airlock events it produced.
 Then call finish with a verdict and short evidence points. Cite event ids only when the cited
 event directly supports the point, and only ids that appear above or in your tool results."""
 
@@ -137,7 +168,7 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
             "base_ref": pr.base_ref, "files": pr.files}
     if on_pr:
         await on_pr(meta)
-    async with Workspace(events, image="node", label=f"{repo}-pr{number}") as ws:
+    async with Workspace(events, image=IMAGES["npm"], label=f"{repo}-pr{number}") as ws:
         events.emit("acquired", f"fetched {pr.slug} @ {pr.head_sha[:7]} ({len(pr.files)} files changed) via the "
                     "GitHub App; copied into the VM", source="github", **{k: meta[k] for k in ("html_url", "head_sha")})
         await ws.write("/work/repo.tgz", tarball)
@@ -160,16 +191,60 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1), meta=meta)
 
 
+async def analyse_python(target: str, *, events: EventLog, model: str, max_turns: int) -> Report:
+    """Detonate a Python sdist (a local .tar.gz/.zip, or pypi:name[==version] fetched in the VM):
+    pip builds it from source as the unprivileged user, so setup.py runs under the watcher."""
+    t0 = time.monotonic()
+    spec = parse_pypi_spec(target)
+    label = f"pypi-{spec[0]}" if spec else Path(target).name.removesuffix(".tar.gz").removesuffix(".zip")
+    async with Workspace(events, image=IMAGES["pypi"], label=label) as ws:
+        if spec:
+            await ws.write("/opt/airlock/pypi_fetch.py", PYPI_FETCH.read_bytes())
+            args = " ".join(shlex.quote(a) for a in spec if a)
+            r = await ws.exec(f"python3 /opt/airlock/pypi_fetch.py {args} /work", timeout=120, source="acquire")
+            if not r.ok:
+                raise RuntimeError(f"fetching {target} from PyPI failed: {(r.stderr or r.stdout)[-300:]}")
+            got = json.loads(r.stdout.strip().splitlines()[-1])
+            archive = Path(got["path"]).name
+            events.emit("acquired", f"fetched {got['filename']} from PyPI (sha256 checked) without building it",
+                        source="pypi", filename=got["filename"], version=got["version"], sha256=got["sha256"])
+        else:
+            archive = "candidate.zip" if target.endswith(".zip") else "candidate.tar.gz"
+            await ws.write(f"/work/{archive}", Path(target).read_bytes())
+            events.emit("acquired", f"copied {Path(target).name} into the VM", source="file")
+
+        # Extract into a scratch dir, then take the sdist's single top-level directory as pkg.
+        extract = ("python3 -m zipfile -e candidate.zip /tmp/unpack" if archive.endswith(".zip")
+                   else "tar xzf candidate.tar.gz -C /tmp/unpack")
+        r = await ws.exec(f"mkdir -p /tmp/unpack && {extract} && set -- /tmp/unpack/* && [ $# -eq 1 ] && [ -d \"$1\" ]"
+                          " && mv \"$1\" pkg && chown -R node:node /work", source="unpack")
+        if not r.ok:
+            raise RuntimeError(f"unpacking the sdist failed (one top-level directory expected): {r.stderr[-300:]}")
+        installed = await ws.exec(f"python3 -m venv venv && venv/bin/pip install --no-cache-dir --no-input "
+                                  f"--disable-pip-version-check /work/{archive}",
+                                  cwd="/tmp/try", timeout=240, trace=True, source="detonate", as_user="node")
+
+        agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
+        result = await agent.run(PY_GOAL.format(archive=archive, observed=observed_summary(events)))
+        gaps = await coverage_gaps(ws, installed)
+        verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
+
+    return Report(target=target, verdict=verdict, evidence=evidence, model=model, agent=result,
+                  events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1))
+
+
 async def analyse(target: str, *, events: EventLog | None = None, model: str | None = None,
                   max_turns: int = 12, on_pr: Callable[[dict], Awaitable[None]] | None = None) -> Report:
-    """target: a GitHub PR URL, a local .tgz path, or an npm spec such as left-pad@1.3.0."""
+    """target: a GitHub PR URL, a local .tgz path, an npm spec such as left-pad@1.3.0,
+    a local Python sdist (.tar.gz or .zip), or a PyPI spec such as pypi:six==1.17.0."""
     events = events or EventLog()
-    if parse_pr_url(target):
-        return await analyse_pr(target, events=events, model=model or load_roles()["roles"]["agent"],
-                                max_turns=max_turns, on_pr=on_pr)
     model = model or load_roles()["roles"]["agent"]
+    if parse_pr_url(target):
+        return await analyse_pr(target, events=events, model=model, max_turns=max_turns, on_pr=on_pr)
+    if is_python_target(target):
+        return await analyse_python(target, events=events, model=model, max_turns=max_turns)
     t0 = time.monotonic()
-    async with Workspace(events, image="node", label=Path(target).stem if target.endswith(".tgz") else target) as ws:
+    async with Workspace(events, image=IMAGES["npm"], label=Path(target).stem if target.endswith(".tgz") else target) as ws:
         if target.endswith(".tgz") and Path(target).exists():
             await ws.write("/work/candidate.tgz", Path(target).read_bytes())
             events.emit("acquired", f"copied {Path(target).name} into the VM", source="file")
