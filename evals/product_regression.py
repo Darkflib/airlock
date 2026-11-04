@@ -23,8 +23,12 @@ TARGETS = [
     ("evals/fixtures/colorful-logs-shell-stealer.tgz", "malicious", "Shell stealer (tarball)"),
     ("evals/fixtures/left-padder-benign.tgz", "benign", "Benign with postinstall (tarball)"),
     ("left-pad@1.3.0", "benign", "Real npm package"),
+    ("evals/fixtures/termcolour-utils-stealer.tar.gz", "malicious", "Python stealer sdist (setup.py)"),
+    ("evals/fixtures/tinyslug-benign.tar.gz", "benign", "Benign sdist with setup.py work"),
+    ("pypi:six==1.17.0", "benign", "Real PyPI package"),
     ("https://github.com/Darkflib/airlock-demo/pull/1", "benign", "Demo PR #1: left-pad bump"),
     ("https://github.com/Darkflib/airlock-demo/pull/3", "malicious", "Demo PR #3: vendored stealer"),
+    ("https://github.com/Darkflib/airlock-demo/pull/4", "malicious", "Demo PR #4: hidden config-stealer"),
 ]
 
 
