@@ -514,3 +514,15 @@ Tags: #demo
 **Result:** about 5,500 words, built from the build log, both reviews and the code; claims checked against `airlock/guard.py`, `events.py` and `behaviour.py`. Linked from the README's Results section.
 **So:** a place to point anyone asking "how does it actually work?" or "what would it take to ship this?".
 Tags: #demo
+
+### 13:33 — Isolated hosting feasibility exploration
+**Tried:** compared Airlock's current lifecycle/networking with FaaS, app hosting, onion services and edge gateways; checked upstream runtime, Fly networking and Tor documentation.
+**Result:** uv.lock pins microsandbox 0.7.13, whose README documents detached workloads; Airlock uses disposable context-managed VMs with a default 480-second lifetime. Service ingress, durable supervision and multi-host placement are separate hosting work.
+**So:** proposed a two-service, two-node gateway prototype with explicit route isolation and failure tests; no hosting implementation or production configuration changed.
+Tags: #decision
+
+### 13:50 — Report: GitHub App and sign-in in depth, faster roadmap
+**Tried:** expanded the technical report's gate and access sections from the code (`airlock/github.py`, `airlock/web/auth.py`, `invite.py`, `gate_pr`/`decide` in `app.py`): why a GitHub App over a PAT or the user's token, its permissions, token minting, the gate step by step, the OAuth flow, stateless sessions, token kinds, invites and share links.
+**Result:** reading the code surfaced four gaps now listed as weaknesses: deciding a PR run isn't tied to the decider's GitHub write access; no webhooks; share links and sessions can't be revoked one by one; a failed post-decision GitHub write has no retry (the PR stays `pending`, so it fails safe).
+**So:** productisation estimates halved, assuming one engineer with coding agents (about ten weeks to a multi-tenant beta), and the fixes for those gaps added to stage 14.1 and 14.2.
+Tags: #decision

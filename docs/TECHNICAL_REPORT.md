@@ -14,8 +14,8 @@ How Airlock works, the choices behind it, where it is weak, and what it would ta
 6. [The evidence model](#6-the-evidence-model)
 7. [Behaviour diff for pull requests](#7-behaviour-diff-for-pull-requests)
 8. [The AI triage agent](#8-the-ai-triage-agent)
-9. [The merge gate](#9-the-merge-gate)
-10. [Control plane and access](#10-control-plane-and-access)
+9. [The merge gate and the GitHub App](#9-the-merge-gate-and-the-github-app)
+10. [Control plane, sign-in and access](#10-control-plane-sign-in-and-access)
 11. [How we tested it](#11-how-we-tested-it)
 12. [Trade-offs](#12-trade-offs)
 13. [Weaknesses and known limits](#13-weaknesses-and-known-limits)
@@ -243,26 +243,96 @@ Everything the attacker controls (file contents, command output, PR title, file 
 - **The evidence isn't the model's to change.** Even a fully hijacked agent can only produce a wrong summary. The PROVEN event, the containment count and the behaviour diff are computed without it, and they're what the reviewer sees first.
 - We tried Vultr's `nemotron-3.5-content-safety` as a model-based guard. It classifies *user safety*, not injection, and answered "safe" to everything we tried, so it is not wired in.
 
-## 9. The merge gate
+## 9. The merge gate and the GitHub App
 
-A verdict nobody enforces is a suggestion. The GitHub side:
+A verdict nobody enforces is a suggestion. Airlock enforces it through GitHub's own branch protection, using a GitHub App (`airlock/github.py`, `gate_pr` and `decide` in `airlock/web/app.py`).
 
-- **GitHub App** `airlocksandbox`: contents read, pull requests write, statuses write, metadata read, installed on selected repos only. Each call uses a one-hour installation token scoped to one repo. The App key lives only on the control plane.
-- **`pending` first.** When the head is fetched, the App posts `airlock: pending`. It posts `pending` again with the verdict, and `error` if the run fails. Only a person's decision sets `success` or `failure`.
-- **Branch protection** on the demo repo requires the `airlock` check **from the App's id**, admins included, so a status written by anyone else doesn't count.
-- **Stale runs can't decide.** If a newer run exists for the same commit, an older run can't post a decision. If the `pending` write fails, the run is flagged, because an earlier green status on the same commit would otherwise still stand (`RECHECK` R4).
+### Why a GitHub App
+
+We considered three ways to act on a repository:
+
+| Option | Problem |
+| --- | --- |
+| A personal access token | Acts as a person, across every repo that person can reach. A leak is a leak of that person. Statuses look like they came from a human. |
+| The signed-in user's OAuth token | Same breadth, plus Airlock would need write scopes at sign-in, and would act as whoever happened to click. |
+| **A GitHub App** (chosen) | Installed per repo by the repo's owner, with only the permissions it declares. Acts as its own identity, `airlocksandbox[bot]`. Tokens are short-lived and can be narrowed to one repo. Branch protection can name the App as the only accepted source of a check. |
+
+The last point decides it: with a PAT, anyone who can write a commit status could also write a green `airlock` status. With an App, branch protection can require `airlock` **from that App's id**, so nobody else's status counts.
+
+### Permissions
+
+Installed on selected repositories only, with:
+
+| Permission | Level | Used for |
+| --- | --- | --- |
+| Metadata | read | Required by GitHub for every App |
+| Contents | read | Downloading the head and merge-base archives; computing the merge base |
+| Pull requests | write | Reading the PR, its files and diff; posting the evidence comment |
+| Commit statuses | write | Posting the `airlock` status that branch protection requires |
+
+It cannot push code, merge, change settings or read secrets. It does not subscribe to webhooks yet: a run starts when someone pastes a PR URL (section 14.2 covers automatic triggers).
+
+### How a token is minted
+
+1. The control plane signs a JWT with the App's private key (RS256). It is valid for nine minutes, back-dated by 60 seconds to tolerate clock skew.
+2. With that JWT it looks up the App's installation on the target repo. A 404 becomes a plain error: "the Airlock GitHub App is not installed on owner/repo".
+3. It asks for an installation token **restricted to that one repository**, even if the installation covers more. GitHub issues it for one hour.
+4. The token is cached per repo and replaced five minutes before it expires.
+
+The private key comes from 1Password at deploy time and exists only in the web service's mode-600 env file on the host. The VM never sees it, or any GitHub token: the control plane downloads the PR's archive and copies it into the VM, which has no route to GitHub.
+
+### The gate, step by step
+
+1. **Head fetched:** the App posts `airlock: pending` ("Detonating in a microVM; merge waits for a human decision") on the head commit. From this moment, branch protection blocks the merge.
+2. **Verdict ready:** `pending` again, now carrying the verdict ("Verdict: malicious; waiting for a human decision"). The AI's verdict never turns the check green or red.
+3. **Run failed:** `error`. Still not mergeable.
+4. **Person decides** on the run page: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green.
+
+Details that matter:
+
+- **Branch protection** on `Darkflib/airlock-demo` `main` requires `airlock` from the App's id, and applies to admins too.
+- **Stale runs can't decide.** If a newer run exists for the same commit, the older one neither updates the status nor accepts a decision (HTTP 409, "decide that one instead"). Otherwise an old approval could overwrite a newer, more worrying result.
+- **A failed `pending` write is loud.** If it fails, the run records "the PR is NOT held" in its timeline and marks its gate as unsynced, because an earlier green status on the same commit would otherwise still stand (`RECHECK` R4).
+- **A failed decision post doesn't undo the decision.** The decision is stored first; if GitHub then fails, the error is logged as an event on the run. The PR stays at `pending`, so it fails safe, but there is no retry button yet: a new run is the way out.
 - **The comment** leads with what the PR adds, then containment, then the captured request (collapsed, labelled as canaries), then the agent's cited evidence.
 
-## 10. Control plane and access
+### Who may decide (a known gap)
+
+Today, the people who can approve a run are Airlock users: an owner, or the guest who submitted that run. Airlock does **not** check whether that person has write access to the repository on GitHub. For the hackathon this is contained, because guests can submit PRs only from the demo repo. In a product it is the first thing to change: the decision should require the person's GitHub permission on the repo (checked with the App's token), or move into GitHub itself as a Check Run action (section 14.2).
+
+## 10. Control plane, sign-in and access
 
 - **Stack:** FastAPI, SQLite (runs and events), Server-Sent Events to a vanilla JS UI with no build step, Caddy for TLS, systemd units for the app and the sinkhole. Event text is untrusted and inserted with `textContent` only.
-- **Sign-in:** GitHub OAuth with no scopes (public profile only), HMAC-signed session cookie (HttpOnly, Secure, SameSite=Lax, 7 days), allowlist re-read on every request so removal is immediate. The app refuses to start without OAuth config.
-- **Tokens with kinds.** Session, invite and share tokens share one secret but carry a kind, so one can never stand in for another.
-- **Guests** (judges, invitees): see their own runs and the owners' demo runs only (a `demo` flag on runs; owners' uploads and other repos stay private), decide and share only their own, may submit PRs only from an allowlisted repo, and are capped at 15 runs per rolling 24 h each and 150 between all guests.
-- **Invites** mint a signed sign-up link; accounts admitted by it are tagged, and revoking the invite removes them all at once.
-- **Share links** are 60-day bearer tokens that allow only GETs of the named runs.
 - **Secrets** come from 1Password at deploy time and are piped over SSH stdin into a mode-600 file. The repo's `.env` holds only `op://` references.
 - **Rebuildable host.** Everything done by hand on the box is captured in `infra/cloud-init.yaml`; the host comes back in about 10 minutes.
+
+### Sign-in
+
+The site is private: every page and API call needs a signed-in, allowlisted user, a valid share link, or is one of a few public paths (login, static files, health check). Sign-in is "Log in with GitHub" (`airlock/web/auth.py`).
+
+**Two GitHub identities, on purpose.** Sign-in uses a GitHub **OAuth App**; repo actions use the **GitHub App** from section 9. They have different jobs and different secrets. The OAuth App only proves who you are. It requests **no scopes**, so it can read your public profile and nothing else, and the access token it returns is used once, to read your login, then thrown away. Nothing Airlock does to a repository is done with your token. A GitHub App can also sign users in, and merging the two is on the list (section 14.2); keeping them apart was simpler to reason about for the hackathon.
+
+**The flow:**
+
+1. `/auth/login` creates a random `state`, stores it with the page you were going to in a signed cookie that lasts 10 minutes, and redirects to GitHub (`allow_signup=false`).
+2. GitHub sends you back to `/auth/callback` with a code. The `state` must match the cookie (constant-time compare), or sign-in fails. This stops login CSRF.
+3. The code is exchanged for a token, the token reads `/user`, and Airlock gets your login.
+4. If the login is on the allowlist, or you arrived through a valid invite, you get a session cookie and are sent back to where you were going. The "next" path must be a local path, so the login flow can't be used as an open redirect.
+
+**Sessions are stateless.** The session is a cookie holding your login and an expiry, signed with HMAC-SHA256 (HttpOnly, Secure, SameSite=Lax, 7 days). There is no session table. The trade-off: the server can't list or kill individual sessions. We compensate by **re-reading the allowlist on every request**, so removing a login (`scripts/allow.sh rm`) locks that person out on their next click, whatever cookie they hold. The app refuses to start without OAuth configuration, so a missing secret can't silently open the site.
+
+**One secret, four kinds of token.** Session, OAuth-state, invite and share tokens are all signed with the same secret, but each carries a kind (`k`), and every check asks for a specific kind. A share link can't be presented as a session, and an invite can't be presented as either. Rotating the secret logs everyone out and kills every share link and invite at once: a blunt but useful emergency switch.
+
+### Owners and guests
+
+- **Owners** are listed in the service's environment (`AIRLOCK_ALLOWED_USERS`). They see everything and aren't rate-limited.
+- **Guests** are everyone else on the allowlist file: judges and invitees. Guests see their own runs plus the owners' **demo** runs (self-tests, public npm and PyPI packages, PRs from the demo repo); owners' uploads and other repos stay private. Guests decide and share only their own runs, may submit PRs only from `AIRLOCK_GUEST_REPOS`, and are capped at 15 runs per rolling 24 h each and 150 between all guests (HTTP 429 after that). The caps exist because every run boots real VMs and calls a paid model.
+
+### Invites and share links
+
+**Invites** solve "we don't know the judges' GitHub logins in advance". `scripts/invite.sh new` mints a signed link with an expiry (default 30 days) and a maximum number of accounts (default 50). Whoever signs in through it is appended to the allowlist file, tagged `# invite <id>`. Revoking the invite does two things: it adds the id to a revocation file, so the link stops admitting people, and it removes every account it admitted, at once. Invited accounts are still ordinary allowlist lines, so `scripts/allow.sh` lists and removes them like any other.
+
+**Share links** (`/s/<token>`) let someone without an account read specific runs or a self-test. The token names the runs, lasts 60 days, and allows only `GET` and `HEAD` of those exact pages and their event streams: no decisions, no new runs, nothing else. It is a bearer token, so anyone holding the link can read those runs. Individual links can't be revoked yet, only all of them at once by rotating the secret. That is why the links live in 1Password and never in the repo, slides or video.
 
 Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owners' uploads (404), can't decide or share owners' runs (403), can't submit PRs from other repos (403), hit 429 on the 16th run, and lose access immediately on revoke.
 
@@ -320,33 +390,39 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy, and there is no backpressure on event queues.
 - **GitHub fetch limits.** The changed-file list stops at 100 files and the diff at 200,000 characters without a completeness marker. Files and diff are fetched by PR number while the archive is fetched by head SHA, so a push mid-run could mismatch.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
+- **Approval isn't tied to GitHub permissions.** Whoever may decide a run in Airlock can turn the check green, whether or not they have write access to the repo (section 9).
+- **No webhooks.** Runs start only when someone submits a PR URL; a new push to the PR isn't picked up automatically.
+- **Share links can't be revoked one by one,** and sessions can't be killed individually; both rely on the allowlist check or rotating the shared secret.
+- **No retry for a failed GitHub post** after a decision; the PR stays safely at `pending` but needs a new run.
 - **Self-hosting** still depends on personal defaults (domain, SSH key, 1Password item names) and lacks a complete `.env.example` and App setup guide.
 
 ## 14. From prototype to product
 
-Grouped by what they unlock. Rough effort in brackets, for one experienced engineer.
+Grouped by what they unlock. Effort in brackets assumes one experienced engineer working with coding agents, which is how this prototype went from nothing to a gated, live service in under a week. The estimates are deliberately optimistic: about **ten weeks** from here to a multi-tenant beta that paying teams could use.
 
-### 14.1 Harden what exists (weeks)
+### 14.1 Harden what exists (about a week)
 
-- Paginate GitHub files and diffs; pin everything to the head SHA; mark truncation. [days]
-- End-to-end run deadline with cancellation; runtime model fallback. [days]
-- Retention and backpressure: delete uploads and logs after N days, cap event and log sizes. [days]
-- Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [days]
-- Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [days]
-- Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [days]
-- Complete self-hosting docs: `.env.example`, App creation, OAuth callback, branch protection. [days]
+- Paginate GitHub files and diffs; pin everything to the head SHA; mark truncation. [a day]
+- End-to-end run deadline with cancellation; runtime model fallback. [a day]
+- Retention and backpressure: delete uploads and logs after N days, cap event and log sizes. [a day]
+- Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [a day]
+- Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [half a day]
+- Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [half a day]
+- Require GitHub write access to decide a PR run (check the decider's repo permission with the App's token); a retry for failed GitHub posts; revocable share links via a small server-side table. [a day]
+- Complete self-hosting docs: `.env.example`, App creation, OAuth callback, branch protection. [half a day]
 
-### 14.2 Fit into how teams work (1–2 months)
+### 14.2 Fit into how teams work (2–4 weeks)
 
-- **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour.
-- **Automatic triggers:** run on every PR that touches a lockfile, a manifest or a vendored archive, and on Dependabot/Renovate PRs, without anyone pasting a URL.
+- **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour, and **Approve / Reject buttons on the check itself** (Check Run requested actions), so reviewers decide inside GitHub and GitHub's own permissions say who may.
+- **One GitHub App for everything:** sign users in through the GitHub App (user-to-server tokens) instead of a separate OAuth App, and let an org admin install it once and pick repos, with no allowlist file.
+- **Automatic triggers:** subscribe the App to `pull_request` webhooks and run on every PR (and every new push) that touches a lockfile, a manifest or a vendored archive, including Dependabot/Renovate PRs, without anyone pasting a URL.
 - **Policy as code.** Teams decide what may auto-approve: e.g. "no new behaviours and no containment → approve", "any PROVEN exfil → block and page security", "new network host → require a security reviewer". Humans then look only at what matters.
 - **Allowlists per repo** for known, expected behaviour (a package that legitimately downloads a binary from its own CDN), versioned and reviewed like code.
 - **A cache of results by package hash.** The same `left-pad@1.3.0` tarball doesn't need to be detonated again for every repo; reuse the evidence, re-detonate on a schedule.
 - **GitLab, Bitbucket and a plain CI step** (a container that calls the API and fails the job), for teams not on GitHub.
 - **Org dashboard:** which dependencies did what, over time, across all repos.
 
-### 14.3 Scale and multi-tenancy (2–3 months)
+### 14.3 Scale and multi-tenancy (4–6 weeks)
 
 - **Separate control plane from detonation workers.** A queue (e.g. Postgres-backed or Redis) and a pool of KVM workers that pull jobs, so capacity is added by starting more VX1 instances.
 - **Warm pools** of booted, un-armed VMs per image to remove the boot and image-pull time from the critical path.
@@ -355,7 +431,9 @@ Grouped by what they unlock. Rough effort in brackets, for one experienced engin
 - **SSO (SAML/OIDC), roles, audit log** of every decision and every policy change.
 - **Data residency:** run workers in the customer's chosen Vultr region; never move evidence out of it.
 
-### 14.4 Detect more (ongoing)
+### 14.4 Detect more (ongoing; first slices in 2–3 weeks)
+
+Runs alongside the stages above. The first slices worth doing are the canaries for source code and `.env` files and the anti-evasion basics (a few days each); the eBPF guest kernel and the real-world evaluation are the larger pieces.
 
 - **Custom guest kernel with eBPF** (kprobes, tracepoints, BTF) for syscall-level tracing instead of polling. This closes the short-connection and fast-refusal gaps.
 - **Anti-evasion:** realistic hostnames, home directories, shell history and cloud metadata responses; randomised sinkhole ranges outside well-known test networks; a fake clock to trigger time bombs; plausible CI environment variables.
