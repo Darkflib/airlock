@@ -10,7 +10,7 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
 - **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
-- **Remaining work** (plan as of 4 Nov 08:45): the second-account access check, then presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
+- **Remaining work** (plan as of 4 Nov 09:15): presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
 
@@ -159,7 +159,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Judge access: signed invite link (`scripts/invite.sh`) that adds whoever signs in through it to the allowlist, tagged and revocable; signed read-only share links for runs and self-tests
 - [x] Clean up after a crash (4 Nov): a VM doesn't outlive its process (after `kill -9` it shows as stopped), but its record and root directory stayed. VMs now carry an owner label, and `airlock-web` destroys its own leftovers at startup (`reap_leftovers`); CLI and regression VMs are untouched. Verified by killing the service mid-run: the restart removed the VM and the run shows as an error
 - [x] Close F6: the pattern guard is the guard; the model-based guard is descoped (`nemotron-3.5-content-safety` answers "safe" to everything)
-- [ ] Judge access end to end with a second GitHub account: invite sign-up, guest visibility (demo runs only), the 15-run daily cap, signed-out share links (not independently verified by the review)
+- [x] Judge access end to end with a second GitHub account (4 Nov, one-use `guesttest` invite, since revoked): guest sees 18 demo runs and none of the owner's uploads (direct fetch 404); deciding or sharing an owner's run 403; PR from another repo 403; own run decided and shared; the 16th run in a day 429. Share links signed out: only their own runs (others, the run list, decide and submit 401); a tampered link goes to `/login?error=share`. Revoking ended the guest's session at once
 - [ ] PRD final pass: status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
 
 **Fri 6 Nov: story**

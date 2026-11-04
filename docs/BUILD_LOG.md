@@ -460,3 +460,15 @@ Tags: #demo
 **Result:** the VM doesn't outlive its process: `msb ls` showed it `stopped` with no VM process left. Its record and 1.6 MB root directory stayed until `msb rm`. Fix: every VM carries an `airlock-owner` label (`web` from the systemd unit, `cli` otherwise), and the web app's startup destroys its own labelled sandboxes, so a regression on the same host is never touched. Live check: VM running → kill → systemd restart → `startup: removed 1 leftover sandbox(es)`, `msb ls` empty, run `20261104-090320-d988d9` marked "the server restarted during this run". Pattern B (F10) descoped (no UI in the demo repo to check); F6 closed as the pattern guard. 106 tests.
 **So:** the PRD's "stale VMs after a crash" was a smaller problem than feared, and it's closed. Next: the second-account judge-access check.
 Tags: #fail #win #decision #descope
+
+### 09:15 — Judge access verified with a second GitHub account
+**Tried:** a one-use invite (`guesttest`) signed in a second GitHub account as a guest in a real browser; share links tested from a shell with no sign-in.
+**Result:**
+- Guest saw 18 runs, all demo material; the owner's uploads were absent and 404 when fetched directly.
+- Approving the owner's PR #4 run, or sharing it or the self-test: 403. A PR from `Darkflib/airlock`: 403, "airlock-demo only".
+- The guest's own `left-pad` run: decided (200) and shared (200).
+- Runs 1–15 accepted, the 16th 429 "daily limit of 15 runs per account reached".
+- Share links signed out: 302 into their page; their own run 200, any other run, the run list, decide and submit 401. A tampered token goes to `/login?error=share` with no cookie.
+- `invite.sh revoke guesttest` removed the account, and the guest's open session got 401 on its next request.
+**So:** the reviewer's unverified items (invite, quota, signed-out share) are now verified live. Every Thursday item is done a day early; what's left is the story.
+Tags: #win #metric
