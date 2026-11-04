@@ -89,13 +89,18 @@ points. Cite event ids only when the cited event directly supports the point, an
 appear above or in your tool results."""
 
 
-async def coverage_gaps(ws: Workspace, install) -> list[str]:
+async def coverage_gaps(ws: Workspace, install, test=None) -> list[str]:
     """Reasons Airlock may not have seen everything the change does. With any of them, quiet
-    behaviour proves nothing, so a benign verdict becomes inconclusive (see apply_gaps)."""
+    behaviour proves nothing, so a benign verdict becomes inconclusive (see apply_gaps).
+    Call it after the agent has finished, so observation is checked over the whole run."""
     gaps = []
     if not install.ok:
         gaps.append("the install timed out" if install.timed_out else
                     f"the install exited {install.exit_code}, so not all of its scripts may have run")
+    # A failing assertion still ran the code; a timeout or a kill means some of it never ran.
+    if test is not None and (test.timed_out or test.exit_code > 128):
+        gaps.append("the tests timed out" if test.timed_out else
+                    f"the tests were killed (exit {test.exit_code}), so not all of the code ran")
     ok, why = await ws.observation_ok()
     if not ok:
         gaps.append(why)
@@ -144,12 +149,12 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
         install = "npm ci" if "package-lock.json" in (await ws.exec("ls", cwd="/work/repo", source="unpack")).stdout else "npm install"
         installed = await ws.exec(f"{install} --no-audit --no-fund", cwd="/work/repo", timeout=240, trace=True,
                                   source="detonate", as_user="node")
-        await ws.exec("npm test --if-present", cwd="/work/repo", timeout=120, trace=True, source="detonate",
-                      as_user="node")
-        gaps = await coverage_gaps(ws, installed)
+        tested = await ws.exec("npm test --if-present", cwd="/work/repo", timeout=120, trace=True,
+                               source="detonate", as_user="node")
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
         result = await agent.run(PR_GOAL.format(slug=pr.slug, title=pr.title, author=pr.author, files=files,
                                                 observed=observed_summary(events)))
+        gaps = await coverage_gaps(ws, installed, tested)
         verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
     return Report(target=url, verdict=verdict, evidence=evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1), meta=meta)
@@ -180,10 +185,10 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
             raise RuntimeError(f"unpacking the package failed: {r.stderr[-300:]}")
         installed = await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
                                   cwd="/tmp/try", timeout=180, trace=True, source="detonate", as_user="node")
-        gaps = await coverage_gaps(ws, installed)
 
         agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
         result = await agent.run(GOAL.format(observed=observed_summary(events)))
+        gaps = await coverage_gaps(ws, installed)
         verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
 
     return Report(target=target, verdict=verdict, evidence=evidence, model=model, agent=result,

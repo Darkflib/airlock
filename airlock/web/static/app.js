@@ -347,9 +347,14 @@ const Airlock = (() => {
     function renderGate(r) {
       const g = $('gate');
       g.replaceChildren();
-      const waiting = ((r.meta || {}).kind === 'pr'
-        ? `${r.meta.owner}/${r.meta.repo}#${r.meta.number} is held at a pending airlock status, so it can't merge until a human decides.`
-        : 'Nothing is let through until a human decides.') + ' Waiting for the verdict…';
+      const m = r.meta || {};
+      const unsynced = m.kind === 'pr' && m.gate && !m.gate.synced;
+      const waiting = (m.kind !== 'pr' ? 'Nothing is let through until a human decides.'
+        : unsynced ? `GitHub could not be updated, so ${m.owner}/${m.repo}#${m.number} is not held by this run.`
+          : `${m.owner}/${m.repo}#${m.number} is held at a pending airlock status, so it can't merge until a human decides.`)
+        + ' Waiting for the verdict…';
+      if (unsynced && !r.decision) g.append(el('p', 'warn',
+        `⚠ Setting the GitHub status failed (${m.gate.error}). The PR keeps any earlier airlock status, which may be a success. Deciding here posts the status again.`));
       const viewOnly = readOnly || (me.login && !me.owner && (r.submitted_by || '').toLowerCase() !== me.login.toLowerCase());
       if (viewOnly && !r.decision) {
         g.append(el('p', '', r.status !== 'done'

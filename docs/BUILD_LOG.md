@@ -371,3 +371,9 @@ Tags: #metric #win
 **Result:** live check against PR #1 from the host: two `pending` statuses posted ("Detonating in a microVM…", then "Verdict: benign; waiting for a human decision"), and GitHub reports `mergeable_state: blocked`. 68 tests pass. Claims reworded from "nothing reaches GitHub until a human decides" to "held at a pending status until a human decides".
 **So:** the video can show the merge button greyed out until someone clicks Approve. PR #1 is left pending, ready for that shot.
 Tags: #win #decision #demo
+
+### 01:52 — Review recheck: fixes confirmed, remaining coverage and access gaps
+**Tried:** rechecked through `8c902b1`, ran local tests with loopback enabled, inspected the live homepage, and repeated safe fake-client/parser reproductions.
+**Result:** 68 tests passed; owner approval/sharing and wrong-token proof are fixed. Guests still read all owner runs; timed-out tests and observer loss during agent investigation can still end BENIGN; malformed guest DNS can crash its worker; rejected pending updates can preserve an earlier success.
+**So:** [current recheck](RECHECK-2026-11-04.md) supersedes the original open-issue list. Finish visibility, end-of-run observer health, status-failure handling and remaining claims; no application code or production state changed by this review.
+Tags: #decision #metric

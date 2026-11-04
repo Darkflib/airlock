@@ -30,7 +30,7 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 
 - **PROVEN credential exfiltration.** The postinstall POSTed the contents of `~/.npmrc` and `~/.aws/credentials` to `telemetry.colorful-logs.invalid`. Airlock's sinkhole answered the request, captured the body containing this run's canary tokens, and nothing reached the internet.
 - **Who did it.** `cat` read both credential files, `curl` looked up the exfil host, `python3` read the AWS file again, and a raw-IP connection was refused.
-- **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. The model is told to cite only events that support a point; that's prompted, not enforced.
+- **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. Cited IDs are checked: a verdict citing an event that doesn't exist is sent back once, then flagged on the page. Whether a real event actually supports the point is still the model's judgement.
 - **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. Only Approve (success) or Reject (failure) sets the final status, along with a PR comment carrying the evidence. A failed run sets `error`.
 
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and a BENIGN verdict.
@@ -125,6 +125,7 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 - **Encoded exfil.** Encoded or split canaries are still blocked or captured, but only a verbatim token counts as PROVEN.
 - **DNS over TCP** to the gateway fails closed (SERVFAIL) but isn't recorded as an event.
 - **Coverage.** The connection poller can miss very short-lived activity, and payload bodies are truncated at 2,000 characters.
+- **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
 - **Abandoned VMs.** If the server process dies mid-run, the VM is left to its 480 s lifetime limit; the run is marked failed when the server restarts.
 - **npm only for now.** The sandbox allows PyPI, but there's no Python install path yet.
 
@@ -150,7 +151,7 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 - `scripts/allow.sh add <github-login>` allows a known account.
 - `scripts/invite.sh new --days 30 --max 50 --id lablab` prints a sign-up link for people whose logins you don't know. Anyone who signs in through it is added to the allowlist tagged with the invite, and `scripts/invite.sh revoke lablab` removes them all.
 - Accounts other than the owners are **guests**:
-  - They see their own runs and the owners' runs, but approve, reject and share only their own.
+  - They see their own runs and the owners' demo runs (self-tests, npm packages, PRs from the demo repo), but not the owners' uploads or other repos. They approve, reject and share only their own.
   - They can analyse PRs only from `Darkflib/airlock-demo` (`AIRLOCK_GUEST_REPOS`), so an invite never lets anyone speak for another repo through the GitHub App.
   - They're capped at 15 runs a day each and 150 a day between them (`AIRLOCK_USER_DAILY_RUNS`, `AIRLOCK_GLOBAL_DAILY_RUNS`).
 - **Share read-only link** on a run or self-test page mints a signed link, valid for 60 days, that opens only that run (or that self-test and its probe runs), with no sign-in and no approve or reject buttons.

@@ -8,7 +8,7 @@ Airlock: Dependency Detonation Chamber
 
 ## Short Description
 
-Airlock runs an untrusted pull request or npm package in a disposable Vultr microVM with fake credentials and no internet beyond the registries. It proves what the code tried to steal, AI explains it, and a human approves before anything reaches GitHub.
+Airlock runs an untrusted pull request or npm package in a disposable Vultr microVM with fake credentials and no internet beyond the registries. It proves what the code tried to steal, AI explains it, and the PR stays blocked until a human approves.
 
 ## Long Description
 

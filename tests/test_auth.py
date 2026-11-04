@@ -261,11 +261,17 @@ def test_guests_cannot_act_for_owners_or_each_other(tmp_path, monkeypatch):
         wait_done(owner, owner_run)
         store.update_run(owner_run, meta={"kind": "pr", "owner": "Darkflib", "repo": "airlock-demo", "number": 3,
                                           "head_sha": "abc"})
+        private = owner.post("/api/runs", files={"file": ("acme-internal.tgz", b"\x1f\x8b" + b"\0" * 20,
+                                                          "application/gzip")}).json()["id"]
+        wait_done(owner, private)
     with client("judge-a") as a:
         sign_in(a)
         a_run = a.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
         wait_done(a, a_run)
-        assert a.get(f"/api/runs/{owner_run}").status_code == 200          # owners' runs are the demo
+        assert a.get(f"/api/runs/{owner_run}").status_code == 200          # owners' demo runs are visible
+        assert a.get(f"/api/runs/{private}").status_code == 404            # an owner's upload is not
+        assert a.get(f"/api/runs/{private}/events").status_code == 404
+        assert private not in [r["id"] for r in a.get("/api/runs").json()]
         assert a.post(f"/api/runs/{owner_run}/decision", json={"decision": "approved"}).status_code == 403
         assert a.post(f"/api/runs/{owner_run}/share").status_code == 403
         assert a.post(f"/api/runs/{a_run}/decision", json={"decision": "rejected"}).status_code == 200

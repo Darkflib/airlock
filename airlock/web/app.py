@@ -50,9 +50,9 @@ class Runner:
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
 
-    def start(self, target: str, label: str, user: str | None = None) -> str:
+    def start(self, target: str, label: str, user: str | None = None, demo: bool = False) -> str:
         run_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-        self.store.create_run(run_id, label, submitted_by=user)
+        self.store.create_run(run_id, label, submitted_by=user, demo=demo)
         log = EventLog(on_emit=lambda ev: self.store.add_event(run_id, ev))
         self.live[run_id] = log
         task = asyncio.create_task(self._run(run_id, target, log))
@@ -133,7 +133,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         from ..pipeline import analyse as real_analyse
         analyse = real_analyse
     store = store or Store()
-    store.fail_stale_runs()  # nothing survives a restart: those runs' VMs and tasks are gone
+    store.fail_stale_runs()
+    store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
 
@@ -145,6 +146,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         m = run["meta"]
         if m.get("kind") != "pr" or not github:
             return
+        if newer := store.newer_run_of_commit(run):
+            log.emit("github_status", f"not updating the GitHub status: run {newer} of the same commit is newer",
+                     superseded_by=newer, source="github")
+            return
         state, desc = {
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
             "verdict": ("pending", f"Verdict: {run['verdict']}; waiting for a human decision"),
@@ -154,8 +159,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, f"{public_url}/runs/{run_id}")
             log.emit("github_status", f"commit status on {m['owner']}/{m['repo']}#{m['number']}: {state} ({desc})",
                      state=state, source="github")
-        except Exception as e:  # noqa: BLE001 - never fails the run; branch protection still blocks without success
-            log.emit("error", f"setting the GitHub status failed: {type(e).__name__}: {str(e)[:200]}")
+            gate = {"state": state, "synced": True}
+        except Exception as e:  # noqa: BLE001 - never fails the run, but the page must say the PR isn't held
+            # GitHub keeps whatever status it had: possibly an earlier review's success. Say so loudly.
+            log.emit("error", f"setting the GitHub status failed, so {m['owner']}/{m['repo']}#{m['number']} is NOT held: "
+                     f"it keeps any earlier airlock status, which may be a success. {type(e).__name__}: {str(e)[:150]}")
+            gate = {"state": state, "synced": False, "error": f"{type(e).__name__}: {e}"[:200]}
+        store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate})
     runner = Runner(store, analyse, gate=gate_pr)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
@@ -172,7 +182,9 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         user = authmod.current_user(request)
         if user is None or is_owner(user):
             return True
-        return mine(run, user) or (run.get("submitted_by") or "").lower() in owners
+        # An owner's run is shown to guests only when it is demo material: a self-test, a public
+        # npm package or a PR from AIRLOCK_GUEST_REPOS. Uploads and other repos stay private.
+        return mine(run, user) or (bool(run.get("demo")) and (run.get("submitted_by") or "").lower() in owners)
 
     def get_readable(run_id: str, request: Request) -> dict:
         run = store.get_run(run_id)
@@ -249,12 +261,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             owner, repo, number = parse_pr_url(spec)
             if not is_owner(user) and f"{owner}/{repo}".lower() not in GUEST_REPOS:
                 raise HTTPException(403, f"guest accounts can analyse PRs from {', '.join(sorted(GUEST_REPOS))} only")
-            run_id = runner.start(spec.strip(), f"{owner}/{repo}#{number}", user)
+            run_id = runner.start(spec.strip(), f"{owner}/{repo}#{number}", user,
+                                  demo=f"{owner}/{repo}".lower() in GUEST_REPOS)
         else:
             spec = spec.strip()
             if len(spec) > MAX_SPEC or not SPEC.match(spec):
                 raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, or upload a .tgz")
-            run_id = runner.start(spec, spec, user)
+            run_id = runner.start(spec, spec, user, demo=True)  # public registry packages only
         return {"id": run_id, "url": f"/runs/{run_id}"}
 
     @app.get("/selftests/{test_id}")
@@ -275,7 +288,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(503, f"self-test fixtures missing on this server: {', '.join(missing)}")
         user = authmod.current_user(request)
         check_quota(user, len(SELFTEST))
-        probes = [{"run_id": runner.start(str(FIXTURES / f), f"self-test: {label}", user), "label": label,
+        probes = [{"run_id": runner.start(str(FIXTURES / f), f"self-test: {label}", user, demo=True), "label": label,
                    "expect": expect} for f, label, expect in SELFTEST]
         test_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
         store.create_selftest(test_id, probes, user)
@@ -364,6 +377,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(409, f"already {run['decision']}")
         if body.decision not in {"approved", "rejected"}:
             raise HTTPException(400, "decision must be approved or rejected")
+        if newer := store.newer_run_of_commit(run):
+            raise HTTPException(409, f"run {newer} reviewed the same commit later; decide that one instead")
         store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
                          decided_by=authmod.current_user(request))
         run = store.get_run(run_id)

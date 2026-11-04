@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS runs (
   decision_note TEXT,
   created REAL NOT NULL,
   finished REAL,
-  decided REAL
+  decided REAL,
+  demo INTEGER                     -- 1: guests may read it even when an owner submitted it
 );
 CREATE TABLE IF NOT EXISTS events (
   run_id TEXT NOT NULL,
@@ -63,11 +64,23 @@ class Store:
         for col in ("submitted_by", "decided_by", "meta"):
             if col not in cols:  # databases created before auth existed
                 self.db.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
+        if "demo" not in cols:
+            self.db.execute("ALTER TABLE runs ADD COLUMN demo INTEGER")
         self.db.commit()
 
-    def create_run(self, run_id: str, target: str, submitted_by: str | None = None) -> None:
-        self.db.execute("INSERT INTO runs (id, target, status, created, submitted_by) VALUES (?, ?, 'queued', ?, ?)",
-                        (run_id, target, time.time(), submitted_by))
+    def create_run(self, run_id: str, target: str, submitted_by: str | None = None, demo: bool = False) -> None:
+        self.db.execute("INSERT INTO runs (id, target, status, created, submitted_by, demo) VALUES (?, ?, 'queued', ?, ?, ?)",
+                        (run_id, target, time.time(), submitted_by, int(demo)))
+        self.db.commit()
+
+    def backfill_demo(self, guest_repos: frozenset[str]) -> None:
+        """Runs from before the demo flag: only self-tests, npm specs and guest-repo PRs are demo."""
+        rows = self.db.execute("SELECT id, target FROM runs WHERE demo IS NULL").fetchall()
+        for run_id, target in rows:
+            t = target.lower()
+            demo = t.startswith("self-test:") or t.split("#")[0] in guest_repos or (
+                "#" not in t and "/" not in t.lstrip("@").split("/", 1)[-1] and not t.endswith(".tgz"))
+            self.db.execute("UPDATE runs SET demo = ? WHERE id = ?", (int(demo), run_id))
         self.db.commit()
 
     def update_run(self, run_id: str, **fields) -> None:
@@ -104,6 +117,19 @@ class Store:
         ev = Event(kind=kind, summary=summary, data=data, id=seq)
         self.add_event(run_id, ev)
         return ev.to_dict()
+
+    def newer_run_of_commit(self, run: dict) -> str | None:
+        """A later run of the same PR head commit. Its status supersedes this run's, so this
+        run must no longer post to GitHub (its decision would overwrite the newer review)."""
+        m = run.get("meta") or {}
+        if not m.get("head_sha"):
+            return None
+        row = self.db.execute(
+            "SELECT id FROM runs WHERE id != ? AND (created > ? OR (created = ? AND id > ?))"
+            " AND json_extract(meta, '$.head_sha') = ? AND lower(json_extract(meta, '$.owner')) = lower(?)"
+            " AND lower(json_extract(meta, '$.repo')) = lower(?) ORDER BY created DESC LIMIT 1",
+            (run["id"], run["created"], run["created"], run["id"], m["head_sha"], m["owner"], m["repo"])).fetchone()
+        return row[0] if row else None
 
     def count_runs(self, since: float, user: str | None = None, exclude: frozenset[str] = frozenset()) -> int:
         """Runs created since a time, for one submitter, or for everyone not in `exclude` (case-insensitive)."""

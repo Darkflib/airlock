@@ -84,6 +84,12 @@ class TriageAgent:
                              origin=origin, text=f.text)
         return clean
 
+    def bad_citations(self, evidence: list[str]) -> list[str]:
+        """Event ids cited in the evidence that don't exist in this run."""
+        known = {e.id for e in self.events.events}
+        return sorted({m for item in evidence for m in re.findall(r"\bE(\d+)\b", item) if int(m) not in known},
+                      key=int)
+
     def _new_events_note(self, start: int) -> str:
         """Tell the model which Airlock events its call produced, so it can cite real ids."""
         new = self.events.events[start:]
@@ -102,15 +108,18 @@ class TriageAgent:
         if name == "read_file":
             try:
                 text = await self.ws.read_text(args["path"])
-            except Exception as e:  # noqa: BLE001
-                return f"error: {type(e).__name__}: {e}"
+            except Exception as e:  # noqa: BLE001 - the message can quote package-controlled paths
+                return self._screen(f"error: {type(e).__name__}: {e}", args["path"])
             return self._screen(_tail(text), args["path"])
         raise KeyError(name)
 
     async def run(self, goal: str) -> AgentResult:
         res = AgentResult()
         t0 = time.monotonic()
+        # The goal quotes untrusted text (PR title, file names, event summaries): screen it like tool output.
+        goal = self._screen(goal, "the task (PR details and observed events)")
         messages: list[dict] = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": goal}]
+        recited = False
         self.events.emit("agent_start", f"triage agent started ({self.model}, budget {self.max_turns} turns)",
                          model=self.model)
         for turn in range(1, self.max_turns + 1):
@@ -140,7 +149,21 @@ class TriageAgent:
                 try:
                     args = json.loads(tc.function.arguments or "{}")
                     if tc.function.name == "finish":
-                        res.verdict, res.evidence = parse_finish(args)
+                        verdict, evidence = parse_finish(args)
+                        bad = self.bad_citations(evidence)
+                        if bad and not recited and not last:  # one chance to cite real events
+                            recited = True
+                            messages.append({"role": "tool", "tool_call_id": tc.id, "content":
+                                             f"finish rejected: these event ids don't exist: "
+                                             f"{', '.join('E' + b for b in bad)}. Cite only ids Airlock gave you, "
+                                             "then call finish again."})
+                            continue
+                        if bad:
+                            self.events.emit("citation_invalid", f"the verdict cites events that don't exist: "
+                                             f"{', '.join('E' + b for b in bad)}", ids=bad)
+                            evidence = [f"{e} (cites a nonexistent event)" if self.bad_citations([e]) else e
+                                        for e in evidence]
+                        res.verdict, res.evidence = verdict, evidence
                         res.seconds = round(time.monotonic() - t0, 1)
                         self.events.emit("verdict", f"verdict: {res.verdict}", verdict=res.verdict,
                                          evidence=res.evidence, turns=turn, forced=res.forced)

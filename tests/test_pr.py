@@ -101,3 +101,42 @@ def test_comment_for_clean_pr_says_nothing_observed():
     run = {"verdict": "benign", "decision": "approved", "decided_by": "x", "meta": META, "evidence": [], "model": "m"}
     body = build_comment(run, [], "https://airlock.test/runs/1")
     assert "Nothing suspicious was observed" in body and "approved by @x" in body
+
+
+class StickyGitHub(FakeGitHub):
+    """GitHub that already holds an earlier success for the commit and rejects pending writes."""
+    def __init__(self):
+        super().__init__()
+        self.state = "success"
+
+    async def status(self, owner, repo, sha, state, description, target_url):
+        if state == "pending":
+            raise PermissionError("rate limited")
+        self.state = state
+        await super().status(owner, repo, sha, state, description, target_url)
+
+
+def test_failed_pending_write_is_surfaced_not_claimed(make):
+    gh = StickyGitHub()
+    with make(gh) as c:
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        run = wait_done(c, run_id)
+        events = c.get(f"/api/runs/{run_id}").json()["events"]
+        assert run["meta"]["gate"]["synced"] is False and "rate limited" in run["meta"]["gate"]["error"]
+        assert any(e["kind"] == "error" and "NOT held" in e["summary"] for e in events)
+        assert gh.state == "success"  # unchanged, and the run says so instead of pretending
+        c.post(f"/api/runs/{run_id}/decision", json={"decision": "rejected"})
+    assert gh.state == "failure"  # the decision re-syncs it
+
+
+def test_older_run_of_same_commit_cannot_decide_or_post(make):
+    gh = FakeGitHub()
+    with make(gh) as c:
+        old = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        wait_done(c, old)
+        new = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        wait_done(c, new)
+        r = c.post(f"/api/runs/{old}/decision", json={"decision": "approved"})
+        assert r.status_code == 409 and new in r.json()["detail"]
+        assert c.post(f"/api/runs/{new}/decision", json={"decision": "approved"}).status_code == 200
+    assert [x[2] for x in gh.calls if x[0] == "status"][-1] == "success"

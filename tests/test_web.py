@@ -169,3 +169,14 @@ def test_spec_validation_rejects_shell_syntax_and_overlong_specs(client):
     for bad in ("left-pad@1|id|cat", "left-pad@>1", "left-pad@1<2", "a" * 215):
         assert client.post("/api/runs", data={"spec": bad}).status_code == 400, bad
     assert client.post("/api/runs", data={"spec": "@scope/pkg@^1.2.3"}).status_code == 200
+
+
+def test_backfill_marks_only_demo_material(tmp_path):
+    from airlock.store import Store
+    store = Store(tmp_path / "b.db")
+    for i, target in enumerate(["self-test: Node credential stealer", "Darkflib/airlock-demo#3", "acme/private#9",
+                                "left-pad@1.3.0", "@scope/pkg@1.0.0", "acme-internal.tgz"]):
+        store.create_run(str(i), target)
+    store.db.execute("UPDATE runs SET demo = NULL")
+    store.backfill_demo(frozenset({"darkflib/airlock-demo"}))
+    assert [bool(store.get_run(str(i))["demo"]) for i in range(6)] == [True, True, False, True, True, False]

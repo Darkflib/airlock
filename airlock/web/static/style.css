@@ -236,3 +236,4 @@ nav.user button { padding: 6px 12px; font-size: 13px; }
 a.pass, .result.pass { color: var(--good); font-weight: 600; }
 a.fail, .result.fail { color: var(--bad); font-weight: 600; }
 .result.pending { color: var(--cyan); font-weight: 600; }
+.gate p.warn { color: var(--warn); font-weight: 600; }

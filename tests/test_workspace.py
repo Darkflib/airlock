@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from airlock import sandbox
+from airlock import pipeline, sandbox
 from airlock.events import EventLog
 from airlock.pipeline import apply_gaps
 from airlock.sandbox import ACTIVE_SUBNETS, ObservationError, Workspace
@@ -137,3 +137,58 @@ def test_runs_left_running_by_a_dead_server_are_failed_on_startup(tmp_path):
     store.update_run("b", status="done")
     assert store.fail_stale_runs() == 1
     assert store.get_run("a")["status"] == "error" and store.get_run("b")["status"] == "done"
+
+
+class GapWs:
+    def __init__(self, healthy=True):
+        self.healthy = healthy
+
+    async def observation_ok(self):
+        return (True, "") if self.healthy else (False, "the in-guest watcher stopped during the run")
+
+
+def test_test_timeouts_and_kills_are_gaps_but_failing_asserts_are_not():
+    ok, failed = sandbox.ExecResult(0, "", ""), sandbox.ExecResult(1, "", "")
+    gaps = lambda **kw: asyncio.run(pipeline.coverage_gaps(GapWs(), ok, **kw))  # noqa: E731
+    assert gaps(test=failed) == [] and gaps(test=ok) == [] and gaps() == []
+    assert gaps(test=sandbox.ExecResult(124, "", "", timed_out=True)) == ["the tests timed out"]
+    assert "killed (exit 137)" in gaps(test=sandbox.ExecResult(137, "", ""))[0]
+
+
+def test_observer_dying_during_the_investigation_makes_benign_inconclusive(monkeypatch, tmp_path):
+    """Observation is checked after the agent finishes, not just after the install."""
+    ws = GapWs()
+
+    class FakeWorkspace:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def write(self, *a):
+            pass
+
+        async def exec(self, *a, **kw):
+            return sandbox.ExecResult(0, "", "")
+
+        observation_ok = ws.observation_ok
+
+    class FakeAgent:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def run(self, goal):
+            ws.healthy = False  # the watcher dies mid-investigation
+            return SimpleNamespace(verdict="benign", evidence=["quiet install [E1]"])
+
+    monkeypatch.setattr(pipeline, "Workspace", FakeWorkspace)
+    monkeypatch.setattr(pipeline, "TriageAgent", FakeAgent)
+    monkeypatch.setattr(pipeline, "inference_client", lambda: None)
+    pkg = tmp_path / "p.tgz"
+    pkg.write_bytes(b"x")
+    report = asyncio.run(pipeline.analyse(str(pkg), model="m"))
+    assert report.verdict == "inconclusive" and "watcher stopped" in report.evidence[0]

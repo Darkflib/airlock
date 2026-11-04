@@ -86,3 +86,56 @@ def test_open_by_exited_process_uses_uid_from_its_exec_record():
         {"ev": "open", "path": "/home/node/.npmrc", "pid": 540},
     ))
     assert [k for k, _, _ in out] == ["process_spawn", "canary_read"] and "cat read canary" in out[1][1]
+
+
+def load_watcher(tmp_path, monkeypatch):
+    """Import the guest watcher (it parses argv at import) without starting any loops."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+    monkeypatch.setattr(sys, "argv", ["watch.py", str(tmp_path / "w.jsonl"), str(tmp_path),
+                                      "--sinkhole", "198.18.7.0/24", "--allow", "registry.npmjs.org"])
+    spec = importlib.util.spec_from_file_location("guest_watch", Path(__file__).parents[1] / "airlock/guest/watch.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def query(name: str) -> bytes:
+    import struct
+    return struct.pack(">HHHHHH", 7, 0x0100, 1, 0, 0, 0) + b"".join(
+        bytes([len(p)]) + p.encode() for p in name.split(".")) + b"\0" + struct.pack(">HH", 1, 1)
+
+
+class FakeSock:
+    def __init__(self):
+        self.sent = []
+
+    def sendto(self, data, addr):
+        self.sent.append(data)
+
+
+def test_guest_dns_survives_malformed_queries(tmp_path, monkeypatch):
+    w = load_watcher(tmp_path, monkeypatch)
+    monkeypatch.setattr(w, "udp_pid", lambda port: None)
+    sock = FakeSock()
+    good = query("evil.example")
+    # truncated mid-question (Codex's IndexError case), a label running off the end, a pointer, too short
+    for bad in (good[:-3], good[:12] + b"\x3fabc", good[:12] + b"\xc0\x0c" + good[-4:], b"\x00\x01"):
+        assert w.qname(bad) is None
+        w.dns_one(sock, "1.1.1.1", bad, ("127.0.0.1", 5000))
+    assert sock.sent == []  # malformed queries get no answer
+    w.dns_one(sock, "1.1.1.1", good, ("127.0.0.1", 5000))  # and the next real query is still answered
+    assert len(sock.sent) == 1 and sock.sent[0][:2] == good[:2]
+    log = [json.loads(line)["ev"] for line in (tmp_path / "w.jsonl").read_text().splitlines()]
+    assert log.count("dns_malformed") == 4 and "dns" in log
+
+
+def test_guest_observer_crash_is_logged_as_watch_error(tmp_path, monkeypatch):
+    w = load_watcher(tmp_path, monkeypatch)
+
+    def dns_loop():
+        raise IndexError("index out of range")
+    w.guarded(dns_loop)()
+    recs = [json.loads(line) for line in (tmp_path / "w.jsonl").read_text().splitlines()]
+    assert recs[-1]["ev"] == "watch_error" and recs[-1]["what"] == "dns_loop"

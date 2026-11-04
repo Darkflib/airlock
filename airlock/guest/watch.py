@@ -161,12 +161,26 @@ def upstream_resolver() -> str:
     return "8.8.8.8"
 
 
-def qname(packet: bytes) -> str:
-    labels, i = [], 12
+def question_end(packet: bytes) -> int | None:
+    """Offset just past the first question (name, type, class), or None if malformed.
+    The package controls these bytes, so every read is bounds-checked."""
+    if len(packet) < 12:
+        return None
+    i = 12
     while i < len(packet) and packet[i]:
-        n = packet[i]
-        labels.append(packet[i + 1:i + 1 + n].decode(errors="replace"))
-        i += 1 + n
+        if packet[i] & 0xC0:  # compression pointers never appear in a query's question
+            return None
+        i += 1 + packet[i]
+    return i + 5 if i + 5 <= len(packet) else None
+
+
+def qname(packet: bytes) -> str | None:
+    if question_end(packet) is None:
+        return None
+    labels, i = [], 12
+    while packet[i]:
+        labels.append(packet[i + 1:i + 1 + packet[i]].decode(errors="replace"))
+        i += 1 + packet[i]
     return ".".join(labels)
 
 
@@ -191,10 +205,7 @@ def sinkhole_ip(name: str) -> str:
 def fake_answer(query: bytes, ip: str | None) -> bytes:
     """Answer the query ourselves: one A record, or an empty NOERROR (e.g. for AAAA,
     so clients fall back to IPv4 and reach the sinkhole)."""
-    i = 12
-    while query[i]:
-        i += 1 + query[i]
-    question = query[12:i + 5]
+    question = query[12:question_end(query)]  # callers pass only queries qname() accepted
     header = query[:2] + struct.pack(">HHHHH", 0x8180, 1, 1 if ip else 0, 0, 0)
     answer = (b"\xc0\x0c" + struct.pack(">HHIH", 1, 1, 30, 4) + socket.inet_aton(ip)) if ip else b""
     return header + question + answer
@@ -248,32 +259,42 @@ def dns_loop() -> None:
     log("watch_ready", what="dns", upstream=upstream)
     while True:
         data, addr = srv.recvfrom(4096)
-        pid = udp_pid(addr[1])
-        info = proc_info(pid) if pid else {}
-        name = qname(data)
-        if SINKHOLE and name and not allowlisted(name):
-            ip = sinkhole_ip(name)
-            log("dns", name=name, sinkholed=ip, **info)
-            srv.sendto(fake_answer(data, ip if qtype(data) == 1 else None), addr)
-            log("dns_answer", name=name, ips=[ip], sinkholed=True)
-            continue
-        log("dns", name=name, **info)
+        try:
+            dns_one(srv, upstream, data, addr)
+        except Exception as e:  # noqa: BLE001 - one bad packet must never stop DNS observation
+            log("dns_malformed", err=f"{type(e).__name__}: {e}"[:200], size=len(data))
 
-        def forward(data=data, addr=addr):
-            up = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            up.settimeout(5)
-            try:
-                up.sendto(data, (upstream, 53))
-                resp = up.recv(4096)
-                srv.sendto(resp, addr)
-                ips = answer_ips(resp)
-                if ips:
-                    log("dns_answer", name=qname(data), ips=ips)
-            except OSError:
-                pass
-            finally:
-                up.close()
-        threading.Thread(target=forward, daemon=True).start()
+
+def dns_one(srv: socket.socket, upstream: str, data: bytes, addr) -> None:
+    pid = udp_pid(addr[1])
+    info = proc_info(pid) if pid else {}
+    name = qname(data)
+    if name is None:
+        log("dns_malformed", size=len(data), **info)
+        return
+    if SINKHOLE and name and not allowlisted(name):
+        ip = sinkhole_ip(name)
+        log("dns", name=name, sinkholed=ip, **info)
+        srv.sendto(fake_answer(data, ip if qtype(data) == 1 else None), addr)
+        log("dns_answer", name=name, ips=[ip], sinkholed=True)
+        return
+    log("dns", name=name, **info)
+
+    def forward(data=data, addr=addr):
+        up = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        up.settimeout(5)
+        try:
+            up.sendto(data, (upstream, 53))
+            resp = up.recv(4096)
+            srv.sendto(resp, addr)
+            ips = answer_ips(resp)
+            if ips:
+                log("dns_answer", name=qname(data), ips=ips)
+        except OSError:
+            pass
+        finally:
+            up.close()
+    threading.Thread(target=forward, daemon=True).start()
 
 
 # --- SYN_SENT polling ------------------------------------------------------------
@@ -336,11 +357,27 @@ def conn_loop() -> None:
 
 def main() -> None:
     os.setpriority(os.PRIO_PROCESS, 0, -5)
-    for target in (fanotify_loop, exec_loop, dns_loop, conn_loop):
-        threading.Thread(target=target, daemon=True).start()
+    threads = [threading.Thread(target=guarded(t), name=t.__name__, daemon=True)
+               for t in (fanotify_loop, exec_loop, dns_loop, conn_loop)]
+    for t in threads:
+        t.start()
     log("watch_ready", what="watcher", pid=ME)
-    while True:
-        time.sleep(3600)
+    reported = set()
+    while True:  # a dead observer must show up as an error, or a quiet run would look clean
+        for t in threads:
+            if not t.is_alive() and t.name not in reported:
+                reported.add(t.name)
+                log("watch_error", what=t.name, err="observer thread exited")
+        time.sleep(0.5)
+
+
+def guarded(target):
+    def run():
+        try:
+            target()
+        except Exception as e:  # noqa: BLE001 - recorded; main() then reports the thread dead
+            log("watch_error", what=target.__name__, err=f"{type(e).__name__}: {e}"[:200])
+    return run
 
 
 if __name__ == "__main__":
