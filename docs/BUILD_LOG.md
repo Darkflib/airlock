@@ -365,3 +365,9 @@ Tags: #fail #win #demo
 **Result:** probe against the live code: registry resolves, `example.com` and the unique probe name get NXDOMAIN, both recorded as `dns_blocked`. Regression (`evals/results/product-20261104T014526Z`): **18/18**, exfil proven 9/9, 0 containment on benign targets, none downgraded to inconclusive, 0 forced, 0 invalid tool calls; median 10.7–17.0 s. A first attempt without `web.env` sourced failed the two PR targets with "GitHub App not configured": a harness setup slip, not a product fault.
 **So:** the stricter checks cost no accuracy and no false "inconclusive"s. README results table now points at this run.
 Tags: #metric #win
+
+### 02:10 — Merge gate: PRs are held at pending until a human decides
+**Tried:** the `airlock` status was only posted after the decision, so it gated nothing. Now `Runner` calls a `gate` hook: `pending` when the PR head is fetched, `pending` again with the verdict, `error` if the run fails; only Approve/Reject sets `success`/`failure`. Added branch protection on `Darkflib/airlock-demo` `main`: requires `airlock` from the `airlocksandbox` App (id pinned, so a status from anyone else doesn't count), admins included.
+**Result:** live check against PR #1 from the host: two `pending` statuses posted ("Detonating in a microVM…", then "Verdict: benign; waiting for a human decision"), and GitHub reports `mergeable_state: blocked`. 68 tests pass. Claims reworded from "nothing reaches GitHub until a human decides" to "held at a pending status until a human decides".
+**So:** the video can show the merge button greyed out until someone clicks Approve. PR #1 is left pending, ready for that shot.
+Tags: #win #decision #demo
