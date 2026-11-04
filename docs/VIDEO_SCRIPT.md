@@ -1,11 +1,13 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 407 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:30 blocks first.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 408 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. PR #4 is now started on camera by a push (the GitHub webhook); to make room, the 2:33 block no longer says "npm and PyPI" (the numbers slide still does) and PR #4 no longer mentions the host built from pieces.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
 - [ ] Run the regression once on the frozen commit; the 30/30 figure on the "under the hood" slide must match it.
-- [ ] Fresh run of PR #3 to film live. Fresh run of PR #4 to cut to (record it first, film the finished page).
+- [ ] Fresh run of PR #3 to film live.
+- [ ] PR #4 is started on camera by a push. Prepare a one-line README change on the PR #4 branch in GitHub's web editor (don't commit it yet). Check the App's webhook is active: **Advanced → Recent Deliveries** shows a 200. Do one practice push the day before, and check the `(webhook)` run appears within a few seconds.
+- [ ] Don't push to PR #1: a push starts a run and moves its status.
 - [ ] PR #1 is held at a pending `airlock` status; check it still is, and that its merge button is greyed out.
 - [ ] PR #3 and PR #4 carry bot comments from earlier decisions: tidy them, or frame only the newest.
 - [ ] Browser: signed in as `Darkflib`, zoom 125%, bookmarks bar hidden, notifications off, one tab for the site and one for GitHub.
@@ -48,17 +50,21 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "Next, an AI agent on Vultr Serverless Inference looks inside the same machine and writes a verdict. Every claim links to an event. The AI explains the evidence. It does not decide what the evidence is."
 
-### 1:35–2:10 The hard one, PR #4 (recorded run)
+### 1:35–2:15 The hard one, PR #4 (started live by a push)
 
 **[SCREEN]** GitHub PR #4 "feat: timestamped startup log", Files tab. Scroll past "install analytics" and a "config discovery" helper.
 
-> "That script was easy to read. This one is not. Pull request four looks like a normal update. The stealing code is split across two files that look harmless, and the address it sends data to is built from small pieces."
+> "That script was easy to read. This one is not. Pull request four looks like a normal update. The stealing code is split across two files that look harmless."
 
-**[SCREEN]** Cut to the finished PR #4 run. Turn on "only what this PR adds". Rows tagged NEW IN THIS PR; the counter shows 10 new, 5 containment. Expand the PROVEN POST to `telemetry.tinystamp.invalid`.
+**[SCREEN]** In GitHub's web editor, commit the prepared one-line README change to the PR #4 branch. Switch to the Airlock tab: a new run `Darkflib/airlock-demo#4 (webhook)` appears by itself and starts streaming. On GitHub, the PR's `airlock` check turns pending.
 
-> "Airlock also ran the code from before this change, in a second machine. So we see only what is new: ten new behaviours, five of them blocked or caught. The stolen data is captured again. What matters is what the code does, not how it looks."
+> "And nobody has to paste anything. When a developer pushes to the pull request, Airlock starts testing by itself."
 
-### 2:10–2:30 The gate
+**[SCREEN]** Cut to the same run, finished (about 30 s later; cut the wait). Turn on "only what this PR adds". Rows tagged NEW IN THIS PR; the counter shows 10 new, 5 containment. Expand the PROVEN POST to `telemetry.tinystamp.invalid`.
+
+> "It also ran the code from before this change, in a second machine. So we see only what is new: ten new behaviours, five of them blocked or caught. The stolen data is captured again. What matters is what the code does, not how it looks."
+
+### 2:15–2:33 The gate
 
 **[SCREEN]** GitHub PR #4: merge button greyed out, `airlock` check pending. Back on the run page, click **Reject**. On GitHub: red `airlock` status and the `airlocksandbox[bot]` evidence comment.
 
@@ -68,11 +74,11 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "This one is a safe update: nothing new, nothing blocked. I click Approve, and now it can be merged."
 
-### 2:30–2:50 Under the hood
+### 2:33–2:50 Under the hood
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. It works for npm and PyPI. We tested all thirteen Serverless Inference models to choose the agent. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
+> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models to choose the agent. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
 
 ### 2:50–3:00 Close
 
@@ -85,6 +91,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 - **PR #3 live run stalls or inference is slow:** film the fresh run recorded during prep instead; the page replays stored events in the same order.
 - **Exfil row doesn't appear:** stop. That's a regression; check the sinkhole unit (`systemctl status airlock-sinkhole`) before recording anything else.
 - **GitHub status lags:** refresh once on camera, or cut the wait.
+- **The webhook run doesn't appear within ~5 s:** check Recent Deliveries for the error, then paste the PR #4 URL into Airlock instead and drop the line "nobody has to paste anything"; the rest of the block still works.
 
 ## Sources
 
@@ -92,7 +99,8 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 |---|---|
 | Boot under a second (0.69 s) | BUILD_LOG 3 Nov 17:39 |
 | Shell stealer, proven exfil, `cat`/`curl`/raw-IP | BUILD_LOG 3 Nov 22:37; self-test `20261104-084347-33a1a2` |
-| PR #4: 10 new, 5 containment, proven | BUILD_LOG 4 Nov 08:50, run `20261104-084529-f40401` |
+| PR #4: 10 new, 5 containment, proven | BUILD_LOG 4 Nov 08:50, run `20261104-084529-f40401` (recheck on the live run) |
+| A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 30/30, proven 15/15 | `product-20261104T030613Z` (rerun on the frozen commit) |

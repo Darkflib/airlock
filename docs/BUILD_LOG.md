@@ -538,3 +538,9 @@ Tags: #decision #win
 **Result:** 117 tests pass (6 new: signed start held at pending, bad/missing signature, disabled without secret, ping and ignored events, redelivery and same commit, daily cap). Live: unsigned POST → 401; signed ping → 200 `{"ok": true}`.
 **So:** a push to a demo PR now starts a run with nobody pasting a URL; F11 done. Don't push to PR #1 before the gate shot, or it starts a run.
 Tags: #win #demo
+
+### 15:10 — Video: PR #4 now starts live from a push
+**Tried:** reworked the 1:35 block of `docs/VIDEO_SCRIPT.md` around the webhook: commit a prepared README line to the PR #4 branch in GitHub's web editor, the `(webhook)` run appears by itself, cut to the finished run.
+**Result:** narration 408 words (was 407): added "nobody has to paste anything…" (18 words), cut the host-from-pieces clause and "It works for npm and PyPI". Checklist gains a practice push and a Recent Deliveries check; fallback is pasting the URL and dropping that line.
+**So:** the video shows the product working without a human starting it; the gate shot now rejects the run that push started.
+Tags: #demo
