@@ -114,11 +114,11 @@ def test_selftest_runs_fixtures_and_judges_them(tmp_path, monkeypatch, fixtures)
         assert c.get("/api/selftests/latest").json() is None
         r = c.post("/api/selftests").json()
         t = wait_selftest(c, r["id"])
-        assert (t["passed"], t["total"]) == (3, 3)
-        assert [p["proven"] for p in t["probes"]] == [True, True, False]
+        assert (t["passed"], t["total"]) == (5, 5)
+        assert [p["proven"] for p in t["probes"]] == [True, True, False, True, False]
         assert c.get("/api/selftests/latest").json()["id"] == r["id"]
         assert c.get(f"/selftests/{r['id']}").status_code == 200
-        assert len(c.get("/api/runs").json()) == 3  # probes are ordinary runs
+        assert len(c.get("/api/runs").json()) == 5  # probes are ordinary runs
 
 
 def test_selftest_in_progress_is_reused(tmp_path, monkeypatch, fixtures):
@@ -169,6 +169,23 @@ def test_spec_validation_rejects_shell_syntax_and_overlong_specs(client):
     for bad in ("left-pad@1|id|cat", "left-pad@>1", "left-pad@1<2", "a" * 215):
         assert client.post("/api/runs", data={"spec": bad}).status_code == 400, bad
     assert client.post("/api/runs", data={"spec": "@scope/pkg@^1.2.3"}).status_code == 200
+
+
+def test_pypi_spec_is_accepted_and_shell_syntax_rejected(client):
+    assert client.post("/api/runs", data={"spec": "pypi:six==1.17.0"}).status_code == 200
+    for bad in ("pypi:six; id", "pypi:six==1|cat", "pypi:$(id)", "pypi:six>=1"):
+        assert client.post("/api/runs", data={"spec": bad}).status_code == 400, bad
+
+
+def test_sdist_uploads_keep_their_extension_so_routing_works(client):
+    import io, zipfile
+    r = client.post("/api/runs", files={"file": ("pkg.tar.gz", b"\x1f\x8b" + b"\0" * 20, "application/gzip")})
+    assert wait_done(client, r.json()["id"])["target"].endswith(".tar.gz")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("pkg/setup.py", "setup()")
+    r = client.post("/api/runs", files={"file": ("pkg.zip", buf.getvalue(), "application/zip")})
+    assert wait_done(client, r.json()["id"])["target"].endswith(".zip")
 
 
 def test_backfill_marks_only_demo_material(tmp_path):
