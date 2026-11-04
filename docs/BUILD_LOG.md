@@ -454,3 +454,9 @@ Tags: #metric #win #demo
 **Result:** health 200; the served homepage describes the five-package self-test and has a PR #4 example (the browser had cached the old page until a reload). Signed out, both links redirect into their shared page, while `/api/runs` still returns 401. Links expire in 60 days (3 Jan 2027).
 **So:** the submission can link the 5/5 self-test and the PR #4 behaviour diff without sign-in. Links live in 1Password, not this repo.
 Tags: #demo
+
+### 09:04 — Crash cleanup: VMs die with their process; the leftovers didn't
+**Tried:** `kill -9` on a process holding a live VM (a probe), then the same on `airlock-web` mid-run (`left-pad@1.3.0`).
+**Result:** the VM doesn't outlive its process: `msb ls` showed it `stopped` with no VM process left. Its record and 1.6 MB root directory stayed until `msb rm`. Fix: every VM carries an `airlock-owner` label (`web` from the systemd unit, `cli` otherwise), and the web app's startup destroys its own labelled sandboxes, so a regression on the same host is never touched. Live check: VM running → kill → systemd restart → `startup: removed 1 leftover sandbox(es)`, `msb ls` empty, run `20261104-090320-d988d9` marked "the server restarted during this run". Pattern B (F10) descoped (no UI in the demo repo to check); F6 closed as the pattern guard. 106 tests.
+**So:** the PRD's "stale VMs after a crash" was a smaller problem than feared, and it's closed. Next: the second-account judge-access check.
+Tags: #fail #win #decision #descope

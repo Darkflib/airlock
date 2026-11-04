@@ -197,3 +197,17 @@ def test_backfill_marks_only_demo_material(tmp_path):
     store.db.execute("UPDATE runs SET demo = NULL")
     store.backfill_demo(frozenset({"darkflib/airlock-demo"}))
     assert [bool(store.get_run(str(i))["demo"]) for i in range(6)] == [True, True, False, True, True, False]
+
+
+@pytest.mark.parametrize("broken", [False, True])
+def test_startup_reaps_leftover_sandboxes_and_never_blocks_on_it(tmp_path, broken):
+    calls = []
+
+    async def reap():
+        calls.append(1)
+        if broken:
+            raise RuntimeError("msb down")
+        return ["airlock-old-1"], []
+    with TestClient(create_app(store=Store(tmp_path / "r.db"), analyse=fake_analyse, reap=reap)) as c:
+        assert c.get("/api/runs").status_code == 200
+    assert calls == [1]

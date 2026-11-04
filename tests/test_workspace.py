@@ -58,6 +58,7 @@ def fake_msb(tmp_path, monkeypatch):
 
     async def create(name, **kw):
         holder["network"] = kw["network"]
+        holder["labels"] = kw.get("labels")
         return holder["cm"]
     monkeypatch.setattr(sandbox.Sandbox, "create", create)
     return holder
@@ -79,6 +80,7 @@ def test_ready_watcher_and_clean_teardown(fake_msb):
     ws = asyncio.run(run())
     assert cm.exited and ws._subnet not in ACTIVE_SUBNETS and ws.dns.transport is None
     assert kinds(events)[-1] == "vm_destroyed" and "watcher_started" in kinds(events)
+    assert fake_msb["labels"] == {sandbox.OWNER_LABEL: sandbox.VM_OWNER}
 
 
 @pytest.mark.parametrize("lines", [READY[:2], READY + [{"ev": "watch_error", "what": "fanotify_mark /root", "err": "EPERM"}]])
@@ -192,3 +194,28 @@ def test_observer_dying_during_the_investigation_makes_benign_inconclusive(monke
     pkg.write_bytes(b"x")
     report = asyncio.run(pipeline.analyse(str(pkg), model="m"))
     assert report.verdict == "inconclusive" and "watcher stopped" in report.evidence[0]
+
+
+class FakeHandle:
+    def __init__(self, name, fail=False):
+        self.name, self.fail, self.destroyed = name, fail, False
+
+    async def destroy(self, *, force=False, timeout=None):
+        if self.fail:
+            raise RuntimeError("busy")
+        self.destroyed = force
+
+
+def test_reap_leftovers_destroys_only_this_owners_sandboxes_across_pages(monkeypatch):
+    pages = {None: ([FakeHandle("airlock-a"), FakeHandle("airlock-b", fail=True)], "p2"), "p2": ([FakeHandle("airlock-c")], None)}
+    asked = []
+
+    async def list_with(*, cursor=None, limit=None, labels=None):
+        asked.append(labels)
+        hs, nxt = pages[cursor]
+        return SimpleNamespace(sandboxes=hs, next_cursor=nxt)
+    monkeypatch.setattr(sandbox.Sandbox, "list_with", list_with)
+    removed, failed = asyncio.run(sandbox.reap_leftovers("web"))
+    assert removed == ["airlock-a", "airlock-c"] and failed == ["airlock-b: RuntimeError: busy"]
+    assert asked == [{sandbox.OWNER_LABEL: "web"}] * 2
+    assert all(h.destroyed for hs, _ in pages.values() for h in hs if not h.fail)

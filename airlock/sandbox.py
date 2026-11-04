@@ -42,6 +42,30 @@ DEFAULT_ALLOW = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
 SINKHOLE_ADDR = os.environ.get("AIRLOCK_SINKHOLE", "127.0.0.1:1080")
 SINKHOLE_CA = Path.home() / ".mitmproxy" / "mitmproxy-ca-cert.pem"
 SINKHOLE_PORTS = (80, 443, 8080, 8443)
+# Every VM carries its owner as a label, so the web service can clear its own leftovers at startup
+# without touching a CLI run or a regression on the same host. airlock-web.service sets "web".
+OWNER_LABEL = "airlock-owner"
+VM_OWNER = os.environ.get("AIRLOCK_VM_OWNER", "cli")
+
+
+async def reap_leftovers(owner: str = VM_OWNER) -> tuple[list[str], list[str]]:
+    """Destroy every sandbox labelled with this owner; returns (removed, failed) names.
+
+    A VM doesn't outlive the process that started it: after a kill -9 microsandbox shows it as
+    stopped (verified 4 Nov). Its record and root directory stay until removed, though. Call only
+    when this owner has no live runs, i.e. at startup."""
+    removed, failed, cursor = [], [], None
+    while True:
+        page = await Sandbox.list_with(cursor=cursor, labels={OWNER_LABEL: owner})
+        for h in page.sandboxes:
+            try:
+                await h.destroy(force=True, timeout=30)
+                removed.append(h.name)
+            except Exception as e:
+                failed.append(f"{h.name}: {type(e).__name__}: {e}"[:200])
+        cursor = page.next_cursor
+        if not cursor:
+            return removed, failed
 
 
 def sinkhole_available() -> bool:
@@ -124,7 +148,7 @@ class Workspace:
             dns_port = await self.dns.start()
             self._cm = await Sandbox.create(
                 self.name, image=self.image, cpus=self.cpus, memory=self.memory_mb,
-                max_duration=self.max_duration_s, replace=True,
+                max_duration=self.max_duration_s, replace=True, labels={OWNER_LABEL: VM_OWNER},
                 network=egress_network(self.allow_hosts, self.sinkhole, dns_port), **extra)
             self.sb = await self._cm.__aenter__()
         except BaseException:

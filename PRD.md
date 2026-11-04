@@ -10,13 +10,13 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
 - **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
-- **Remaining work** (plan as of 4 Nov 08:45): live checks of the five-fixture self-test and PR #4 with the behaviour diff, stale-VM cleanup, a timeboxed Pattern B decision, then presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
+- **Remaining work** (plan as of 4 Nov 08:45): the second-account access check, then presentation (video, slides, PRD pass) and the pre-publish audit. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
 
 - **Pattern A** (sandboxed execution, errors fed back for retries) is the core of every run.
 - **The human approval gate** is in place.
-- **Pattern B** (Playwright screenshot verification) is optional and not built yet.
+- **Pattern B** (Playwright screenshot verification) is descoped: the demo repo has no UI to check. Vision was still measured in the model eval.
 - **Containment is the product,** so the required "containment moment" happens on its own.
 
 **Hard constraints, all met**
@@ -69,11 +69,11 @@ One run per submitted change. The PR flow is the headline:
 | F3 | Default-deny egress to real destinations; registries allowlisted; every attempt recorded | P0 | Done |
 | F4 | Per-run canary credentials; detect reads and exfiltration attempts | P0 | Done |
 | F5 | Tool-calling agent (`exec`, `read_file`, `finish`), errors fed back for retries, hard turn budget | P0 | Done |
-| F6 | Injection guard on untrusted text before it reaches the model (pattern guard live; model-based guard not wired) | P0 | Partial |
+| F6 | Injection guard on untrusted text before it reaches the model: the pattern guard (`airlock/guard.py`). A model-based guard is descoped: `nemotron-3.5-content-safety` answered "safe" to everything | P0 | Done |
 | F7 | Live run page: staged timeline, verdict with linked evidence, containment stats | P0 | Done |
 | F8 | Human approval gate before any outward action; commit status and PR comment via GitHub App | P0 | Done |
 | F9 | Behaviour diff: merge base vs PR head, each detonated in its own microVM (`airlock/behaviour.py`) | P1 | Done |
-| F10 | Playwright screenshot verification (Pattern B) | P1 | Not started |
+| F10 | Playwright screenshot verification (Pattern B) | P1 | Descoped (4 Nov): the demo repo has no UI to check |
 | F11 | Automatic trigger on PR open (App webhook) | P2 | Not started |
 | F12 | PyPI support: sdist upload and `pypi:name==version`, installed from source so `setup.py` runs | P2 | Done |
 | F13 | Language-agnostic observation: in-guest watcher (fanotify, DNS, TCP), package runs unprivileged | Added | Done |
@@ -116,7 +116,7 @@ The agent is **`mimo-v2.6-flash`** on Vultr Serverless Inference. It was chosen 
 | Triage agent and verdict | `mimo-v2.6-flash` | 15/15 on the harder tasks at n=3, fewest tokens (153k in), 1.13 s median per call |
 | Fallback agent | `qwen3.8-27b` | 14/15, fastest per call (0.97 s) |
 | Injection guard | Pattern guard in `airlock/guard.py` | `nemotron-3.5-content-safety` classifies user safety, not injection: it answered "safe" to everything |
-| Screenshot check (P1) | Any chat model except `muse-glimmer-30b` | Every other model named a solid red square correctly; muse answered "white" |
+| Screenshot check (descoped) | Any chat model except `muse-glimmer-30b` | Every other model named a solid red square correctly; muse answered "white" |
 
 **What the evals showed** (`evals/RESULTS.md`)
 
@@ -151,14 +151,14 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Behaviour diff, base vs head (F9): the merge base is detonated in a second VM in parallel; fingerprints drop run noise (pids, tokens, sinkhole IPs, checkout paths); the agent, the PR comment and the run page see what the PR adds; pre-existing risky behaviour is flagged, never hidden; the diff never lowers a verdict
 - [x] Live five-fixture self-test on the host: 5/5 (`20261104-084347-33a1a2`); README "what we measured" updated; share link minted (60 days, stored outside the repo)
 - [x] Fresh run of PR #4 with the behaviour diff: malicious, proven, 10 new behaviours (5 containment) vs the base, 4 unchanged, 20.2 s (`20261104-084529-f40401`); left pending; share link minted
-- [ ] Decide Pattern B (F10): at most half a day on Thursday, and only if an on-screen check fits the demo repo (`status-api` has no UI). Otherwise descope it here, with that reason
+- [x] Pattern B (F10) descoped (4 Nov): `status-api` has no UI, so a screenshot check would need a page invented for it, and it adds nothing to what a package *did*. Vision ability stays measured in `evals/RESULTS.md`
 
 **Thu 5 Nov: hardening and judge access**
 
 - [x] Per-user and global daily run caps for guests (owners exempt)
 - [x] Judge access: signed invite link (`scripts/invite.sh`) that adds whoever signs in through it to the allowlist, tagged and revocable; signed read-only share links for runs and self-tests
-- [ ] Clean up stale VMs after a crash. `store.fail_stale_runs()` fails leftover runs at startup, but nothing destroys their microVMs: list them by name prefix and remove them; test by killing the service mid-run
-- [ ] Close F6: the pattern guard is the guard; the model-based guard is descoped (`nemotron-3.5-content-safety` answers "safe" to everything)
+- [x] Clean up after a crash (4 Nov): a VM doesn't outlive its process (after `kill -9` it shows as stopped), but its record and root directory stayed. VMs now carry an owner label, and `airlock-web` destroys its own leftovers at startup (`reap_leftovers`); CLI and regression VMs are untouched. Verified by killing the service mid-run: the restart removed the VM and the run shows as an error
+- [x] Close F6: the pattern guard is the guard; the model-based guard is descoped (`nemotron-3.5-content-safety` answers "safe" to everything)
 - [ ] Judge access end to end with a second GitHub account: invite sign-up, guest visibility (demo runs only), the 15-run daily cap, signed-out share links (not independently verified by the review)
 - [ ] PRD final pass: status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
 
@@ -180,7 +180,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [ ] `Darkflib/airlock-demo` is private, so PR links in bot comments and slides 404 for judges: make it public, or rely on share links only
 - [ ] `scripts/check-submission.py` passes (long description at 1977/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
 
-**If anything slips,** cut in this order: Pattern B, the second-account access check, slide polish. Never the video or the pre-publish audit.
+**If anything slips,** cut in this order: the second-account access check, slide polish. Never the video or the pre-publish audit.
 
 ## Demo script (3 minutes)
 
@@ -212,7 +212,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 | --- | --- | --- |
 | Serverless Inference slow or rate-limited during the live demo | Low–medium | Record the video from real runs; past runs replay from the database; `qwen3.8-27b` fallback in `roles.toml` |
 | A judge abuses access (mass submissions, hostile packages) | Low | GitHub sign-in with an allowlist; 2 concurrent runs; every run is sandboxed and destroyed. Add per-user caps on Thursday |
-| Host crash leaves stale VMs or a half-written run | Low | Runs are short and VMs have a wall-clock limit; add startup cleanup on Thursday |
+| Host crash leaves stale VMs or a half-written run | Low | VMs die with their process; at startup, interrupted runs are marked failed and the web service removes its leftover sandboxes (verified 4 Nov) |
 | Judges read it as "just a container" | Medium | Separate kernel (guest 6.12 vs host 6.8); the architecture slide shows all three layers |
 | Sandbox-aware or delayed malware stays quiet | Known limit | Stated openly in the README and slides; not claimed |
 | npm lifecycle-script policy changes (npm 11 warns about unapproved install scripts) | Low | Scripts still run today; pin the npm version in the image if needed |

@@ -10,6 +10,7 @@ import re
 import secrets
 import time
 from pathlib import Path
+from contextlib import asynccontextmanager
 from typing import Awaitable, Callable
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -125,7 +126,8 @@ class Decision(BaseModel):
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
                auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
                github: GitHubApp | None = None, user_daily: int | None = None,
-               global_daily: int | None = None) -> FastAPI:
+               global_daily: int | None = None,
+               reap: Callable[[], Awaitable[tuple[list[str], list[str]]]] | None = None) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config.
 
     Owners are the logins in AIRLOCK_ALLOWED_USERS; everyone else signed in is a guest (e.g. a
@@ -134,7 +136,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     so an invite link that spreads can't run up the bill or speak for a repo through the App."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
-        analyse = real_analyse
+        from ..sandbox import reap_leftovers
+        analyse, reap = real_analyse, reap or reap_leftovers
     store = store or Store()
     store.fail_stale_runs()
     store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
@@ -212,7 +215,19 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     uploads = data_dir() / "uploads"
     uploads.mkdir(exist_ok=True)
 
-    app = FastAPI(title="Airlock")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Runs failed above were this service's last runs; clear the sandboxes they left behind.
+        if reap:
+            try:
+                removed, failed = await reap()
+                if removed or failed:
+                    print(f"startup: removed {len(removed)} leftover sandbox(es) {removed}; failed {failed}", flush=True)
+            except Exception as e:  # never block startup on cleanup
+                print(f"startup: sandbox cleanup failed: {type(e).__name__}: {e}", flush=True)
+        yield
+
+    app = FastAPI(title="Airlock", lifespan=lifespan)
     app.state.runner = runner
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     if auth:

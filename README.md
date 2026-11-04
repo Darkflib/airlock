@@ -18,7 +18,7 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
 - **Proof.** 30/30 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
-- **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm and PyPI only. See [the security model](#security-model-and-limits).
+- **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser screenshots) was descoped, since the demo repo has no UI; npm and PyPI only. See [the security model](#security-model-and-limits).
 
 ## What we measured, all on Vultr
 
