@@ -9,8 +9,8 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 **Status (end of Tue 3 Nov):** every P0 requirement works end to end on the live site, two days ahead of the Thursday cut line.
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
-- **Regression:** 18/18 correct on the real pipeline. Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
-- **Remaining work:** presentation (video, slides, PRD), plus optional depth: a harder obfuscated fixture, the Pattern B browser check, and a base-vs-head behaviour diff.
+- **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
+- **Remaining work:** presentation (video, slides, PRD), plus optional depth: the Pattern B browser check. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
 
@@ -72,7 +72,7 @@ One run per submitted change. The PR flow is the headline:
 | F6 | Injection guard on untrusted text before it reaches the model (pattern guard live; model-based guard not wired) | P0 | Partial |
 | F7 | Live run page: staged timeline, verdict with linked evidence, containment stats | P0 | Done |
 | F8 | Human approval gate before any outward action; commit status and PR comment via GitHub App | P0 | Done |
-| F9 | Behaviour diff: base branch vs PR | P1 | Not started |
+| F9 | Behaviour diff: merge base vs PR head, each detonated in its own microVM (`airlock/behaviour.py`) | P1 | Done |
 | F10 | Playwright screenshot verification (Pattern B) | P1 | Not started |
 | F11 | Automatic trigger on PR open (App webhook) | P2 | Not started |
 | F12 | PyPI support: sdist upload and `pypi:name==version`, installed from source so `setup.py` runs | P2 | Done |
@@ -148,7 +148,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Containment self-test judges can click: three fixtures scored pass/fail live, exfil must be proven by payload (built Tue night, local check only; deploy and run on the host)
 - [x] Harder demo PR: payload hidden in plain sight (PR #4, `tinystamp`) — install-time credential theft smuggled through innocuous "install analytics" + a home-dir "config discovery" helper, with the collector host assembled from fragments, so the diff reads like an ordinary dependency bump. No encoding or obfuscation tooling; detonation still catches it. (Codex caught the readable PR #3.)
 - [x] PyPI support (F12): sdist upload and `pypi:name==version`, installed from source in `python:3.12-slim` so `setup.py` runs under the watcher; two Python fixtures (stealer + benign) added to the regression and self-test
-- [ ] Behaviour diff, base vs head (F9): show only what the PR *adds*
+- [x] Behaviour diff, base vs head (F9): the merge base is detonated in a second VM in parallel; fingerprints drop run noise (pids, tokens, sinkhole IPs, checkout paths); the agent, the PR comment and the run page see what the PR adds; pre-existing risky behaviour is flagged, never hidden; the diff never lowers a verdict
 - [ ] Pattern B: Playwright before/after screenshots checked by a vision model (F10)
 
 **Thu 5 Nov: hardening and judge access**

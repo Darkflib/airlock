@@ -30,6 +30,7 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 
 - **PROVEN credential exfiltration.** The postinstall POSTed the contents of `~/.npmrc` and `~/.aws/credentials` to `telemetry.colorful-logs.invalid`. Airlock's sinkhole answered the request, captured the body containing this run's canary tokens, and nothing reached the internet.
 - **Who did it.** `cat` read both credential files, `curl` looked up the exfil host, `python3` read the AWS file again, and a raw-IP connection was refused.
+- **What the PR adds.** Airlock runs the same install and tests on the PR's merge base in a second microVM and compares the two. On PR #4, the five credential and network events are tagged **NEW IN THIS PR**; the base's own test runs are marked unchanged and can be hidden with one click. Risky behaviour that is already in the base is flagged as pre-existing, never hidden, and the comparison never lowers a verdict.
 - **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. Cited IDs are checked: a verdict citing an event that doesn't exist is sent back once, then flagged on the page. Whether a real event actually supports the point is still the model's judgement.
 - **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. Only Approve (success) or Reject (failure) sets the final status, along with a PR comment carrying the evidence. A failed run sets `error`.
 
@@ -84,20 +85,20 @@ flowchart LR
 
 ## Results
 
-The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T025132Z`](evals/results/product-20261104T025132Z/summary.md)):
+The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)). PR runs also detonate the merge base in a second VM; the last column counts behaviours new versus the base (risky ones in brackets), and the regression fails a PR run unless a stealer's exfiltration shows as new, or a benign PR shows no new containment:
 
-| Target | Ecosystem | Expected | Correct | Containment during install | Exfil proven by payload | Median time |
-| --- | --- | --- | --- | --- | --- | --- |
-| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | 11.4 s |
-| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | 12.9 s |
-| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | 16.9 s |
-| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | 12.1 s |
-| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | 16.4 s |
-| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | 16.7 s |
-| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | 33.3 s |
-| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 15.7 s |
-| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 16.0 s |
-| Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 16.6 s |
+| Target | Ecosystem | Expected | Correct | Containment during install | Exfil proven by payload | New vs base (risky) | Median time |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | – | 12.5 s |
+| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | – | 13.2 s |
+| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | – | 13.0 s |
+| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | – | 12.3 s |
+| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | – | 17.2 s |
+| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | – | 16.0 s |
+| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | – | 30.7 s |
+| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 0 (0) every run | 23.8 s |
+| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 13 (6) every run | 16.2 s |
+| Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 10 (5) every run | 18.2 s |
 
 **30/30 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
 

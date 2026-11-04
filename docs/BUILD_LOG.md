@@ -407,3 +407,9 @@ Tags: #win #demo #metric #decision
 **Result:** `evals/results/product-20261104T025132Z`: **30/30** correct, exfil proven 12/12 on malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment on benign targets, 0 forced, 0 invalid tool calls; median 11.4–33.3 s (real PyPI `six` is the slowest).
 **So:** README results now cover both ecosystems and all three demo PRs in one run.
 Tags: #metric #win
+
+### 03:08 — Behaviour diff (F9): what the PR adds, versus its merge base
+**Tried:** `analyse_pr` now detonates the PR's merge base (GitHub compare API) in a second microVM in parallel, with its own canaries, sinkhole /24 and event log. `airlock/behaviour.py` reduces detonation events to fingerprints (command, path relative to `~`, host, actor relative to the checkout; pids, tokens, sinkhole IPs and hex dropped) and diffs them as sets. The agent gets "new in this PR" (plus anything risky already in the base), the PR comment leads with it, and the run page tags NEW IN THIS PR events with a filter to hide unchanged ones.
+**Result:** first try on the host: PR #4 showed 11 new behaviours (5 risky: the exfil, three canary reads, the blocked egress) and 4 unchanged test/install commands; PR #1 showed 0 new. Regression `product-20261104T030613Z`: **30/30**, and the diff check passed on all 9 PR runs (PR #1 0 new, PR #3 13 new / 6 risky, PR #4 10 / 5, identical every run). PR runs are slower (PR #1 median 23.8 s, from 15.7 s) since the base VM shares the 4 vCPUs. Side fix: the Node tracer didn't count `~/.pypirc` as a canary. 103 tests.
+**So:** reviewers and the agent see only what the PR adds; behaviour already in the base is labelled pre-existing, never hidden, and never lowers a verdict. Deploy is waiting on a 1Password approval.
+Tags: #win #demo #metric #decision
