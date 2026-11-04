@@ -180,6 +180,17 @@ def test_author_can_be_barred_from_approving_their_own_pr(make, monkeypatch):
         assert deliver(c, pr_comment("/airlock reject"), event="issue_comment", delivery="c2").json()["decided"] == "rejected"
 
 
+def test_command_in_a_pr_review_body(make):
+    gh = CommentGitHub()
+    with make(gh=gh) as c:
+        run_id = analysed(c)
+        review = {"action": "submitted", "repository": {"full_name": "Darkflib/airlock-demo"},
+                  "pull_request": {"number": 3}, "review": {"body": "/airlock approve ok", "state": "commented"},
+                  "sender": {"login": "dev-writer", "type": "User"}}
+        assert "ignored" in deliver(c, {**review, "action": "edited"}, event="pull_request_review", delivery="r0").json()
+        assert deliver(c, review, event="pull_request_review", delivery="r1").json() == {"decided": "approved", "run": run_id}
+
+
 def wait_done_store(c, run_id, timeout=5.0):
     import time
     store = c.app.state.runner.store

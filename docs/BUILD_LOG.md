@@ -586,3 +586,9 @@ Tags: #decision #demo
 **Result:** 137 tests pass (1 new for edit/repost, PR flow tests updated to the new comment sequence).
 **So:** a developer sees status, evidence and the next step in the PR itself without opening Airlock.
 Tags: #demo
+
+### 23:10 — `/airlock approve` on PR #6 went nowhere: no Issue comment event
+**Tried:** PR #6 showed the placeholder comment replaced by the verdict, as designed. Commenting `/airlock approve` did nothing.
+**Result:** the App's delivery log had no event for the comment. The App subscribes to commit comment and PR review events but not `issue_comment`, which GitHub offers only to Apps with the Issues permission. Fix on our side: the command is also accepted in a submitted PR review's body (`pull_request_review`, already subscribed). 138 tests pass.
+**So:** for plain PR comments, give the App Issues: read, tick Issue comment, and accept the new permission on the installation.
+Tags: #bug #demo

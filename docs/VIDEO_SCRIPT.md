@@ -9,7 +9,7 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 - [ ] PR #4 is started on camera by a push. Prepare a one-line README change on the PR #4 branch in GitHub's web editor (don't commit it yet). Check the App's webhook is active: **Advanced → Recent Deliveries** shows a 200. Do one practice push the day before, and check the `(webhook)` run appears within a few seconds.
 - [ ] Don't push to PR #1: a push starts a run and moves its status.
 - [ ] PR #1 is held at a pending `airlock` status; check it still is, and that its merge button is greyed out.
-- [ ] The App subscribes to **Issue comment** events. On PR #1, type `/airlock approve` in the comment box but don't send it. Practise the command the day before on a throwaway PR in `airlock-demo`, not on PR #1.
+- [ ] The App has **Issues: read** and subscribes to **Issue comment** events (accept the new permission on the installation). On PR #1, type `/airlock approve` in the comment box but don't send it. Practise the command the day before on a throwaway PR in `airlock-demo`, not on PR #1.
 - [ ] PR #3 and PR #4 carry bot comments from earlier decisions: tidy them, or frame only the newest.
 - [ ] Browser: signed in as `Darkflib`, zoom 125%, bookmarks bar hidden, notifications off, one tab for the site and one for GitHub.
 - [ ] Burn in English captions that match the narration word for word; many judges read English more easily than they hear it.

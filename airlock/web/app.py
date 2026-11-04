@@ -345,8 +345,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if event == "ping":
             return {"ok": True}
         payload = json.loads(body)
-        if event == "issue_comment":
-            return await comment_command(payload, request.headers.get("x-github-delivery", ""))
+        if event in ("issue_comment", "pull_request_review"):
+            return await comment_command(event, payload, request.headers.get("x-github-delivery", ""))
         if event != "pull_request" or payload.get("action") not in WEBHOOK_ACTIONS:
             return {"ignored": f"{event}/{payload.get('action')}"}
         slug, pr = payload["repository"]["full_name"], payload["pull_request"]
@@ -365,13 +365,20 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True)
         return JSONResponse({"id": run_id, "url": f"{public_url}/runs/{run_id}"}, status_code=202)
 
-    async def comment_command(payload: dict, delivery: str) -> dict:
-        """Decide from GitHub: `/airlock approve|reject [note]` in a PR comment. GitHub's write
-        access is the only authority here (the Airlock allowlist is for the web UI), and the same
-        rules apply as on the run page: the latest run of the head commit, not after a decision."""
-        issue, sender = payload.get("issue") or {}, payload.get("sender") or {}
-        cmd = COMMAND.search((payload.get("comment") or {}).get("body") or "")
-        if payload.get("action") != "created" or not issue.get("pull_request") or not cmd:
+    async def comment_command(event: str, payload: dict, delivery: str) -> dict:
+        """Decide from GitHub: `/airlock approve|reject [note]` in a PR comment (`issue_comment`,
+        which needs the App's Issues permission) or in the body of a submitted PR review. GitHub's
+        write access is the only authority here (the Airlock allowlist is for the web UI), and the
+        same rules apply as on the run page: the latest run of the head commit, not after a decision."""
+        sender = payload.get("sender") or {}
+        if event == "pull_request_review":
+            pr, text, wanted = payload.get("pull_request") or {}, (payload.get("review") or {}).get("body"), "submitted"
+        else:
+            issue = payload.get("issue") or {}
+            pr = issue if issue.get("pull_request") else {}
+            text, wanted = (payload.get("comment") or {}).get("body"), "created"
+        cmd = COMMAND.search(text or "")
+        if payload.get("action") != wanted or not pr.get("number") or not cmd:
             return {"ignored": "not an /airlock command on a pull request"}
         if sender.get("type") == "Bot":
             return {"ignored": "comments from bots"}
@@ -380,7 +387,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if delivery:
             deliveries.add(delivery)
         owner, repo = payload["repository"]["full_name"].split("/", 1)
-        number, user = issue["number"], sender["login"]
+        number, user = pr["number"], sender["login"]
         decision = "approved" if cmd.group(1).lower() == "approve" else "rejected"
 
         async def reply(text: str) -> dict:
