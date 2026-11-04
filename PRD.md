@@ -167,7 +167,8 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Demo script reworked (4 Nov): PR #3 (readable stealer) → PR #4 (hidden stealer caught at runtime, with "new in this PR" vs the merge base) → the gate, with PR #1's greyed-out merge button (left pending for this shot); PyPI as one line under "under the hood"
 - [x] Video script drafted from build-log `#demo` moments: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) (shots, 425-word narration, pre-recording checklist, sources)
 - [x] Slide outline drafted (10 slides, including the $1.45 inference spend): [docs/SLIDES.md](docs/SLIDES.md)
-- [ ] Build the deck from the outline with screenshots from the Sat recording; cover image
+- [x] Deck built from the outline (10 slides, Airlock palette; claude.ai Slides artifact, exports to PDF/PPTX)
+- [ ] Swap the two screenshot placeholders (slides 4 and 5) for frames from the Sat recording; recheck 30/30 and the spend on slide 9; cover image
 
 **Sat 7 Nov: freeze and record**
 

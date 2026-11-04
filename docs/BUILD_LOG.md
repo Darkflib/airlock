@@ -484,3 +484,9 @@ Tags: #decision #demo
 **Result:** `docs/VIDEO_SCRIPT.md`: seven beats (PR #3 live → verdict → PR #4 behaviour diff → gate on #4 and #1 → under the hood → close), 425 words of narration (about 2:50, tight), a pre-recording checklist, fallbacks and a claim-to-source table. `docs/SLIDES.md`: ten slides. Also fixed a stale README limit that still said an abandoned VM lives out its 480 s.
 **So:** Friday's work is now building the deck and the cover image; recording uses the script on Saturday after the freeze.
 Tags: #demo
+
+### 11:15 — Slide deck built
+**Tried:** turned `docs/SLIDES.md` into a ten-slide deck in the Airlock palette (navy, cyan, hazard orange; IBM Plex Sans and JetBrains Mono), with the logo and `docs/architecture.png`. Hazard-orange statement slide for the proven exfil.
+**Result:** all ten slides published; speaker notes carry the talking points. Two slides (the PR #3 PROVEN row and the PR #4 diff view) hold marked screenshot placeholders, because the frames should come from Saturday's recording.
+**So:** Saturday: drop in two screenshots, recheck the 30/30 and the spend on the numbers slide, export to PDF for lablab.
+Tags: #demo
