@@ -78,7 +78,7 @@ flowchart LR
 2. **Acquire.** The control plane fetches the PR head through the GitHub App, or the npm package or uploaded tarball. The VM itself has no GitHub access.
 3. **Detonate.** `npm ci` and `npm test` run as the unprivileged `node` user, with every observation layer on.
 4. **Investigate.** A tool-calling agent (`mimo-v2.6-flash`) reads the code, re-runs what it needs, and must give a verdict within 12 turns. The last turn forces `finish`. Tool output passes a prompt-injection guard before the model sees it, and the PR title and file names are presented as untrusted claims. The agent's commands run as the unprivileged `node` user, never root.
-5. **Decide.** Proven theft is rejected automatically; anything else waits for a human to approve or reject. Only then does Airlock post its final status and comment to the PR. The VM is destroyed when the run ends, whatever the outcome.
+5. **Decide.** Proven theft is rejected automatically; anything else waits for a human to approve or reject, on the run page or with a `/airlock approve` or `/airlock reject` comment on the PR (write access required). Only then does Airlock post its final status and comment to the PR. The VM is destroyed when the run ends, whatever the outcome.
 
 **How the network is contained, and how the run is observed:**
 

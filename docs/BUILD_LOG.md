@@ -574,3 +574,9 @@ Tags: #win #demo
 **Result:** 131 tests pass (11 new: retry/backoff/no-duplicate-comment against a mock GitHub, post again, share revoke incl. a cookie already set, guest can't revoke an owner's link, sign out with a copied cookie, sign out everywhere, id-less session refused).
 **So:** the report's "no retry" and "can't revoke one by one" weaknesses are gone; PRD line counts and the demo script brought up to date too.
 Tags: #security #decision
+
+### 22:40 — Decide from GitHub with `/airlock approve`
+**Tried:** let developers decide without leaving the PR. The webhook now also handles `issue_comment`: a line `/airlock approve [note]` or `/airlock reject [note]` on a PR is a decision. The decision rules moved into one `apply_decision` shared with the run page: the latest run of the PR's current head commit (fetched from GitHub when the comment arrives), never after a decision (auto-rejections stand), GitHub write access for the commenter (the Airlock allowlist doesn't apply on this path). Refusals get a one-line bot reply saying why; success is announced by the usual evidence comment with the note. Bots, plain issues, other comments and redeliveries are ignored. New `AIRLOCK_SELF_APPROVAL=0` bars PR authors approving their own PR on both paths (default allowed for the one-maintainer demo). The pending status now reads "comment /airlock approve or /airlock reject to decide". Chose this over Check Run buttons for now: no new App permission and the status that branch protection relies on is unchanged, two days before recording.
+**Result:** 136 tests pass (5 new). Video gate shot now approves PR #1 by comment on GitHub (narration still 407 words); deck slide 6 (v15), report, README, PRD, SLIDES, AGENTS updated.
+**So:** needs the App's "Issue comment" event ticked before it works live.
+Tags: #decision #demo

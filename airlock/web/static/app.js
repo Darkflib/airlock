@@ -455,7 +455,7 @@ const Airlock = (() => {
           ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
-        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Proven theft is rejected automatically. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide.`));
+        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Proven theft is rejected automatically. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide, here or by commenting /airlock approve or /airlock reject on the PR.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
       const refused = el('p', 'warn'); refused.hidden = true;

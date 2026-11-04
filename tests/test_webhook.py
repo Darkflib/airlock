@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 from airlock.store import Store
 from airlock.web.app import create_app
 from tests.test_auth import cfg
-from tests.test_pr import META, FakeGitHub, fake_pr_analyse
+from types import SimpleNamespace
+
+from tests.test_pr import META, FakeGitHub, PermGitHub, fake_pr_analyse
 
 SECRET = "hook-secret"
 
@@ -89,6 +91,93 @@ def test_daily_cap(make, monkeypatch):
     with make() as c:
         assert deliver(c, pr_event()).status_code == 202
         assert deliver(c, pr_event(sha="other"), delivery="d2").status_code == 429
+
+
+class CommentGitHub(PermGitHub):
+    """Knows each login's access, and the PR's current head commit."""
+    def __init__(self, perms=None, head=META["head_sha"]):
+        super().__init__(perms or {"Darkflib": "admin", "dev-writer": "write", "reader": "read"})
+        self.head = head
+
+    async def pull_request(self, owner, repo, number):
+        return SimpleNamespace(head_sha=self.head)
+
+    def replies(self):
+        return [x[2] for x in self.calls if x[0] == "comment" and x[2].startswith("@")]
+
+
+def pr_comment(body, login="Darkflib", kind="User", number=3):
+    return {"action": "created", "repository": {"full_name": "Darkflib/airlock-demo"},
+            "issue": {"number": number, "pull_request": {"url": "x"}},
+            "comment": {"body": body}, "sender": {"login": login, "type": kind}}
+
+
+def analysed(c):
+    run_id = deliver(c, pr_event()).json()["id"]
+    wait_done_store(c, run_id)
+    return run_id
+
+
+def test_comment_approves_from_github(make):
+    gh = CommentGitHub()
+    with make(gh=gh) as c:
+        run_id = analysed(c)
+        r = deliver(c, pr_comment("Checked the evidence.\n/airlock approve the vendored tgz is ours", "dev-writer"),
+                    event="issue_comment", delivery="c1")
+        assert r.json() == {"decided": "approved", "run": run_id}
+        run = c.app.state.runner.store.get_run(run_id)
+    assert run["decided_by"] == "dev-writer" and run["decision_note"] == "the vendored tgz is ours"
+    assert run["meta"]["decided_via"] == "github"
+    assert [x[2] for x in gh.calls if x[0] == "status"][-1] == "success"
+    assert gh.replies() == []   # the evidence comment says who approved; no extra reply
+
+
+def test_comment_needs_write_access_and_replies_why(make):
+    gh = CommentGitHub()
+    with make(gh=gh) as c:
+        run_id = analysed(c)
+        r = deliver(c, pr_comment("/airlock approve", "reader"), event="issue_comment", delivery="c1")
+        assert "write access" in r.json()["refused"]
+        assert c.app.state.runner.store.get_run(run_id)["decision"] is None
+    assert gh.replies()[0].startswith("@reader not recorded:")
+    assert "success" not in [x[2] for x in gh.calls if x[0] == "status"]
+
+
+def test_comment_before_the_head_is_analysed(make):
+    gh = CommentGitHub(head="feedbeef1234")
+    with make(gh=gh) as c:
+        analysed(c)   # an older commit
+        r = deliver(c, pr_comment("/airlock reject"), event="issue_comment", delivery="c1")
+    assert "hasn't analysed the head commit `feedbee`" in r.json()["refused"]
+
+
+def test_other_comments_bots_and_redeliveries_are_ignored(make):
+    gh = CommentGitHub()
+    with make(gh=gh) as c:
+        run_id = analysed(c)
+        assert "ignored" in deliver(c, pr_comment("LGTM, but /airlock approve later?"), event="issue_comment",
+                                    delivery="c1").json()
+        assert "ignored" in deliver(c, pr_comment("/airlock approve", "airlocksandbox[bot]", "Bot"),
+                                    event="issue_comment", delivery="c2").json()
+        issue = pr_comment("/airlock approve")
+        del issue["issue"]["pull_request"]   # a plain issue, not a PR
+        assert "ignored" in deliver(c, issue, event="issue_comment", delivery="c3").json()
+        assert deliver(c, pr_comment("/AIRLOCK Reject"), event="issue_comment", delivery="c4").json()["decided"] == "rejected"
+        assert deliver(c, pr_comment("/airlock approve"), event="issue_comment", delivery="c4").json() == {
+            "ignored": "already handled"}
+        r = deliver(c, pr_comment("/airlock approve"), event="issue_comment", delivery="c5")
+        assert r.json()["refused"].endswith("already rejected by @Darkflib.")
+        assert c.app.state.runner.store.get_run(run_id)["decision"] == "rejected"
+
+
+def test_author_can_be_barred_from_approving_their_own_pr(make, monkeypatch):
+    monkeypatch.setenv("AIRLOCK_SELF_APPROVAL", "0")
+    gh = CommentGitHub()
+    with make(gh=gh) as c:
+        analysed(c)   # META's author is Darkflib
+        r = deliver(c, pr_comment("/airlock approve"), event="issue_comment", delivery="c1")
+        assert "author can't approve" in r.json()["refused"]
+        assert deliver(c, pr_comment("/airlock reject"), event="issue_comment", delivery="c2").json()["decided"] == "rejected"
 
 
 def wait_done_store(c, run_id, timeout=5.0):

@@ -35,6 +35,8 @@ MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
 WEBHOOK_ACTIONS = {"opened", "synchronize", "reopened"}  # a new PR, a new push to it, a PR back from closed
 WEBHOOK_LABEL = " (webhook)"
+# `/airlock approve [note]` or `/airlock reject [note]` on its own line of a PR comment
+COMMAND = re.compile(r"^\s*/airlock\s+(approve|reject)\b[ \t]*(.*)$", re.IGNORECASE | re.MULTILINE)
 FIXTURES = Path(os.environ.get("AIRLOCK_FIXTURES", Path(__file__).parents[2] / "evals" / "fixtures"))
 # The containment self-test: known packages, and what a correct run must show for each.
 SELFTEST = [
@@ -171,7 +173,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             return
         state, desc = {
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
-            "verdict": ("pending", f"Verdict: {run['verdict']}; waiting for a human decision"),
+            "verdict": ("pending", f"Verdict: {run['verdict']}; comment /airlock approve or /airlock reject to decide"),
             "error": ("error", "Airlock run failed; rerun it before merging"),
         }[phase]
         try:
@@ -186,6 +188,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             gate = {"state": state, "synced": False, "error": f"{type(e).__name__}: {e}"[:200]}
         store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate})
     auto_reject = os.environ.get("AIRLOCK_AUTO_REJECT", "1") != "0"
+    self_approval = os.environ.get("AIRLOCK_SELF_APPROVAL", "1") != "0"
     runner = Runner(store, analyse, gate=gate_pr)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
@@ -329,6 +332,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if event == "ping":
             return {"ok": True}
         payload = json.loads(body)
+        if event == "issue_comment":
+            return await comment_command(payload, request.headers.get("x-github-delivery", ""))
         if event != "pull_request" or payload.get("action") not in WEBHOOK_ACTIONS:
             return {"ignored": f"{event}/{payload.get('action')}"}
         slug, pr = payload["repository"]["full_name"], payload["pull_request"]
@@ -346,6 +351,44 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         url = f"https://github.com/{slug}/pull/{pr['number']}"
         run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True)
         return JSONResponse({"id": run_id, "url": f"{public_url}/runs/{run_id}"}, status_code=202)
+
+    async def comment_command(payload: dict, delivery: str) -> dict:
+        """Decide from GitHub: `/airlock approve|reject [note]` in a PR comment. GitHub's write
+        access is the only authority here (the Airlock allowlist is for the web UI), and the same
+        rules apply as on the run page: the latest run of the head commit, not after a decision."""
+        issue, sender = payload.get("issue") or {}, payload.get("sender") or {}
+        cmd = COMMAND.search((payload.get("comment") or {}).get("body") or "")
+        if payload.get("action") != "created" or not issue.get("pull_request") or not cmd:
+            return {"ignored": "not an /airlock command on a pull request"}
+        if sender.get("type") == "Bot":
+            return {"ignored": "comments from bots"}
+        if delivery and delivery in deliveries:
+            return {"ignored": "already handled"}
+        if delivery:
+            deliveries.add(delivery)
+        owner, repo = payload["repository"]["full_name"].split("/", 1)
+        number, user = issue["number"], sender["login"]
+        decision = "approved" if cmd.group(1).lower() == "approve" else "rejected"
+
+        async def reply(text: str) -> dict:
+            try:
+                await github.comment(owner, repo, number, f"@{user} {text}")
+            except Exception:  # noqa: BLE001 - nothing more to tell them through
+                pass
+            return {"refused": text}
+
+        try:
+            head = (await github.pull_request(owner, repo, number)).head_sha
+        except Exception as e:  # noqa: BLE001
+            return await reply(f"Airlock couldn't read this pull request from GitHub ({type(e).__name__}); try again.")
+        run_id = store.run_of_commit(owner, repo, head)
+        if not run_id:
+            return await reply(f"Airlock hasn't analysed the head commit `{head[:7]}` yet, so there's nothing to decide.")
+        try:
+            run = await apply_decision(store.get_run(run_id), decision, user, cmd.group(2).strip(), via="github")
+        except HTTPException as e:
+            return await reply(f"not recorded: {e.detail}.")
+        return {"decided": run["decision"], "run": run_id}
 
     @app.get("/selftests/{test_id}")
     async def selftest_page(test_id: str):
@@ -468,27 +511,38 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         user = authmod.current_user(request)
         if not is_owner(user) and not mine(run, user):
             raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can decide it")
+        return await apply_decision(run, body.decision, user, body.note, via="web")
+
+    async def apply_decision(run: dict, decision: str, user: str | None, note: str, via: str) -> dict:
+        """The decision rules shared by the run page and `/airlock` PR comments."""
+        run_id = run["id"]
         if run["status"] != "done":
             raise HTTPException(409, "no verdict yet")
         if run["decision"]:
-            raise HTTPException(409, f"already {run['decision']}")
-        if body.decision not in {"approved", "rejected"}:
+            auto = (run["meta"] or {}).get("auto_decision")
+            raise HTTPException(409, f"already {run['decision']}" + (f" automatically: {auto}" if auto else
+                                                                      f" by @{run['decided_by']}"))
+        if decision not in {"approved", "rejected"}:
             raise HTTPException(400, "decision must be approved or rejected")
         if newer := store.newer_run_of_commit(run):
             raise HTTPException(409, f"run {newer} reviewed the same commit later; decide that one instead")
-        await require_write(run, user)
-        store.update_run(run_id, decision=body.decision, decision_note=body.note[:500], decided=time.time(),
-                         decided_by=authmod.current_user(request))
+        no_self_approval(run, decision, user)
+        await require_write(run, user, force=via == "github")
+        store.update_run(run_id, decision=decision, decision_note=note[:500], decided=time.time(), decided_by=user,
+                         meta={**(run["meta"] or {}), "decided_via": via})
+        store.append_event(run_id, "decision", f"{decision} by @{user}" + (" in a GitHub comment" if via == "github" else ""),
+                           source="github" if via == "github" else "airlock")
         run = store.get_run(run_id)
         if run["meta"].get("kind") == "pr" and github:
             await post_to_pr(run)
         return store.get_run(run_id)
 
-    async def require_write(run: dict, user: str | None) -> None:
+    async def require_write(run: dict, user: str | None, force: bool = False) -> None:
         """A decision sets the check that branch protection requires, so GitHub decides who may make
-        it: only people with write access to the repo. Fails closed if GitHub can't say."""
+        it: only people with write access to the repo. Fails closed if GitHub can't say. Optionally
+        (AIRLOCK_SELF_APPROVAL=0) the PR's author may not approve their own change."""
         m = run["meta"] or {}
-        if m.get("kind") != "pr" or not github or not auth:
+        if m.get("kind") != "pr" or not github or not (auth or force):
             return
         slug = f"{m['owner']}/{m['repo']}"
         try:
@@ -499,6 +553,11 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if perm not in ("admin", "write"):
             raise HTTPException(403, f"deciding this PR sets its merge check, so it needs write access to "
                                      f"{slug} on GitHub; @{user} has {perm}")
+
+    def no_self_approval(run: dict, decision: str, user: str | None) -> None:
+        author = ((run["meta"] or {}).get("author") or "").lower()
+        if decision == "approved" and not self_approval and author and author == (user or "").lower():
+            raise HTTPException(403, "the PR's author can't approve their own change here; ask another maintainer")
 
     @app.post("/api/runs/{run_id}/post")
     async def repost(run_id: str, request: Request):

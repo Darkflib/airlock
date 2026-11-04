@@ -1,6 +1,6 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 407 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. PR #4 is now started on camera by a push (the GitHub webhook); to make room, the 2:33 block no longer says "npm and PyPI" (the numbers slide still does) and PR #4 no longer mentions the host built from pieces. PR #4 is now rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's Approve is still a person's.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is 407 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. PR #4 is now started on camera by a push (the GitHub webhook); to make room, the 2:33 block no longer says "npm and PyPI" (the numbers slide still does) and PR #4 no longer mentions the host built from pieces. PR #4 is now rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
@@ -9,6 +9,7 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 - [ ] PR #4 is started on camera by a push. Prepare a one-line README change on the PR #4 branch in GitHub's web editor (don't commit it yet). Check the App's webhook is active: **Advanced → Recent Deliveries** shows a 200. Do one practice push the day before, and check the `(webhook)` run appears within a few seconds.
 - [ ] Don't push to PR #1: a push starts a run and moves its status.
 - [ ] PR #1 is held at a pending `airlock` status; check it still is, and that its merge button is greyed out.
+- [ ] The App subscribes to **Issue comment** events. On PR #1, type `/airlock approve` in the comment box but don't send it. Practise the command the day before on a throwaway PR in `airlock-demo`, not on PR #1.
 - [ ] PR #3 and PR #4 carry bot comments from earlier decisions: tidy them, or frame only the newest.
 - [ ] Browser: signed in as `Darkflib`, zoom 125%, bookmarks bar hidden, notifications off, one tab for the site and one for GitHub.
 - [ ] Burn in English captions that match the narration word for word; many judges read English more easily than they hear it.
@@ -70,9 +71,9 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "During the test, the pull request cannot be merged. The repository requires the Airlock check. Here the theft is proven, so Airlock rejects it by itself and posts the evidence on the pull request."
 
-**[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Click **Approve**. GitHub: green status, merge button unlocks.
+**[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Switch to GitHub, PR #1: comment `/airlock approve` (typed ahead, just press Comment). The `airlock` check turns green, the bot's evidence comment appears, and the merge button unlocks.
 
-> "This one is a safe update: nothing new, nothing blocked. Approval is a person's job. I click Approve, and now it can be merged."
+> "This one is a safe update: nothing new, nothing blocked. Approval is a person's job, done right here in GitHub. Now it can merge."
 
 ### 2:33–2:50 Under the hood
 
@@ -91,6 +92,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 - **PR #3 live run stalls or inference is slow:** film the fresh run recorded during prep instead; the page replays stored events in the same order.
 - **Exfil row doesn't appear:** stop. That's a regression; check the sinkhole unit (`systemctl status airlock-sinkhole`) before recording anything else.
 - **GitHub status lags:** refresh once on camera, or cut the wait.
+- **`/airlock approve` doesn't turn the check green within ~5 s:** look for the bot's reply on the PR saying why; otherwise click **Approve** on the PR #1 run page and say "I approve it" instead.
 - **The webhook run doesn't appear within ~5 s:** check Recent Deliveries for the error, then paste the PR #4 URL into Airlock instead and drop the line "nobody has to paste anything"; the rest of the block still works.
 
 ## Sources

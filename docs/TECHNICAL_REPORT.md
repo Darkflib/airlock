@@ -298,7 +298,7 @@ The private key comes from 1Password at deploy time and exists only in the web s
 2. **Verdict ready, theft proven:** if the run has exfiltration proven by a payload the host captured with this run's token, the run is rejected automatically: `failure` ("rejected automatically: exfiltration proven by a captured payload") and the evidence comment, with no click.
 3. **Verdict ready, anything else:** `pending` again, now carrying the verdict ("Verdict: malicious; waiting for a human decision"). The AI's verdict never turns the check green or red.
 4. **Run failed:** `error`. Still not mergeable.
-5. **Person decides** on the run page: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green.
+5. **Person decides**, on the run page or by commenting `/airlock approve [note]` or `/airlock reject [note]` on the PR: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green. The pending status itself says how: "comment /airlock approve or /airlock reject to decide".
 
 Details that matter:
 
@@ -319,11 +319,15 @@ Approval stays human on purpose. "No new behaviour and nothing blocked" is stron
 
 ### Who may decide
 
-Apart from the automatic rejection above, two checks, both required. First, Airlock's own rule: an owner, or the person who submitted the run. Second, for a PR run, **GitHub's rule**: at decision time, Airlock asks GitHub (with the App's installation token) what access the signed-in login has to the repository, and accepts the decision only for `admin` or `write` (GitHub reports `maintain` as `write`). Anyone else gets HTTP 403 with the reason, and the PR stays at `pending`. If GitHub can't answer, the decision is refused with 503: it fails closed.
+Apart from the automatic rejection above, two checks, both required on the run page. First, Airlock's own rule: an owner, or the person who submitted the run. Second, for a PR run, **GitHub's rule**: at decision time, Airlock asks GitHub (with the App's installation token) what access the signed-in login has to the repository, and accepts the decision only for `admin` or `write` (GitHub reports `maintain` as `write`). Anyone else gets HTTP 403 with the reason, and the PR stays at `pending`. If GitHub can't answer, the decision is refused with 503: it fails closed.
 
 The reasoning: the decision sets the check that branch protection requires, so it is effectively a merge approval. The people who may give it should be the people GitHub already trusts to change that repo, not whoever has an Airlock account. The login being checked is the one GitHub itself confirmed at sign-in, so it can't be typed in. A side effect for the hackathon: judges can run the demo PRs and see the verdict, but only the repo's owner can approve or reject them on GitHub. Their own npm and PyPI runs they can still decide.
 
-Moving the decision into GitHub as a Check Run action (section 14.2) would make GitHub enforce this directly.
+**Deciding from GitHub.** Developers live in the PR, so they can decide there: a comment with `/airlock approve [note]` or `/airlock reject [note]` on its own line. The App receives `issue_comment` webhooks (signed like the PR events) and applies **the same rules as the run page**: the latest run of the PR's *current* head commit (fetched from GitHub when the comment arrives, so a comment can't approve an older commit), never after a decision (an automatic rejection stands), and GitHub write access for the commenter. The Airlock allowlist plays no part here: GitHub has already authenticated the commenter, and its write access is the authority. Refusals get a short reply on the PR saying why ("@reader not recorded: … needs write access"); a successful decision is announced by the usual evidence comment, "approved by @login", with the note. Comments from bots, edits and redeliveries are ignored.
+
+**Self-approval.** By default the PR's author may approve their own PR (the demo has one maintainer). `AIRLOCK_SELF_APPROVAL=0` bars it on both paths, so a compromised contributor account can't wave its own dependency through; rejecting is always allowed.
+
+Buttons on a Check Run (section 14.2) are the more native form of the same thing; the comment command needs no new App permission and leaves the status that branch protection relies on unchanged, so it shipped first.
 
 ## 10. Control plane, sign-in and access
 
@@ -434,7 +438,7 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 
 ### 14.2 Fit into how teams work (2–4 weeks)
 
-- **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour, and **Approve / Reject buttons on the check itself** (Check Run requested actions), so reviewers decide inside GitHub and GitHub's own permissions say who may.
+- **GitHub Check Run instead of a commit status**, with annotations on the lines that introduced each new behaviour, and **Approve / Reject buttons on the check itself** (Check Run requested actions), replacing today's `/airlock approve` comment command with the native control.
 - **One GitHub App for everything:** sign users in through the GitHub App (user-to-server tokens) instead of a separate OAuth App, and let an org admin install it once and pick repos, with no allowlist file.
 - **Smarter automatic triggers:** the webhook already runs every PR and push in an enabled repo. Next: enable it per installation, and skip PRs that touch no lockfile, manifest or vendored archive, so Dependabot/Renovate bumps are covered without detonating documentation changes.
 - **Policy as code.** Today one rule is built in: proven theft is rejected automatically (`AIRLOCK_AUTO_REJECT`), and nothing is approved automatically. A product makes this configurable per repo. Teams decide what may auto-approve: e.g. "no new behaviours and no containment → approve", "any PROVEN exfil → block and page security", "new network host → require a security reviewer". Humans then look only at what matters.
