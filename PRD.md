@@ -55,16 +55,16 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm pa
 
 One run per submitted change. The PR flow is the headline:
 
-1. **Submit** a GitHub PR URL, an npm spec (`left-pad@1.3.0`) or a `.tgz`, in the web UI (GitHub sign-in, allowlist) or with `airlock analyse`.
+1. **Submit** a GitHub PR URL, an npm spec (`left-pad@1.3.0`), a PyPI spec (`pypi:requests==2.32.3`), or a package file (npm `.tgz` or a Python sdist `.tar.gz`/`.zip`), in the web UI (GitHub sign-in, allowlist) or with `airlock analyse`.
 2. **Setup** (Airlock code, no AI). A fresh microVM boots in about 0.7 s. Canary `~/.npmrc` and `~/.aws/credentials` carrying a per-run token are planted, and a root watcher starts.
 3. **Acquire.** The control plane fetches the PR head and diff through the GitHub App (the VM has no GitHub access), or the npm package or tarball.
-4. **Detonate.** `npm ci` and `npm test` run as the unprivileged `node` user, with all observation layers on and all traffic routed through the sinkhole.
+4. **Detonate.** For npm, `npm ci` and `npm test`; for Python, `pip install` from source into a venv (so `setup.py` and build hooks run). Both run as the unprivileged `node` user, with all observation layers on and all traffic routed through the sinkhole.
 5. **Investigate.** The triage agent (`mimo-v2.6-flash`) reads the code and re-runs what it needs within a 12-turn budget; the last turn forces `finish`. Every tool result passes the injection guard and ends with the Airlock events it produced, and cited IDs are checked against the run (a nonexistent ID is sent back once, then flagged).
 6. **Decide.** While the run is in progress and until the decision, `airlocksandbox[bot]` holds the `airlock` status at `pending`, and branch protection blocks the merge button. A human approves or rejects; only then does the status go to success or failure, with the evidence posted as a PR comment. The VM is destroyed when the run ends.
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| F1 | Accept a PR URL, npm spec or `.tgz`; queue a run; return a run ID | P0 | Done |
+| F1 | Accept a PR URL, npm or PyPI spec, or a package file; queue a run; return a run ID | P0 | Done |
 | F2 | One microVM per run: CPU, memory and wall-clock limits; destroyed on completion or timeout | P0 | Done |
 | F3 | Default-deny egress to real destinations; registries allowlisted; every attempt recorded | P0 | Done |
 | F4 | Per-run canary credentials; detect reads and exfiltration attempts | P0 | Done |
@@ -75,7 +75,7 @@ One run per submitted change. The PR flow is the headline:
 | F9 | Behaviour diff: base branch vs PR | P1 | Not started |
 | F10 | Playwright screenshot verification (Pattern B) | P1 | Not started |
 | F11 | Automatic trigger on PR open (App webhook) | P2 | Not started |
-| F12 | PyPI support | P2 | Not started |
+| F12 | PyPI support: sdist upload and `pypi:name==version`, installed from source so `setup.py` runs | P2 | Done |
 | F13 | Language-agnostic observation: in-guest watcher (fanotify, DNS, TCP), package runs unprivileged | Added | Done |
 | F14 | Sinkhole: fake DNS into a per-run /24, mitmproxy answers and logs, exfil **proven** with the payload | Added | Done |
 | F15 | GitHub OAuth sign-in with an allowlist; who submitted and who decided recorded per run | Added | Done |
@@ -146,7 +146,8 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 **Wed 4 Nov: optional depth**
 
 - [x] Containment self-test judges can click: three fixtures scored pass/fail live, exfil must be proven by payload (built Tue night, local check only; deploy and run on the host)
-- [ ] Harder demo PR: an obfuscated or encoded payload with no tell-tale comments, to see how far static AI review gets (Codex caught the readable one)
+- [x] Harder demo PR: payload hidden in plain sight (PR #4, `tinystamp`) — install-time credential theft smuggled through innocuous "install analytics" + a home-dir "config discovery" helper, with the collector host assembled from fragments, so the diff reads like an ordinary dependency bump. No encoding or obfuscation tooling; detonation still catches it. (Codex caught the readable PR #3.)
+- [x] PyPI support (F12): sdist upload and `pypi:name==version`, installed from source in `python:3.12-slim` so `setup.py` runs under the watcher; two Python fixtures (stealer + benign) added to the regression and self-test
 - [ ] Behaviour diff, base vs head (F9): show only what the PR *adds*
 - [ ] Pattern B: Playwright before/after screenshots checked by a vision model (F10)
 
@@ -187,7 +188,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and two open PRs. Ever
    - 13 Serverless Inference models benchmarked; 18/18 regression.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to take."
 
-**On other AI reviewers.** Codex also flagged PR #3 by reading the plainly written script. The honest line: *static review can catch an obvious payload; Airlock proves what ran, what it took and where it tried to send it, and gates the merge.* If we build the obfuscated PR, it becomes a fair side-by-side.
+**On other AI reviewers.** Codex also flagged PR #3 by reading the plainly written script. The honest line: *static review can catch an obvious payload; Airlock proves what ran, what it took and where it tried to send it, and gates the merge.* PR #4 (`tinystamp`) is the fair side-by-side: no tell-tale script, the credential read and exfil are split across innocuous-looking "install analytics" and a "config discovery" helper, and the collector host is built from fragments — the diff reads like a routine dependency bump, but detonation still proves the exfil. (For a blind static-review test, strip the fixture's honest NOTICE comments first.)
 
 The malicious fixture is only ever installed inside sandboxes. Its targets are unroutable (a `.invalid` host and a TEST-NET address), and the credentials are per-run canaries.
 

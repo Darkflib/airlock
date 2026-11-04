@@ -4,12 +4,12 @@
 
 **Every untrusted dependency change gets its own disposable computer.**
 
-Airlock runs a pull request, a new npm package or a version bump inside a throwaway microVM. The VM holds fake credentials and can reach nothing on the internet except the npm and PyPI registries. Airlock records what the change does (programs run, files opened, DNS lookups, connection attempts) and an AI reviewer investigates. The PR is held at a pending `airlock` status, which branch protection requires, so it cannot merge until a human clicks **Approve** or **Reject**.
+Airlock runs a pull request, a new npm or PyPI package, or a version bump inside a throwaway microVM. The VM holds fake credentials and can reach nothing on the internet except the npm and PyPI registries. Airlock records what the change does (programs run, files opened, DNS lookups, connection attempts) and an AI reviewer investigates. The PR is held at a pending `airlock` status, which branch protection requires, so it cannot merge until a human clicks **Approve** or **Reject**.
 
 Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
 - **Live:** https://airlock.darkflib.dev. Sign in with GitHub. Judges use the invite link in our lablab submission, or open a recorded run from a read-only share link without signing in.
-- **Demo repo:** `Darkflib/airlock-demo`. PR #1 is a dependency bump; PR #3 vendors a credential stealer whose `npm test` still passes.
+- **Demo repo:** `Darkflib/airlock-demo`. PR #1 is a dependency bump; PR #3 vendors a credential stealer whose `npm test` still passes; PR #4 hides the same theft in plain sight — install-time credential exfil smuggled through innocuous "install analytics" and a "config discovery" helper, so the diff reads like a routine bump, yet detonation still proves it.
 - **Build log:** [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md). What worked, what didn't, and why.
 
 ## 30 seconds for judges
@@ -17,8 +17,8 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. A human approves or rejects before anything is posted to GitHub.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
-- **Proof.** 18/18 correct on a small fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run three known packages yourself and see pass/fail live.
-- **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm only. See [the security model](#security-model-and-limits).
+- **Proof.** 27/27 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
+- **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm and PyPI only. See [the security model](#security-model-and-limits).
 
 ## Why
 
@@ -84,18 +84,21 @@ flowchart LR
 
 ## Results
 
-The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T020544Z`](evals/results/product-20261104T020544Z/summary.md)):
+The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T023628Z`](evals/results/product-20261104T023628Z/summary.md)):
 
-| Target | Expected | Correct | Containment during install | Exfil proven by payload | Median time |
-| --- | --- | --- | --- | --- | --- |
-| Node credential stealer (tarball) | malicious | 3/3 | 4 | 3/3 | 10.4 s |
-| Shell credential stealer, no Node code (tarball) | malicious | 3/3 | 6 | 3/3 | 12.6 s |
-| Benign package with a postinstall (tarball) | benign | 3/3 | 0 | – | 11.8 s |
-| `left-pad@1.3.0` from npm | benign | 3/3 | 0 | – | 12.1 s |
-| Demo PR #1: left-pad bump | benign | 3/3 | 0 | – | 15.9 s |
-| Demo PR #3: vendored stealer, tests pass | malicious | 3/3 | 6 | 3/3 | 16.0 s |
+| Target | Ecosystem | Expected | Correct | Containment during install | Exfil proven by payload | Median time |
+| --- | --- | --- | --- | --- | --- | --- |
+| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | 11.2 s |
+| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | 12.6 s |
+| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | 13.1 s |
+| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | 16.0 s |
+| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | 16.6 s |
+| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | 15.4 s |
+| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | 27.3 s |
+| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 17.4 s |
+| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 14.8 s |
 
-**18/18 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
+**27/27 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, one forced verdict (a benign PyPI run that used its full turn budget), and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 
@@ -111,7 +114,7 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 | **Lifecycle discipline** | One fresh VM per run, destroyed in a `finally` whatever the outcome; each run gets its own fake /24 and canary token | `airlock/sandbox.py:124` | `vm_destroyed` closes every timeline |
 | **Egress** | Default-deny. Only the registries and this run's own fake /24 (never shared with a concurrent run) are allowed; the sinkhole answers that /24 itself and never connects upstream | `airlock/sandbox.py:69`, `airlock/sinkhole/addon.py` | **PROVEN** exfil: a request body captured on the host carrying *this run's* canary token. Reports from the in-guest Node tracer are shown as OBSERVED, because the package could forge them |
 
-**Check it yourself:** **Run self-test** on the home page detonates a Node stealer, a shell stealer and a benign package with a postinstall. A probe passes only if the stealers get a malicious verdict *with exfil proven by payload*, and the benign package gets a benign verdict with zero containment events.
+**Check it yourself:** **Run self-test** on the home page detonates a Node stealer, a shell stealer, a benign npm package with a postinstall, a Python `setup.py` credential stealer and a benign Python sdist. A probe passes only if the stealers get a malicious verdict *with exfil proven by payload*, and the benign package gets a benign verdict with zero containment events.
 
 **Credentials Airlock holds**
 - **GitHub App:** contents read, pull requests write, statuses write, on selected repos only. Each post uses a one-hour token minted for that one repo.
@@ -127,11 +130,11 @@ Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 - **Coverage.** The connection poller can miss very short-lived activity, and payload bodies are truncated at 2,000 characters.
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
 - **Abandoned VMs.** If the server process dies mid-run, the VM is left to its 480 s lifetime limit; the run is marked failed when the server restarts.
-- **npm only for now.** The sandbox allows PyPI, but there's no Python install path yet.
+- **npm and PyPI only.** Python packages are installed from source with `pip install` so `setup.py` and build hooks run under the watcher; wheels-only releases have nothing to run at install and are reported as such. **Go isn't supported:** Go modules have no install or build hooks (`go get`/`go build` run no package-defined scripts), so there is no install-time code to detonate — the interesting behaviour would only show at `go test` or runtime, which Airlock doesn't drive for Go.
 
 ## Try it
 
-**Web.** Sign in at https://airlock.darkflib.dev with an allowlisted GitHub account. Paste a PR URL from a repo where the Airlock App is installed, an npm spec such as `left-pad@1.3.0`, or drop a `.tgz`.
+**Web.** Sign in at https://airlock.darkflib.dev with an allowlisted GitHub account. Paste a PR URL from a repo where the Airlock App is installed, an npm spec such as `left-pad@1.3.0`, a PyPI spec such as `pypi:requests==2.32.3`, or drop a package file (npm `.tgz` or a Python sdist `.tar.gz`/`.zip`).
 
 **CLI**, on a KVM host with the environment from `~/.config/airlock/web.env`:
 
@@ -161,7 +164,7 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 | Path | What |
 | --- | --- |
 | `airlock/sandbox.py` | One microVM per run: egress policy, sinkhole subnet, canaries, watcher, unprivileged exec |
-| `airlock/guest/watch.py`, `airlock/guest/trace.js` | In-guest watcher (fanotify, DNS, TCP) and Node tracer |
+| `airlock/guest/watch.py`, `airlock/guest/trace.js`, `airlock/guest/pypi_fetch.py` | In-guest watcher (fanotify, DNS, TCP), Node tracer, and the PyPI sdist fetcher (downloads, never builds) |
 | `airlock/sinkhole/addon.py` | mitmproxy addon that answers and logs sinkholed requests |
 | `airlock/events.py` | Raw observations → typed containment events (PROVEN / inferred) |
 | `airlock/agent.py`, `airlock/guard.py` | Turn-budgeted triage agent; prompt-injection guard |
