@@ -413,3 +413,9 @@ Tags: #metric #win
 **Result:** first try on the host: PR #4 showed 11 new behaviours (5 risky: the exfil, three canary reads, the blocked egress) and 4 unchanged test/install commands; PR #1 showed 0 new. Regression `product-20261104T030613Z`: **30/30**, and the diff check passed on all 9 PR runs (PR #1 0 new, PR #3 13 new / 6 risky, PR #4 10 / 5, identical every run). PR runs are slower (PR #1 median 23.8 s, from 15.7 s) since the base VM shares the 4 vCPUs. Side fix: the Node tracer didn't count `~/.pypirc` as a canary. 103 tests.
 **So:** reviewers and the agent see only what the PR adds; behaviour already in the base is labelled pre-existing, never hidden, and never lowers a verdict. Deploy is waiting on a 1Password approval.
 Tags: #win #demo #metric #decision
+
+### 08:08 — Behaviour diff deployed
+**Tried:** `scripts/deploy.sh` again after two 1Password authorization timeouts (03:03, 03:07).
+**Result:** deployed; `airlock-web` restarted 08:08 UTC, health 200, live `app.js` has the "only what this PR adds" filter.
+**So:** F9 is live. Existing PR runs predate it and have no `behaviour_diff` event; a fresh run of PR #4 is needed to show it on camera.
+Tags: #win
