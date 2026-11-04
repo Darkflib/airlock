@@ -592,3 +592,9 @@ Tags: #demo
 **Result:** the App's delivery log had no event for the comment. The App subscribes to commit comment and PR review events but not `issue_comment`, which GitHub offers only to Apps with the Issues permission. Fix on our side: the command is also accepted in a submitted PR review's body (`pull_request_review`, already subscribed). 138 tests pass.
 **So:** for plain PR comments, give the App Issues: read, tick Issue comment, and accept the new permission on the installation.
 Tags: #bug #demo
+
+### 23:06 — First approval from a GitHub comment
+**Tried:** with Issues: read and the Issue comment event on the App, commented `/airlock approve` on PR #6.
+**Result:** delivered at 23:05:38; the run was approved by @Darkflib, the `airlock` status went `success` ("approved by @Darkflib (verdict: benign)") and the run's existing comment was rewritten in place to "BENIGN, approved by @Darkflib", six seconds after the comment.
+**So:** the whole loop now happens inside GitHub: push → placeholder comment → evidence comment with how to decide → `/airlock approve` → green check.
+Tags: #win #demo
