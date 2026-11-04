@@ -30,7 +30,7 @@ Every number below comes from the live VX1 host and Vultr Serverless Inference. 
 - **4 Nov, 00:29. DNS-label exfil path found and closed.** Before the fix, raw DNS to the gateway resolver went out unrecorded. After it, only registry names resolve and everything else is NXDOMAIN plus a `dns_blocked` event. DNS over TCP is refused but not recorded.
 - **3 Nov, 23:47. Live self-test 3/3** (Node stealer 5 events, shell stealer 6, benign 0).
 - **3 Nov. Model choice benchmarked**, not assumed: all 13 catalogue models, about 700 agent calls.
-- **Cost: $1.15** of Serverless Inference for the whole build up to 3 Nov 23:00, including that benchmark. One review costs a fraction of a cent.
+- **Cost: $1.45** of Serverless Inference for the whole build up to 4 Nov 08:25, including that benchmark and every regression (inference only; the VM is billed separately). One review costs a fraction of a cent.
 
 What we haven't measured: detection of unseen, real-world malware, or of malware that detects the sandbox and stays quiet.
 

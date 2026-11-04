@@ -212,7 +212,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 **Open questions**
 
-- [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.15.
+- [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.45 (4 Nov 08:25).
 - [x] Read-only public view for judges, or allowlist only? Both: signed read-only share links to recorded runs, plus an invite link with run caps for judges who want to submit their own (decided Tue 3 Nov). The lablab page is public, so the invite link should be treated as public.
 - [ ] Build the obfuscated PR before the video, or after submission?
 

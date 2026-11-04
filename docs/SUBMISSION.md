@@ -20,6 +20,6 @@ Every other destination, DNS included, is answered by Airlock on the host and ne
 
 A tool-calling agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by benchmarking all 13 catalogue models) investigates inside the same VM, as the same unprivileged user, and gives a verdict that cites the events behind it. While it runs, the Airlock GitHub App holds the PR at a pending status that branch protection requires, so it cannot merge. Only a human click on Approve or Reject sets the final status and posts the evidence on the PR.
 
-On a small fixture regression through the real pipeline: 18 of 18 correct, with exfiltration proven by payload on every malicious run and zero containment events on benign ones. The median run takes 10 to 17 seconds end to end. Inference for the whole build cost about $1.15 as of 3 November.
+On a small fixture regression through the real pipeline: 18 of 18 correct, with exfiltration proven by payload on every malicious run and zero containment events on benign ones. The median run takes 10 to 17 seconds end to end. Inference for the whole build cost about $1.45 as of 4 November.
 
 Judges can click Run self-test to detonate three known packages and watch them scored live.
