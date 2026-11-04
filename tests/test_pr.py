@@ -16,7 +16,9 @@ META = {"kind": "pr", "owner": "Darkflib", "repo": "airlock-demo", "number": 3, 
         "files": [{"filename": "vendor/x.tgz", "status": "added", "additions": 0, "deletions": 0}]}
 
 
-async def fake_pr_analyse(target, *, events, **_):
+async def fake_pr_analyse(target, *, events, on_pr=None, **_):
+    if on_pr:
+        await on_pr(META)
     events.emit("canary_exfil", "POST https://t.evil.invalid/v1 carried the canary credentials", stage="detonate",
                 proven=True, payload="token=npm_AIRLOCKCANARYABC", method="POST", url="https://t.evil.invalid/v1")
     await asyncio.sleep(0.01)
@@ -53,20 +55,36 @@ def test_parse_pr_url():
     assert parse_pr_url("https://evil.com/Darkflib/airlock-demo/pull/3") is None
 
 
-def test_pr_run_posts_status_and_comment_only_after_decision(make):
+def test_pr_run_holds_merge_and_posts_decision_only_after_human(make):
     gh = FakeGitHub()
     with make(gh) as c:
         run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
         run = wait_done(c, run_id)
         assert run["target"] == "Darkflib/airlock-demo#3" and run["meta"]["kind"] == "pr"
-        assert gh.calls == []  # nothing leaves before a human decides
+        # before a human decides, only `pending` statuses leave: no verdict state, no comment
+        assert [(x[0], x[2]) for x in gh.calls] == [("status", "pending"), ("status", "pending")]
+        assert "malicious" in gh.calls[1][3]
         out = c.post(f"/api/runs/{run_id}/decision", json={"decision": "rejected", "note": "steals creds"}).json()
-    kinds = [x[0] for x in gh.calls]
-    assert kinds == ["status", "comment"]
-    assert gh.calls[0][1:3] == ("abc1234def", "failure") and gh.calls[0][4] == f"https://airlock.test/runs/{run_id}"
-    body = gh.calls[1][2]
+    decided = gh.calls[2:]
+    assert [x[0] for x in decided] == ["status", "comment"]
+    assert decided[0][1:3] == ("abc1234def", "failure") and decided[0][4] == f"https://airlock.test/runs/{run_id}"
+    body = decided[1][2]
     assert "**MALICIOUS**, rejected" in body and "**PROVEN**" in body and "AIRLOCKCANARYABC" in body
     assert out["meta"]["posted"]["comment_url"].endswith("#issuecomment-1")
+
+
+def test_failed_pr_run_sets_error_status(tmp_path, monkeypatch):
+    monkeypatch.setenv("AIRLOCK_DATA", str(tmp_path))
+
+    async def broken(target, *, events, on_pr=None, **_):
+        await on_pr(META)
+        raise RuntimeError("VM failed")
+    gh = FakeGitHub()
+    with TestClient(create_app(store=Store(tmp_path / "e.db"), analyse=broken, github=gh)) as c:
+        run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
+        run = wait_done(c, run_id)
+    assert run["status"] == "error"
+    assert [x[2] for x in gh.calls] == ["pending", "error"]
 
 
 def test_failed_post_keeps_decision_and_records_error(make):

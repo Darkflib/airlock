@@ -4,7 +4,7 @@ Nov 3, 2026 · @Mike Preston, which is the source of truth
 
 ## Summary
 
-Airlock runs an untrusted dependency change (a GitHub pull request, a new npm package, or an uploaded tarball) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and nothing reaches GitHub until a human approves or rejects.
+Airlock runs an untrusted dependency change (a GitHub pull request, a new npm package, or an uploaded tarball) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and the PR cannot merge until a human approves or rejects: it is held at a pending status that branch protection requires.
 
 **Status (end of Tue 3 Nov):** every P0 requirement works end to end on the live site, two days ahead of the Thursday cut line.
 
@@ -60,7 +60,7 @@ One run per submitted change. The PR flow is the headline:
 3. **Acquire.** The control plane fetches the PR head and diff through the GitHub App (the VM has no GitHub access), or the npm package or tarball.
 4. **Detonate.** `npm ci` and `npm test` run as the unprivileged `node` user, with all observation layers on and all traffic routed through the sinkhole.
 5. **Investigate.** The triage agent (`mimo-v2.6-flash`) reads the code and re-runs what it needs within a 12-turn budget; the last turn forces `finish`. Every tool result passes the injection guard and ends with the Airlock events it produced, so citations are real.
-6. **Decide.** A human approves or rejects. Only then does `airlocksandbox[bot]` set an `airlock` commit status and post the evidence as a PR comment. The VM is destroyed when the run ends.
+6. **Decide.** While the run is in progress and until the decision, `airlocksandbox[bot]` holds the `airlock` status at `pending`, and branch protection blocks the merge button. A human approves or rejects; only then does the status go to success or failure, with the evidence posted as a PR comment. The VM is destroyed when the run ends.
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
@@ -234,4 +234,4 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 The independent [working-tree review](docs/REVIEW-2026-11-03.md) found unresolved issues behind the earlier P0-complete claim. Before publishing judge invites: separate guest access from maintainer/GitHub authority, run model-selected commands unprivileged, fail closed on incomplete observation, preserve unique VM names, and require current-run host-captured canaries for PROVEN evidence. Cleanup guarantees, merge-gate setup, and submission copy also need correction. These findings are not fixed by the review; 54 local unit tests passing and the recorded 18/18 fixture regression do not establish those security properties. Follow-up on 4 Nov at 00:00 UTC verified the live homepage and existing self-test result (3/3) through the browser; invite, quota and signed-out share enforcement were not independently verified by the reviewer.
 
-**Status, 4 Nov:** fixed and tested (59 unit tests): guest privileges separated from owners (guests decide and share only their own runs; PRs only from `AIRLOCK_GUEST_REPOS`), agent commands always run as `node`, PROVEN requires this run's token in a host-captured payload with sinkhole /24s reserved per live run, unique VM names, and a shell-quoted, tightened npm spec. Still open: watcher fail-closed, cleanup after failed setup, a pending status and branch protection for the merge gate, the DNS-to-gateway check, and claim wording.
+**Status, 4 Nov:** fixed and tested (59 unit tests): guest privileges separated from owners (guests decide and share only their own runs; PRs only from `AIRLOCK_GUEST_REPOS`), agent commands always run as `node`, PROVEN requires this run's token in a host-captured payload with sinkhole /24s reserved per live run, unique VM names, and a shell-quoted, tightened npm spec. The rest (watcher fail-closed, cleanup after failed setup, the DNS-to-gateway check, claim wording, and the merge gate as a pending status plus branch protection) was fixed on 4 Nov.

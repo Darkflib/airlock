@@ -18,7 +18,7 @@ Airlock gives every untrusted dependency change its own disposable computer. Pas
 
 Every other destination, DNS included, is answered by Airlock on the host and never forwarded. When a stealer posts the canary credentials, Airlock captures the exact payload, so exfiltration is proven rather than guessed.
 
-A tool-calling agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by benchmarking all 13 catalogue models) investigates inside the same VM, as the same unprivileged user, and gives a verdict that cites the events behind it. Nothing is posted until a human clicks Approve or Reject. Then the Airlock GitHub App sets a commit status and posts the evidence on the PR.
+A tool-calling agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by benchmarking all 13 catalogue models) investigates inside the same VM, as the same unprivileged user, and gives a verdict that cites the events behind it. While it runs, the Airlock GitHub App holds the PR at a pending status that branch protection requires, so it cannot merge. Only a human click on Approve or Reject sets the final status and posts the evidence on the PR.
 
 On a small fixture regression through the real pipeline: 18 of 18 correct, with exfiltration proven by payload on every malicious run and zero containment events on benign ones. The median run takes 10 to 17 seconds end to end. Inference for the whole build cost about $1.15 as of 3 November.
 

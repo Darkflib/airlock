@@ -10,6 +10,7 @@ import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Awaitable, Callable
 
 from openai import AsyncOpenAI
 
@@ -113,7 +114,8 @@ def apply_gaps(verdict: str, evidence: list[str], gaps: list[str], events: Event
     return verdict, evidence
 
 
-async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int) -> Report:
+async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
+                     on_pr: Callable[[dict], Awaitable[None]] | None = None) -> Report:
     """Detonate a GitHub pull request's head: fetched by the control plane (the VM has no
     GitHub access), installed and tested as the unprivileged user, then triaged."""
     owner, repo, number = parse_pr_url(url)
@@ -128,6 +130,8 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int) 
     meta = {"kind": "pr", "owner": owner, "repo": repo, "number": number, "title": pr.title,
             "author": pr.author, "html_url": pr.html_url, "head_sha": pr.head_sha, "head_ref": pr.head_ref,
             "base_ref": pr.base_ref, "files": pr.files}
+    if on_pr:
+        await on_pr(meta)
     async with Workspace(events, image="node", label=f"{repo}-pr{number}") as ws:
         events.emit("acquired", f"fetched {pr.slug} @ {pr.head_sha[:7]} ({len(pr.files)} files changed) via the "
                     "GitHub App; copied into the VM", source="github", **{k: meta[k] for k in ("html_url", "head_sha")})
@@ -152,12 +156,12 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int) 
 
 
 async def analyse(target: str, *, events: EventLog | None = None, model: str | None = None,
-                  max_turns: int = 12) -> Report:
+                  max_turns: int = 12, on_pr: Callable[[dict], Awaitable[None]] | None = None) -> Report:
     """target: a GitHub PR URL, a local .tgz path, or an npm spec such as left-pad@1.3.0."""
     events = events or EventLog()
     if parse_pr_url(target):
         return await analyse_pr(target, events=events, model=model or load_roles()["roles"]["agent"],
-                                max_turns=max_turns)
+                                max_turns=max_turns, on_pr=on_pr)
     model = model or load_roles()["roles"]["agent"]
     t0 = time.monotonic()
     async with Workspace(events, image="node", label=Path(target).stem if target.endswith(".tgz") else target) as ws:

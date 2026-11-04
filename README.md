@@ -4,7 +4,7 @@
 
 **Every untrusted dependency change gets its own disposable computer.**
 
-Airlock runs a pull request, a new npm package or a version bump inside a throwaway microVM. The VM holds fake credentials and can reach nothing on the internet except the npm and PyPI registries. Airlock records what the change does (programs run, files opened, DNS lookups, connection attempts) and an AI reviewer investigates. Nothing reaches GitHub until a human clicks **Approve** or **Reject**.
+Airlock runs a pull request, a new npm package or a version bump inside a throwaway microVM. The VM holds fake credentials and can reach nothing on the internet except the npm and PyPI registries. Airlock records what the change does (programs run, files opened, DNS lookups, connection attempts) and an AI reviewer investigates. The PR is held at a pending `airlock` status, which branch protection requires, so it cannot merge until a human clicks **Approve** or **Reject**.
 
 Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
@@ -31,7 +31,7 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 - **PROVEN credential exfiltration.** The postinstall POSTed the contents of `~/.npmrc` and `~/.aws/credentials` to `telemetry.colorful-logs.invalid`. Airlock's sinkhole answered the request, captured the body containing this run's canary tokens, and nothing reached the internet.
 - **Who did it.** `cat` read both credential files, `curl` looked up the exfil host, `python3` read the AWS file again, and a raw-IP connection was refused.
 - **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. The model is told to cite only events that support a point; that's prompted, not enforced.
-- **A human gate.** On Reject, `airlocksandbox[bot]` sets a failing `airlock` commit status and posts the evidence as a PR comment.
+- **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. Only Approve (success) or Reject (failure) sets the final status, along with a PR comment carrying the evidence. A failed run sets `error`.
 
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and a BENIGN verdict.
 

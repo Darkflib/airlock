@@ -38,13 +38,14 @@ SELFTEST = [
 ]
 
 Analyse = Callable[..., Awaitable[object]]
+Gate = Callable[[str, str, EventLog], Awaitable[None]]
 
 
 class Runner:
     """Owns live runs: one EventLog per active run, at most `slots` at once."""
 
-    def __init__(self, store: Store, analyse: Analyse, slots: int = 2):
-        self.store, self.analyse = store, analyse
+    def __init__(self, store: Store, analyse: Analyse, slots: int = 2, gate: Gate | None = None):
+        self.store, self.analyse, self.gate = store, analyse, gate
         self.live: dict[str, EventLog] = {}
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
@@ -62,15 +63,25 @@ class Runner:
     async def _run(self, run_id: str, target: str, log: EventLog) -> None:
         async with self.slots:
             self.store.update_run(run_id, status="running")
+
+            async def on_pr(meta: dict) -> None:  # the PR is fetched: record it, then block its merge
+                self.store.update_run(run_id, meta=meta)
+                if self.gate:
+                    await self.gate(run_id, "started", log)
             try:
-                report = await self.analyse(target, events=log)
-                self.store.update_run(run_id, status="done", verdict=report.verdict, evidence=report.evidence,
-                                      model=report.model, finished=time.time(), meta=getattr(report, "meta", {}) or {})
+                report = await self.analyse(target, events=log, on_pr=on_pr)
+                end = dict(status="done", verdict=report.verdict, evidence=report.evidence, model=report.model,
+                           meta=getattr(report, "meta", {}) or {})
             except Exception as e:  # noqa: BLE001 - recorded on the run
                 log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
-                self.store.update_run(run_id, status="error", error=f"{type(e).__name__}: {e}"[:500],
-                                      finished=time.time())
+                end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
+            try:
+                # the status reflects the outcome before the run reads as finished
+                self.store.update_run(run_id, **{k: v for k, v in end.items() if k != "status"})
+                if self.gate:
+                    await self.gate(run_id, "verdict" if end["status"] == "done" else "error", log)
             finally:
+                self.store.update_run(run_id, status=end["status"], finished=time.time())
                 log.close()
                 self.live.pop(run_id, None)
 
@@ -125,7 +136,27 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     store.fail_stale_runs()  # nothing survives a restart: those runs' VMs and tasks are gone
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
-    runner = Runner(store, analyse)
+
+    async def gate_pr(run_id: str, phase: str, log: EventLog) -> None:
+        """Hold a PR's merge while it runs: a `pending` airlock status (which branch protection can
+        require to be success) from the moment the head is fetched until a human decides. Only the
+        decision posts success/failure and a comment; a failed run posts `error`."""
+        run = store.get_run(run_id)
+        m = run["meta"]
+        if m.get("kind") != "pr" or not github:
+            return
+        state, desc = {
+            "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
+            "verdict": ("pending", f"Verdict: {run['verdict']}; waiting for a human decision"),
+            "error": ("error", "Airlock run failed; rerun it before merging"),
+        }[phase]
+        try:
+            await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, f"{public_url}/runs/{run_id}")
+            log.emit("github_status", f"commit status on {m['owner']}/{m['repo']}#{m['number']}: {state} ({desc})",
+                     state=state, source="github")
+        except Exception as e:  # noqa: BLE001 - never fails the run; branch protection still blocks without success
+            log.emit("error", f"setting the GitHub status failed: {type(e).__name__}: {str(e)[:200]}")
+    runner = Runner(store, analyse, gate=gate_pr)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
     owners = auth.allowed if auth else frozenset()

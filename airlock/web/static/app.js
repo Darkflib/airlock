@@ -347,10 +347,13 @@ const Airlock = (() => {
     function renderGate(r) {
       const g = $('gate');
       g.replaceChildren();
+      const waiting = ((r.meta || {}).kind === 'pr'
+        ? `${r.meta.owner}/${r.meta.repo}#${r.meta.number} is held at a pending airlock status, so it can't merge until a human decides.`
+        : 'Nothing is let through until a human decides.') + ' Waiting for the verdict…';
       const viewOnly = readOnly || (me.login && !me.owner && (r.submitted_by || '').toLowerCase() !== me.login.toLowerCase());
       if (viewOnly && !r.decision) {
         g.append(el('p', '', r.status !== 'done'
-          ? 'Nothing leaves Airlock until a human decides. Waiting for the verdict…'
+          ? waiting
           : readOnly ? 'Read-only shared view. A signed-in reviewer approves or rejects this run.'
             : 'This run belongs to the Airlock team, so only they can approve or reject it. Submit your own run to try the gate.'));
         return;
@@ -364,14 +367,14 @@ const Airlock = (() => {
         return;
       }
       if (r.status === 'error') { g.append(el('p', '', `Run failed: ${r.error || 'unknown error'}`)); return; }
-      if (r.status !== 'done') { g.append(el('p', '', 'Nothing leaves Airlock until a human decides. Waiting for the verdict…')); return; }
+      if (r.status !== 'done') { g.append(el('p', '', waiting)); return; }
       g.append(el('p', '', r.verdict === 'benign'
         ? 'The agent found nothing harmful. Approve to let this change through.'
         : r.verdict === 'inconclusive'
           ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
-        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as a commit status and a comment from the Airlock GitHub App.`));
+        `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
       const mk = (label, cls, decision) => {
