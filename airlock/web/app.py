@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from ..events import EventLog
 from ..github import GitHubApp, parse_pr_url
+from ..pipeline import parse_pypi_spec
 from ..prcomment import build_comment
 from ..store import Store, data_dir
 from . import auth as authmod
@@ -35,6 +36,8 @@ SELFTEST = [
     ("left-padder-hostile.tgz", "Node credential stealer", "malicious"),
     ("colorful-logs-shell-stealer.tgz", "Shell credential stealer, no Node code", "malicious"),
     ("left-padder-benign.tgz", "Benign package with a postinstall", "benign"),
+    ("termcolour-utils-stealer.tar.gz", "Python credential stealer in setup.py", "malicious"),
+    ("tinyslug-benign.tar.gz", "Benign Python sdist with setup.py work", "benign"),
 ]
 
 Analyse = Callable[..., Awaitable[object]]
@@ -246,13 +249,19 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if file and file.filename:
             data = await file.read(MAX_UPLOAD + 1)
             if len(data) > MAX_UPLOAD:
-                raise HTTPException(413, "tarball larger than 20 MB")
-            if not data.startswith(b"\x1f\x8b"):
-                raise HTTPException(400, "upload must be a gzipped tarball (.tgz)")
+                raise HTTPException(413, "package larger than 20 MB")
             name = re.sub(r"[^\w.-]", "_", Path(file.filename).name)
+            # npm tarball (.tgz) or Python sdist (.tar.gz gzip, or .zip). The suffix is how the
+            # pipeline tells npm from Python, so keep it; default a gzip upload to .tgz.
+            if data.startswith(b"\x1f\x8b"):
+                ext = ".tar.gz" if name.endswith(".tar.gz") else ".tgz"
+            elif data.startswith(b"PK\x03\x04") and name.endswith(".zip"):
+                ext = ".zip"
+            else:
+                raise HTTPException(400, "upload a gzipped tarball (.tgz / .tar.gz) or a Python sdist .zip")
             path = uploads / f"{secrets.token_hex(4)}-{name}"
-            if not path.name.endswith(".tgz"):
-                path = path.with_name(path.name + ".tgz")
+            if not path.name.endswith(ext):
+                path = path.with_name(path.name + ext)
             path.write_bytes(data)
             run_id = runner.start(str(path), name, user)
         elif parse_pr_url(spec):
@@ -265,8 +274,9 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                                   demo=f"{owner}/{repo}".lower() in GUEST_REPOS)
         else:
             spec = spec.strip()
-            if len(spec) > MAX_SPEC or not SPEC.match(spec):
-                raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, or upload a .tgz")
+            if len(spec) > MAX_SPEC or not (SPEC.match(spec) or parse_pypi_spec(spec)):
+                raise HTTPException(400, "give a GitHub PR URL, an npm spec like left-pad@1.3.0, "
+                                    "a PyPI spec like pypi:requests==2.32.3, or upload a package")
             run_id = runner.start(spec, spec, user, demo=True)  # public registry packages only
         return {"id": run_id, "url": f"/runs/{run_id}"}
 

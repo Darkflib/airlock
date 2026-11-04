@@ -57,7 +57,7 @@ const Airlock = (() => {
     const pick = (f) => {
       picked = f;
       drop.classList.toggle('has-file', !!f);
-      $('drop-label').textContent = f ? `${f.name} (${Math.round(f.size / 1024)} KB) — ready` : '…or drop a package tarball (.tgz) here';
+      $('drop-label').textContent = f ? `${f.name} (${Math.round(f.size / 1024)} KB) — ready` : '…or drop a package: npm .tgz or Python sdist (.tar.gz / .zip)';
       if (f) spec.value = '';
     };
     file.addEventListener('change', () => pick(file.files[0] || null));
@@ -73,7 +73,7 @@ const Airlock = (() => {
       const body = new FormData();
       if (picked) body.append('file', picked);
       else if (spec.value.trim()) body.append('spec', spec.value.trim());
-      else { err.textContent = 'Enter an npm package or drop a .tgz.'; return; }
+      else { err.textContent = 'Enter an npm or PyPI package, a PR URL, or drop a package file.'; return; }
       go.disabled = true; go.textContent = 'Starting…';
       try {
         const r = await fetch('/api/runs', { method: 'POST', body });
