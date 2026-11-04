@@ -419,3 +419,9 @@ Tags: #win #demo #metric #decision
 **Result:** deployed; `airlock-web` restarted 08:08 UTC, health 200, live `app.js` has the "only what this PR adds" filter.
 **So:** F9 is live. Existing PR runs predate it and have no `behaviour_diff` event; a fresh run of PR #4 is needed to show it on camera.
 Tags: #win
+
+### 08:24 — README: dated "what we measured" list
+**Tried:** borrowed the idea from the recon: a short list of measured results with dates and run ids near the top of the README.
+**Result:** new section after "30 seconds for judges": regression 30/30 (exfil proven 15/15), PR #4 in 13.4 s, the two DNS probes, live self-test 3/3, the 13-model benchmark and the $1.15 spend, plus one line on what we haven't measured. Also fixed a stale "27/27" in the judges' summary.
+**So:** every headline claim now points at a dated run on Vultr.
+Tags: #demo

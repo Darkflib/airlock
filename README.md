@@ -17,8 +17,22 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. A human approves or rejects before anything is posted to GitHub.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
-- **Proof.** 27/27 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
+- **Proof.** 30/30 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
 - **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser) isn't built; npm and PyPI only. See [the security model](#security-model-and-limits).
+
+## What we measured, all on Vultr
+
+Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
+
+- **4 Nov, 03:06. Full regression 30/30** ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR.
+- **4 Nov, 02:35. Hidden stealer (PR #4) caught in 13.4 s.** The sinkhole captured the POST carrying this run's canary token, though the diff reads like a routine bump.
+- **4 Nov, 02:12. Malformed DNS can't blind the watcher.** A real VM sent truncated queries as `node`; both were logged as `dns_malformed` and the next lookup was still recorded.
+- **4 Nov, 00:29. DNS-label exfil path found and closed.** Before the fix, raw DNS to the gateway resolver went out unrecorded. After it, only registry names resolve and everything else is NXDOMAIN plus a `dns_blocked` event. DNS over TCP is refused but not recorded.
+- **3 Nov, 23:47. Live self-test 3/3** (Node stealer 5 events, shell stealer 6, benign 0).
+- **3 Nov. Model choice benchmarked**, not assumed: all 13 catalogue models, about 700 agent calls.
+- **Cost: $1.15** of Serverless Inference for the whole build up to 3 Nov 23:00, including that benchmark. One review costs a fraction of a cent.
+
+What we haven't measured: detection of unseen, real-world malware, or of malware that detects the sandbox and stays quiet.
 
 ## Why
 
