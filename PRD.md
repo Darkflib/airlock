@@ -149,8 +149,8 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Harder demo PR: payload hidden in plain sight (PR #4, `tinystamp`) — install-time credential theft smuggled through innocuous "install analytics" + a home-dir "config discovery" helper, with the collector host assembled from fragments, so the diff reads like an ordinary dependency bump. No encoding or obfuscation tooling; detonation still catches it. (Codex caught the readable PR #3.)
 - [x] PyPI support (F12): sdist upload and `pypi:name==version`, installed from source in `python:3.12-slim` so `setup.py` runs under the watcher; two Python fixtures (stealer + benign) added to the regression and self-test
 - [x] Behaviour diff, base vs head (F9): the merge base is detonated in a second VM in parallel; fingerprints drop run noise (pids, tokens, sinkhole IPs, checkout paths); the agent, the PR comment and the run page see what the PR adds; pre-existing risky behaviour is flagged, never hidden; the diff never lowers a verdict
-- [x] Live five-fixture self-test on the host: 5/5 (`20261104-084347-33a1a2`); README "what we measured" updated. Share link still to mint
-- [x] Fresh run of PR #4 with the behaviour diff: malicious, proven, 10 new behaviours (5 containment) vs the base, 4 unchanged, 20.2 s (`20261104-084529-f40401`); left pending. Share link still to mint
+- [x] Live five-fixture self-test on the host: 5/5 (`20261104-084347-33a1a2`); README "what we measured" updated; share link minted (60 days, stored outside the repo)
+- [x] Fresh run of PR #4 with the behaviour diff: malicious, proven, 10 new behaviours (5 containment) vs the base, 4 unchanged, 20.2 s (`20261104-084529-f40401`); left pending; share link minted
 - [ ] Decide Pattern B (F10): at most half a day on Thursday, and only if an on-screen check fits the demo repo (`status-api` has no UI). Otherwise descope it here, with that reason
 
 **Thu 5 Nov: hardening and judge access**

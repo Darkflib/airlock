@@ -448,3 +448,9 @@ Tags: #decision
 **Result:** self-test `20261104-084347-33a1a2` **5/5**: Node, shell and Python stealers malicious, each with exfil proven by payload during install (4, 6 and 13 containment events; the Python stealer reads all three canaries from several processes); benign npm and benign Python sdist 0. PR #4 `20261104-084529-f40401`: malicious in 20.2 s, POST to `telemetry.tinystamp.invalid` PROVEN, behaviour diff "10 new (5 containment), 4 unchanged", the same as an 08:08 run and the regression. The homepage still described a three-package self-test; copy fixed and a PR #4 example chip added (not deployed yet).
 **So:** the five-package claim in the README and submission copy is now measured live. PR #4 is left pending for the camera.
 Tags: #metric #win #demo
+
+### 09:05 — Homepage copy deployed; share links for the new runs
+**Tried:** deployed `600d832`, then minted read-only share links for self-test `20261104-084347-33a1a2` and PR #4 run `20261104-084529-f40401`.
+**Result:** health 200; the served homepage describes the five-package self-test and has a PR #4 example (the browser had cached the old page until a reload). Signed out, both links redirect into their shared page, while `/api/runs` still returns 401. Links expire in 60 days (3 Jan 2027).
+**So:** the submission can link the 5/5 self-test and the PR #4 behaviour diff without sign-in. Links live in 1Password, not this repo.
+Tags: #demo
