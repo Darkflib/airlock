@@ -377,3 +377,9 @@ Tags: #win #decision #demo
 **Result:** 68 tests passed; owner approval/sharing and wrong-token proof are fixed. Guests still read all owner runs; timed-out tests and observer loss during agent investigation can still end BENIGN; malformed guest DNS can crash its worker; rejected pending updates can preserve an earlier success.
 **So:** [current recheck](RECHECK-2026-11-04.md) supersedes the original open-issue list. Finish visibility, end-of-run observer health, status-failure handling and remaining claims; no application code or production state changed by this review.
 Tags: #decision #metric
+
+### 02:12 — Recheck findings fixed; malformed DNS no longer blinds the watcher
+**Tried:** fixed Codex's six recheck findings (`docs/RECHECK-2026-11-04.md`), deployed, and wrote `spikes/dns_malformed_probe.py`: as `node` in a real VM, send two malformed queries (truncated question, label running off the end) to the watcher's resolver, then a normal lookup.
+**Result:** before, a truncated question raised `IndexError` and killed the guest DNS thread with no `watch_error`. Now both get no answer and are logged as `dns_malformed`, the next lookup is still answered and logged, and `observation_ok` is true. A dead observer thread now logs `watch_error`, so the run turns inconclusive. Also: guests see only owners' demo runs (`demo` flag); test timeouts/kills are coverage gaps and observation is rechecked after the agent; a failed `pending` write is flagged on the run, and an older run of the same commit can't decide or post; the task prompt is screened and nonexistent citations are sent back once, then flagged. 78 tests pass. Regression `product-20261104T020544Z`: **18/18**, proven 9/9, median 10.4–16.0 s.
+**So:** a package can't switch off DNS observation, and none of this cost accuracy.
+Tags: #fail #win #metric
