@@ -605,7 +605,7 @@ Tags: #win #demo
 **So:** the main earlier fixes are present, but serialize gate transitions, bind commands to the intended PR/commit, and make legacy visibility default private before relying on private analysis and merge approval. Review artifacts only; no application fix or deployment performed.
 Tags: #security #decision
 
-### 23:45 — Authority review fixed: atomic decisions, commands bound to PR, commit and time
+### 23:27 — Authority review fixed: atomic decisions, commands bound to PR, commit and time
 **Tried:** fixed all of AUTH_REVIEW-2026-11-04: atomic decision claim plus per-commit serialized GitHub writes (A1); review commit and comment time must match the result decided (A2); legacy runs private unless self-test or guest-repo PR (A3); runs selected by PR number, self-approval against the PR's current author (A4); shares readable by signed-in guests (read only), streams recheck credentials every 15 s, PR comments admit when the pending status couldn't be set.
 **Result:** 148 tests pass (10 new in `tests/test_auth_review.py`, one per reproduction plus the gaps). Production checked for A3: the only guest-visible non-PR, non-self-test runs are `left-pad@1.3.0`; nothing to repair. Fix table appended to the review.
 **So:** a decision now applies only to the run, PR, commit and result its author acted on, and an older write can't overwrite a newer one. Constraint: one uvicorn worker.
