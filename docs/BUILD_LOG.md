@@ -401,3 +401,9 @@ Tags: #win #demo #metric
 **Result:** full host regression **27/27** ([`evals/results/product-20261104T023628Z`](../evals/results/product-20261104T023628Z/summary.md)): the Python stealer malicious with exfil **PROVEN** by payload 3/3 (the sinkhole captured the POST carrying this run's `pypi-…` canary); both benign Python targets (the sdist and real `six==1.17.0`) benign with 0 containment. A cold first run missed the sinkhole capture (TLS handshake vs the stealer's 5 s timeout); bumping it to 8 s made 5/5 later runs PROVEN. 96 unit tests pass.
 **So:** Airlock now covers npm and PyPI. Go stays out — Go modules have no install/build hooks, so there's no install-time code to detonate (noted in the README).
 Tags: #win #demo #metric #decision
+
+### 02:56 — Deployed PyPI and PR #4; full regression 30/30
+**Tried:** the live service was still on code from before PyPI support (started 02:03, PyPI landed 02:32), so ran `scripts/deploy.sh` and then one regression across all ten targets, including Python and the hidden-stealer PR #4.
+**Result:** `evals/results/product-20261104T025132Z`: **30/30** correct, exfil proven 12/12 on malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment on benign targets, 0 forced, 0 invalid tool calls; median 11.4–33.3 s (real PyPI `six` is the slowest).
+**So:** README results now cover both ecosystems and all three demo PRs in one run.
+Tags: #metric #win

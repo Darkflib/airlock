@@ -84,21 +84,22 @@ flowchart LR
 
 ## Results
 
-The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T023628Z`](evals/results/product-20261104T023628Z/summary.md)):
+The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T025132Z`](evals/results/product-20261104T025132Z/summary.md)):
 
 | Target | Ecosystem | Expected | Correct | Containment during install | Exfil proven by payload | Median time |
 | --- | --- | --- | --- | --- | --- | --- |
-| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | 11.2 s |
-| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | 12.6 s |
-| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | 13.1 s |
-| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | 16.0 s |
-| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | 16.6 s |
-| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | 15.4 s |
-| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | 27.3 s |
-| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 17.4 s |
-| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 14.8 s |
+| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | 11.4 s |
+| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | 12.9 s |
+| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | 16.9 s |
+| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | 12.1 s |
+| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | 16.4 s |
+| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | 16.7 s |
+| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | 33.3 s |
+| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 15.7 s |
+| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 16.0 s |
+| Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 16.6 s |
 
-**27/27 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, one forced verdict (a benign PyPI run that used its full turn budget), and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
+**30/30 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 
