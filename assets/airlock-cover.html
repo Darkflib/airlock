@@ -1,0 +1,67 @@
+<!doctype html>
+<!-- Source for airlock-cover.png (lablab cover, 1920x1080). Render: see docs/BUILD_LOG.md 4 Nov "Cover image". -->
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root { --bg:#07111f; --panel:#0d1b2e; --line:#1d3352; --text:#e3ecf7; --muted:#8ba0bb; --cyan:#2fd9f0; --hazard:#ff7a1a; --good:#33d17a; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { width:1920px; height:1080px; overflow:hidden; }
+  body { background:var(--bg); color:var(--text); font-family:'IBM Plex Sans', Arial, sans-serif; position:relative; }
+  .grid { position:absolute; inset:0;
+    background-image:linear-gradient(rgba(47,217,240,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(47,217,240,.06) 1px, transparent 1px);
+    background-size:96px 96px; }
+  .rings { position:absolute; left:1340px; top:540px; }
+  .rings div { position:absolute; border:1.5px solid rgba(47,217,240,.18); border-radius:50%; transform:translate(-50%,-50%); }
+  .glow { position:absolute; left:1340px; top:540px; width:1100px; height:1100px; transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(47,217,240,.10), transparent 60%); }
+  .left { position:absolute; left:150px; top:0; bottom:0; width:800px; display:flex; flex-direction:column; justify-content:center; gap:28px; }
+  .brand { display:flex; align-items:center; gap:28px; }
+  .brand img { width:150px; height:150px; }
+  .brand h1 { font-size:132px; font-weight:700; letter-spacing:2px; line-height:1; }
+  .kicker { font-family:'JetBrains Mono', monospace; font-size:26px; color:var(--cyan); letter-spacing:5px; text-transform:uppercase; }
+  .tag { font-size:52px; font-weight:600; line-height:1.18; }
+  .tag em { font-style:normal; color:var(--hazard); }
+  .sub { font-size:30px; color:var(--muted); line-height:1.4; }
+  .card { position:absolute; left:1010px; top:250px; width:760px; background:rgba(13,27,46,.92); border:1.5px solid var(--line);
+    border-radius:22px; padding:30px 34px; box-shadow:0 30px 80px rgba(0,0,0,.45); font-family:'JetBrains Mono', monospace; }
+  .card .hd { display:flex; justify-content:space-between; font-size:22px; color:var(--muted); padding-bottom:18px; border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .row { display:flex; gap:18px; align-items:baseline; font-size:24px; padding:13px 0; color:var(--text); }
+  .row .t { color:var(--muted); width:56px; flex:none; }
+  .pill { font-size:18px; font-weight:700; padding:4px 10px; border-radius:6px; flex:none; }
+  .ok { background:rgba(51,209,122,.15); color:var(--good); }
+  .warn { background:rgba(255,122,26,.15); color:var(--hazard); }
+  .proven { margin-top:12px; border:2px solid var(--hazard); background:rgba(255,122,26,.10); border-radius:14px; padding:18px 20px; }
+  .proven .row { padding:4px 0; }
+  .proven .tok { color:var(--bg); background:var(--hazard); padding:0 6px; border-radius:4px; font-weight:700; }
+  .verdict { margin-top:18px; display:flex; justify-content:space-between; align-items:center; font-size:22px; color:var(--muted); }
+  .verdict b { font-size:28px; color:#ff4d5e; letter-spacing:2px; }
+  .foot { position:absolute; left:150px; bottom:64px; font-family:'JetBrains Mono', monospace; font-size:24px; color:var(--muted); }
+</style></head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <div class="rings"><div style="width:600px;height:600px"></div><div style="width:900px;height:900px"></div><div style="width:1200px;height:1200px"></div></div>
+
+  <div class="left">
+    <p class="kicker">Dependency detonation chamber</p>
+    <div class="brand"><img src="airlock-logo.png" alt=""><h1>AIRLOCK</h1></div>
+    <p class="tag">Every untrusted change gets its own disposable computer.<br><em>See what it tried to take.</em></p>
+    <p class="sub">PRs, npm and PyPI detonated in a Vultr microVM. Exfiltration proven by payload. Merge held until a human approves.</p>
+  </div>
+
+  <div class="card">
+    <div class="hd"><span>PR #3 · feat: coloured startup log</span><span>microVM</span></div>
+    <div class="row"><span>VM booted 0.7s · canaries</span><span class="pill ok">READY</span></div>
+    <div class="row"><span>npm ci as node</span></div>
+    <div class="row"><span>cat ~/.npmrc ~/.aws/credentials</span><span class="pill warn">CANARY</span></div>
+    <div class="row"><span>curl → sinkhole</span><span class="pill warn">CONTAINED</span></div>
+    <div class="proven">
+      <div class="row"><span class="pill warn">PROVEN EXFIL</span><span>captured by the sinkhole</span></div>
+      <div class="row"><span>POST telemetry.colorful-logs.invalid</span></div>
+      <div class="row" style="color:var(--muted)"><span>body: .npmrc + AWS keys <span class="tok">run token ✓</span></span></div>
+    </div>
+    <div class="verdict"><span>Merge held · airlock: pending</span><b>MALICIOUS</b></div>
+  </div>
+
+  <div class="foot">airlock.darkflib.dev · Vultr Agent Rush · Blast Radius Zero</div>
+</body></html>

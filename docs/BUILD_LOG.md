@@ -490,3 +490,9 @@ Tags: #demo
 **Result:** all ten slides published; speaker notes carry the talking points. Two slides (the PR #3 PROVEN row and the PR #4 diff view) hold marked screenshot placeholders, because the frames should come from Saturday's recording.
 **So:** Saturday: drop in two screenshots, recheck the 30/30 and the spend on the numbers slide, export to PDF for lablab.
 Tags: #demo
+
+### 11:35 — Cover image
+**Tried:** the generated README banner says only "Sandbox untrusted code", so built a lablab cover in HTML instead (`assets/airlock-cover.html`, site palette and fonts, the logo) and rendered it at 1920×1080 with headless Chrome: `chrome --headless=new --window-size=1920,1080 --virtual-time-budget=8000 --screenshot=airlock-cover.png airlock-cover.html`.
+**Result:** `assets/airlock-cover.png`: wordmark and tagline on the left, a stylised PR #3 timeline card on the right ending in the PROVEN exfil to `telemetry.colorful-logs.invalid` and MALICIOUS with the merge held. First render used made-up timings; replaced them, so the card only shows things a real PR #3 run shows.
+**So:** text is HTML, so wording changes are a re-render, not a regeneration.
+Tags: #demo
