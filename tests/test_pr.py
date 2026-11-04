@@ -34,9 +34,11 @@ class FakeGitHub:
             raise PermissionError("not installed")
         self.calls.append(("status", sha, state, description, target_url))
 
-    async def comment(self, owner, repo, number, body):
-        self.calls.append(("comment", number, body))
-        return f"https://github.com/{owner}/{repo}/pull/{number}#issuecomment-1"
+    async def comment(self, owner, repo, number, body, edit=None):
+        if self.fail:
+            raise PermissionError("not installed")
+        self.calls.append(("comment", number, body, edit))
+        return edit or f"https://github.com/{owner}/{repo}/pull/{number}#issuecomment-1"
 
 
 @pytest.fixture
@@ -61,15 +63,21 @@ def test_pr_run_holds_merge_and_posts_decision_only_after_human(make):
         run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
         run = wait_done(c, run_id)
         assert run["target"] == "Darkflib/airlock-demo#3" and run["meta"]["kind"] == "pr"
-        # before a human decides, only `pending` statuses leave: no verdict state, no comment
-        assert [(x[0], x[2]) for x in gh.calls] == [("status", "pending"), ("status", "pending")]
-        assert "malicious" in gh.calls[1][3]
+        # before a human decides, only `pending` statuses leave, and one comment that says what's happening
+        assert [(x[0], x[2] if x[0] == "status" else None) for x in gh.calls] == [
+            ("status", "pending"), ("comment", None), ("status", "pending"), ("comment", None)]
+        started, verdict = gh.calls[1], gh.calls[3]
+        assert "testing this PR" in started[2] and started[3] is None              # posted
+        assert verdict[3] == "https://github.com/Darkflib/airlock-demo/pull/3#issuecomment-1"   # then edited
+        assert "**MALICIOUS**, waiting for a decision" in verdict[2] and "`/airlock approve`" in verdict[2]
+        assert "malicious" in gh.calls[2][3]
         out = c.post(f"/api/runs/{run_id}/decision", json={"decision": "rejected", "note": "steals creds"}).json()
-    decided = gh.calls[2:]
+    decided = gh.calls[4:]
     assert [x[0] for x in decided] == ["status", "comment"]
     assert decided[0][1:3] == ("abc1234def", "failure") and decided[0][4] == f"https://airlock.test/runs/{run_id}"
     body = decided[1][2]
     assert "**MALICIOUS**, rejected" in body and "**PROVEN**" in body and "AIRLOCKCANARYABC" in body
+    assert "waiting for a decision" not in body and decided[1][3] == verdict[3]   # the same comment, final
     assert out["meta"]["posted"]["comment_url"].endswith("#issuecomment-1")
 
 
@@ -84,7 +92,8 @@ def test_failed_pr_run_sets_error_status(tmp_path, monkeypatch):
         run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
         run = wait_done(c, run_id)
     assert run["status"] == "error"
-    assert [x[2] for x in gh.calls] == ["pending", "error"]
+    assert [x[2] for x in gh.calls if x[0] == "status"] == ["pending", "error"]
+    assert "run failed" in gh.calls[-1][2] and "VM failed" in gh.calls[-1][2]
 
 
 def test_failed_post_keeps_decision_and_records_error(make):
@@ -202,7 +211,7 @@ def test_proven_theft_is_rejected_automatically(tmp_path, monkeypatch, switch, a
         if auto:
             assert run["decision"] == "rejected" and run["decided_by"] is None
             assert statuses[-1] == ("failure", "rejected automatically: exfiltration proven by a captured payload")
-            comment = next(x[2] for x in gh.calls if x[0] == "comment")
+            comment = [x[2] for x in gh.calls if x[0] == "comment"][-1]
             assert "rejected automatically" in comment and "@" not in comment.splitlines()[0]
             assert c.post(f"/api/runs/{run_id}/decision", json={"decision": "approved"}).status_code == 409
         else:
@@ -214,7 +223,7 @@ def test_unproven_exfil_still_waits_for_a_person(make):
     with make(gh) as c:  # fake_pr_analyse's exfil isn't host-captured with this run's token
         run = wait_done(c, c.post("/api/runs", data={"spec": PR}).json()["id"])
     assert run["decision"] is None and [x[2] for x in gh.calls if x[0] == "status"] == ["pending", "pending"]
-    assert not any(x[0] == "comment" for x in gh.calls)
+    assert "waiting for a decision" in [x[2] for x in gh.calls if x[0] == "comment"][-1]
 
 
 def test_failed_post_can_be_posted_again(make):

@@ -63,3 +63,13 @@ def test_comment_retries_only_when_it_cannot_have_landed():
     with pytest.raises(httpx.ReadTimeout):
         comment(gh)
     assert len(writes) == 1
+
+
+def test_comment_is_edited_in_place_or_reposted_if_deleted():
+    gh, writes = app_with([500, 200])   # an edit is idempotent, so it retries through a 500
+    url = "https://github.com/o/r/pull/4#issuecomment-77"
+    assert asyncio.run(gh.comment("o", "r", 4, "body", edit=url)) == "https://github.com/c"
+    assert writes == ["/repos/o/r/issues/comments/77"] * 2
+    gh, writes = app_with([404, 201])   # someone deleted it: post a new one
+    asyncio.run(gh.comment("o", "r", 4, "body", edit=url))
+    assert writes == ["/repos/o/r/issues/comments/77", "/repos/o/r/issues/4/comments"]

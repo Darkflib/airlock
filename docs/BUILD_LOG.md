@@ -580,3 +580,9 @@ Tags: #security #decision
 **Result:** 136 tests pass (5 new). Video gate shot now approves PR #1 by comment on GitHub (narration still 407 words); deck slide 6 (v15), report, README, PRD, SLIDES, AGENTS updated.
 **So:** needs the App's "Issue comment" event ticked before it works live.
 Tags: #decision #demo
+
+### 22:58 — The PR shows the run as it happens
+**Tried:** PR #5 finished its run, but on GitHub the only sign was the one-line pending check: the evidence comment waited for a decision. Now each run keeps one PR comment, posted when the head is fetched ("testing this PR…", live link) and rewritten in place (`PATCH` on the issue comment, retried like a status; reposted if someone deleted it): at the verdict it becomes the full evidence report headed "waiting for a decision" with how to decide (`/airlock approve|reject`), on a failed run it says why, and the decision rewrites it once more. Fixed on the way: the runner replaced the run's meta with the pipeline's at the end, which would have dropped what the gate stored while running (now merged).
+**Result:** 137 tests pass (1 new for edit/repost, PR flow tests updated to the new comment sequence).
+**So:** a developer sees status, evidence and the next step in the PR itself without opening Airlock.
+Tags: #demo

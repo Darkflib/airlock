@@ -238,7 +238,7 @@ class FakeGitHub:
     async def status(self, *a):
         self.posts.append(("status", a))
 
-    async def comment(self, *a):
+    async def comment(self, *a, **k):
         self.posts.append(("comment", a))
         return "https://github.test/c/1"
 

@@ -138,7 +138,18 @@ class GitHubApp:
             r.raise_for_status()
             return r.text[:limit]
 
-    async def comment(self, owner: str, repo: str, number: int, body: str) -> str:
+    async def comment(self, owner: str, repo: str, number: int, body: str, edit: str | None = None) -> str:
+        """Post a comment, or rewrite the one at `edit` (its html_url) in place; returns its html_url.
+        Editing is idempotent, so it retries like a status; if that comment was deleted, post anew."""
+        cid = re.search(r"#issuecomment-(\d+)$", edit or "")
+        if cid:
+            async def patch():
+                async with await self._client(owner, repo) as c:
+                    r = await c.patch(f"/repos/{owner}/{repo}/issues/comments/{cid.group(1)}", json={"body": body})
+                    return None if r.status_code == 404 else r.raise_for_status().json()["html_url"]
+            if url := await self._retry(patch):
+                return url
+
         async def post():
             async with await self._client(owner, repo) as c:
                 r = (await c.post(f"/repos/{owner}/{repo}/issues/{number}/comments", json={"body": body})).raise_for_status()

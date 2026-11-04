@@ -294,10 +294,10 @@ The private key comes from 1Password at deploy time and exists only in the web s
 
 ### The gate, step by step
 
-1. **Head fetched:** the App posts `airlock: pending` ("Detonating in a microVM; merge waits for a human decision") on the head commit. From this moment, branch protection blocks the merge.
+1. **Head fetched:** the App posts `airlock: pending` ("Detonating in a microVM; merge waits for a human decision") on the head commit. From this moment, branch protection blocks the merge. It also posts a short PR comment, "Airlock: testing this PR…", with a link to the live run. That comment is the run's **one comment on the PR**: every later step rewrites it in place rather than adding another, so the PR conversation shows where the run is without stacking bot messages.
 2. **Verdict ready, theft proven:** if the run has exfiltration proven by a payload the host captured with this run's token, the run is rejected automatically: `failure` ("rejected automatically: exfiltration proven by a captured payload") and the evidence comment, with no click.
-3. **Verdict ready, anything else:** `pending` again, now carrying the verdict ("Verdict: malicious; waiting for a human decision"). The AI's verdict never turns the check green or red.
-4. **Run failed:** `error`. Still not mergeable.
+3. **Verdict ready, anything else:** `pending` again, now carrying the verdict ("Verdict: malicious; comment /airlock approve or /airlock reject to decide"), and the comment becomes the full evidence report headed "waiting for a decision", with how to decide. The AI's verdict never turns the check green or red.
+4. **Run failed:** `error`, and the comment says the run failed and why. Still not mergeable.
 5. **Person decides**, on the run page or by commenting `/airlock approve [note]` or `/airlock reject [note]` on the PR: `success` (approved) or `failure` (rejected), with "approved by @login" in the description, plus the evidence comment. This is the only path to green. The pending status itself says how: "comment /airlock approve or /airlock reject to decide".
 
 Details that matter:

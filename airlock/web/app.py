@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from ..events import EventLog
 from ..github import GitHubApp, parse_pr_url
 from ..pipeline import parse_pypi_spec
-from ..prcomment import build_comment
+from ..prcomment import build_comment, build_progress
 from ..store import Store, data_dir
 from . import auth as authmod
 
@@ -87,6 +87,8 @@ class Runner:
                 end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
             try:
                 # the status reflects the outcome before the run reads as finished
+                if "meta" in end:  # keep what the gate recorded while it ran (status sync, comment url)
+                    end["meta"] = {**(self.store.get_run(run_id)["meta"] or {}), **end["meta"]}
                 self.store.update_run(run_id, **{k: v for k, v in end.items() if k != "status"})
                 if self.gate:
                     await self.gate(run_id, "verdict" if end["status"] == "done" else "error", log)
@@ -186,7 +188,18 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             log.emit("error", f"setting the GitHub status failed, so {m['owner']}/{m['repo']}#{m['number']} is NOT held: "
                      f"it keeps any earlier airlock status, which may be a success. {type(e).__name__}: {str(e)[:150]}")
             gate = {"state": state, "synced": False, "error": f"{type(e).__name__}: {e}"[:200]}
-        store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate})
+        # One comment per run, rewritten as it goes, so the PR itself shows progress and how to decide.
+        run_url, extra = f"{public_url}/runs/{run_id}", {}
+        body = (build_progress(run, run_url) if phase == "started"
+                else build_progress(run, run_url, failed=run.get("error") or "unknown error") if phase == "error"
+                else build_comment(run, store.events(run_id), run_url))
+        try:
+            extra["comment_url"] = await github.comment(m["owner"], m["repo"], m["number"], body,
+                                                        edit=m.get("comment_url"))
+        except Exception as e:  # noqa: BLE001 - the status is what holds the merge; the comment is a courtesy
+            log.emit("error", f"commenting on {m['owner']}/{m['repo']}#{m['number']} failed: "
+                     f"{type(e).__name__}: {str(e)[:150]}")
+        store.update_run(run_id, meta={**store.get_run(run_id)["meta"], "gate": gate, **extra})
     auto_reject = os.environ.get("AIRLOCK_AUTO_REJECT", "1") != "0"
     self_approval = os.environ.get("AIRLOCK_SELF_APPROVAL", "1") != "0"
     runner = Runner(store, analyse, gate=gate_pr)
@@ -586,8 +599,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         try:
             await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, run_url)
             url = await github.comment(m["owner"], m["repo"], m["number"],
-                                       build_comment(run, store.events(run["id"]), run_url))
-            store.update_run(run["id"], meta={**m, "posted": {"comment_url": url, "status": state}})
+                                       build_comment(run, store.events(run["id"]), run_url), edit=m.get("comment_url"))
+            store.update_run(run["id"], meta={**m, "comment_url": url, "posted": {"comment_url": url, "status": state}})
             store.append_event(run["id"], "github_posted", f"posted to {m['owner']}/{m['repo']}#{m['number']}: "
                                f"commit status {state} and a comment", comment_url=url, status=state, source="github")
         except Exception as e:  # noqa: BLE001 - the decision stands; report the failed post

@@ -1,9 +1,32 @@
-"""The verdict as a pull request comment, posted after a human decision (or an automatic
-rejection when exfiltration is proven by a captured payload)."""
+"""Airlock's pull request comment: one per run, posted when the run starts and rewritten in
+place as it progresses (testing, then the verdict with how to decide, then the decision)."""
 
 from __future__ import annotations
 
 MAX_ITEMS = 8
+
+
+def how_to_decide(run_url: str) -> list[str]:
+    return ["**Waiting for a decision.** The `airlock` check stays pending and this PR can't merge until someone "
+            "with write access to the repository comments `/airlock approve` or `/airlock reject` (a note after "
+            f"it is kept with the decision), or decides on the [run page]({run_url}).", ""]
+
+
+def build_progress(run: dict, run_url: str, failed: str | None = None) -> str:
+    """The comment while the run is in progress, or after it failed."""
+    head = run["meta"].get("head_sha", "")[:7]
+    if failed:
+        return "\n".join([
+            "### Airlock: run failed", "",
+            f"Airlock couldn't finish testing this PR's head (`{head}`): {failed[:300]}", "",
+            "The `airlock` check is set to error, so this PR can't merge on Airlock's word. Push again, or rerun "
+            "it from Airlock, before merging.", "", f"[Run timeline]({run_url})"])
+    return "\n".join([
+        "### Airlock: testing this PR…", "",
+        f"Airlock is installing and testing this PR's head (`{head}`) in a disposable microVM with fake "
+        "credentials and no internet access beyond the package registries. This comment updates with the "
+        "results, usually within a minute; the `airlock` check stays pending meanwhile.", "",
+        f"[Watch it live]({run_url})"])
 
 
 def build_comment(run: dict, events: list[dict], run_url: str) -> str:
@@ -12,7 +35,8 @@ def build_comment(run: dict, events: list[dict], run_url: str) -> str:
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
     lines = [
         f"### Airlock: **{verdict.upper()}**, "
-        + (f"{decision} automatically: {run['meta']['auto_decision']}" if run["meta"].get("auto_decision")
+        + ("waiting for a decision" if not decision
+           else f"{decision} automatically: {run['meta']['auto_decision']}" if run["meta"].get("auto_decision")
            else f"{decision} by @{who}"),
         "",
         f"Airlock installed and tested this PR's head (`{head}`) in a disposable microVM with fake credentials "
@@ -52,6 +76,8 @@ def build_comment(run: dict, events: list[dict], run_url: str) -> str:
                   "requests, no unexpected processes.", ""]
     if run.get("evidence"):
         lines += ["**Reviewer's evidence**", ""] + [f"- {p}" for p in run["evidence"][:MAX_ITEMS]] + [""]
+    if not decision:
+        lines += how_to_decide(run_url)
     if run.get("decision_note"):
         lines += [f"> {run['decision_note']}", ""]
     lines.append(f"[Full run timeline]({run_url}) · reviewer model `{run.get('model') or '?'}`")
