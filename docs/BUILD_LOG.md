@@ -430,3 +430,9 @@ Tags: #demo
 **Result:** Vultr Serverless Inference spend for the whole build is now **$1.45**, up $0.30 since 3 Nov 23:00. Since then: five full regressions (two of 18 runs, one of 27, two of 30), the PyPI and behaviour-diff work, and their debug runs. Inference only; the VX1 VM is billed separately.
 **So:** README, PRD and submission copy updated. The cost story holds: everything since 3 Nov 23:00, five full regressions included, cost 30 cents.
 Tags: #metric
+
+### 08:31 — Submission copy brought up to date
+**Tried:** the lablab copy still described the 18/18 npm-only regression and a three-package self-test.
+**Result:** `docs/SUBMISSION.md` now covers PyPI, the merge-base behaviour diff, the 30/30 regression (`product-20261104T030613Z`: exfil proven 15/15, medians 12–31 s) and the five-package self-test. `scripts/check-submission.py` passes; the long description is at 1977 of 2000 characters.
+**So:** any further addition to the long description has to replace something.
+Tags: #demo
