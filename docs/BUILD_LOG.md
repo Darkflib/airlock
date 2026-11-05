@@ -648,3 +648,9 @@ Tags: #security #decision
 **Result:** 161 tests pass (11 new in `tests/test_budgets.py`). Not yet run in a real VM: the new guest commands (`tail -c +N | head -c`, the `sh -c … >out 2>err; tail` wrapper) are only checked against fakes. `scripts/remote.sh` syncs into the live service's tree, so the host check waits for a go-ahead.
 **So:** a noisy or chatty package can't grow host memory, the database or the model's context without limit, and no run can hang a slot. Retention (uploads, `sinkhole.jsonl`, old runs) is still not done.
 Tags: #security #fix
+
+### 00:11 — Budgets checked in real VMs
+**Tried:** ran the four package fixtures with the CLI on the host (`scripts/remote.sh`), to exercise the new guest commands (chunked `tail -c +N | head -c` log reads, the `sh -c … >out 2>err; tail` exec wrapper) in both the `node` and `python:3.12-slim` images.
+**Result:** all four correct: Node stealer MALICIOUS with PROVEN exfil (13.0 s), Python `setup.py` stealer MALICIOUS with PROVEN exfil (24.2 s), benign npm BENIGN (13.7 s), benign sdist BENIGN with 0 containment (15.8 s). Exit codes and output reach the agent (it re-ran the stealer and grepped the source), no spurious `limit_hit` or `coverage_incomplete`, every VM `vm_destroyed`. The first benign npm run showed 1 containment event from the agent `cat`-ing the canary itself; a rerun had 0 (13.9 s).
+**So:** the budgets don't change results on the fixtures. The code is synced to `~/airlock` on the host but `airlock-web` hasn't been restarted, so the live service still runs the earlier build. PR runs (two VMs, GitHub fetch) weren't exercised from the CLI.
+Tags: #metric #fix
