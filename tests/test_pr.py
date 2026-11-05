@@ -76,7 +76,7 @@ def test_pr_run_holds_merge_and_posts_decision_only_after_human(make):
     assert [x[0] for x in decided] == ["status", "comment"]
     assert decided[0][1:3] == ("abc1234def", "failure") and decided[0][4] == f"https://airlock.test/runs/{run_id}"
     body = decided[1][2]
-    assert "**Malicious**, rejected" in body and "**PROVEN**" in body and "AIRLOCKCANARYABC" in body
+    assert "**Malicious**, rejected" in body and "**PROVEN:**" in body and "AIRLOCKCANARYABC" in body
     assert "waiting for a decision" not in body and decided[1][3] == verdict[3]   # the same comment, final
     assert out["meta"]["posted"]["comment_url"].endswith("#issuecomment-1")
 
@@ -262,3 +262,16 @@ def test_a_quiet_run_is_shown_as_nothing_observed_with_what_it_covered():
     assert "**No malicious behaviour observed**, waiting for a decision" in body
     assert "`npm ci --no-audit --no-fund (exit 0)`, `npm test --if-present (exit 0)`" in body
     assert "the AI reviewer then ran 1 command" in body and "Not exercised:" in body
+
+
+def test_comment_leads_with_the_reviewers_sentence_and_links_its_events():
+    events = [{"id": 9, "kind": "verdict", "summary": "verdict: malicious", "containment": False,
+               "data": {"one_line": "tinyconf sends your npm token to an outside server in production."}}]
+    run = {"verdict": "malicious", "decision": None, "meta": META, "model": "m",
+           "evidence": ["load() posts ~/.npmrc when NODE_ENV=production [E57, E58]"]}
+    body = build_comment(run, events, "https://airlock.test/runs/1")
+    first = body.split("\n\n")
+    assert first[0].startswith("### 🚫 Airlock: **Malicious**") and first[1].startswith("tinyconf sends your npm token")
+    assert ("NODE_ENV=production ([E57](https://airlock.test/runs/1#E57), [E58](https://airlock.test/runs/1#E58))"
+            in body)
+    assert "<details><summary>What this covers</summary>" in body

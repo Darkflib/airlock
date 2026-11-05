@@ -69,7 +69,7 @@ def test_pr_comment_leads_with_new_behaviour():
     run = {"verdict": "malicious", "decision": "rejected", "decided_by": "Darkflib", "meta": {"head_sha": "abcdef1"},
            "evidence": [], "model": "m"}
     body = build_comment(run, [e.to_dict() for e in head.events], "https://airlock.test/runs/x")
-    assert "**New behaviour introduced by this PR**" in body and "`0123456`" in body
+    assert "**New in this PR**" in body and "`0123456`" in body
     assert "⚠ sent canary credentials to telemetry.tinystamp.invalid" in body
 
 

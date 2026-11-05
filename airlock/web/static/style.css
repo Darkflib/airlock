@@ -339,3 +339,9 @@ ul.shares button { padding: 2px 10px; font-size: 12px; }
 .covered h3 { margin: 0 0 6px; font-size: 13px; color: var(--text); }
 .covered ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .covered strong { color: var(--text); font-weight: 600; }
+
+.stage-events .phase-head { list-style: none; margin: 10px 0 4px; padding: 4px 0 4px 10px; border-left: 3px solid var(--line);
+  font-size: 12px; font-weight: 600; color: var(--text); }
+.stage-events .phase-runtime { border-left-color: var(--cyan, #4fd1e8); }
+.stage-events .phase-own { color: var(--muted); font-weight: 500; }
+.verdict-line { margin: 0 0 8px; font-size: 15px; line-height: 1.4; color: var(--text); }

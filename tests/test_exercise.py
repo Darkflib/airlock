@@ -98,10 +98,12 @@ def test_exercise_proof_is_labelled_in_the_pr_comment_and_coverage():
     events = [{"id": 1, "kind": "exercise", "containment": False, "data": {"stage": "exercise"},
                "summary": "Airlock calls tinyconf.load(…) with NODE_ENV=production from a fresh copy (chosen by the agent)"},
               {"id": 2, "kind": "canary_exfil", "containment": True, "summary": "POST carried the canary credentials",
-               "data": {"stage": "exercise", "proven": True}}]
+               "data": {"stage": "exercise", "proven": True, "method": "POST",
+                        "url": "https://cfg-metrics.tinyconf.invalid/v1/usage"}}]
     assert what_ran(events)["exercised"] == ["tinyconf.load(…) with NODE_ENV=production"]
     assert "only the calls listed were made" in what_ran(events)["not_exercised"]
     body = build_comment({"verdict": "malicious", "decision": None, "meta": META, "evidence": [], "model": "m"},
                          events, "https://airlock.test/runs/1")
-    assert "**PROVEN** POST carried the canary credentials _(when Airlock called it as the reviewer asked)_" in body
+    assert "**PROVEN:** Airlock caught a POST to" in body and "the way a live app would (the AI reviewer chose how)" in body
+    assert "Install and tests" not in body.split("**PROVEN:**")[0]   # the proof comes before the details
     assert "Called by Airlock from a fresh copy, as the reviewer asked: `tinyconf.load(…) with NODE_ENV=production`" in body

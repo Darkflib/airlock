@@ -3,6 +3,8 @@ place as it progresses (testing, then the verdict with how to decide, then the d
 
 from __future__ import annotations
 
+import re
+
 MAX_ITEMS = 8
 
 
@@ -80,69 +82,92 @@ def what_ran(events: list[dict]) -> dict:
             "not_exercised": not_exercised}
 
 
+ICON = {"malicious": "🚫", "suspicious": "⚠️", "inconclusive": "⚠️", "benign": "✅"}
+REFS = re.compile(r"\[([^\]]*\bE\d+[^\]]*)\]")
+
+
+def link_refs(text: str, run_url: str) -> str:
+    """"[E57, E58]" in the reviewer's points → links to those events on the run page."""
+    def group(m: re.Match) -> str:
+        return "(" + re.sub(r"\bE(\d+)\b", lambda e: f"[E{e[1]}]({run_url}#E{e[1]})", m[1]) + ")"
+    return REFS.sub(group, text)
+
+
 def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True) -> str:
+    """The PR comment once there is a verdict: what it is and why first, then the proof, then the
+    details a reviewer may want, folded away."""
     verdict, decision, who = run["verdict"] or "inconclusive", run["decision"], run.get("decided_by") or "a reviewer"
-    head = run["meta"].get("head_sha", "")[:7]
+    m = run["meta"]
+    head = m.get("head_sha", "")[:7]
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
-    exercised = any(e["data"].get("stage") == "exercise" for e in found)
+    proven = next((e for e in found if e["data"].get("proven")), None)
+    summary = next((e["data"].get("one_line") for e in reversed(events) if e["kind"] == "verdict"), "") or ""
     lines = [
-        f"### Airlock: **{verdict_label(verdict)}**, "
+        f"### {ICON.get(verdict, '')} Airlock: **{verdict_label(verdict)}**, "
         + ("waiting for a decision" if not decision
-           else f"{decision} automatically: {run['meta']['auto_decision']}" if run["meta"].get("auto_decision")
+           else f"{decision} automatically: {m['auto_decision']}" if m.get("auto_decision")
            else f"{decision} by @{who}"),
-        "",
-        f"Airlock installed and tested this PR's head (`{head}`) in a disposable microVM with fake credentials "
-        "and no internet access beyond the package registries, recorded what it did, then had an AI reviewer "
-        "investigate.",
-        "",
-    ]
-    snap = run["meta"].get("snapshot") or {}
+        ""]
+    if summary:
+        lines += [summary, ""]
+    if proven:
+        d = proven["data"]
+        when = ("when Airlock ran the code the way a live app would (the AI reviewer chose how)"
+                if d.get("stage") == "exercise" else "during install and tests")
+        target = d.get("url") or d.get("host") or "an outside server"
+        lines += [f"**PROVEN:** Airlock caught a {d.get('method') or 'request'} to `{target}` carrying this run's "
+                  f"fake credentials, {when}. Nothing left the sandbox.", ""]
+        if d.get("payload"):
+            lines += ["<details><summary>The captured request</summary>", "", "```",
+                      d["payload"][:1500].replace("```", "\'\'\'"), "```", "",
+                      "Those credentials are fake and unique to this run.", "</details>", ""]
+    elif found:
+        lines += ["**What it did**", ""]
+        lines += [f"- {e['summary']}" for e in found[:MAX_ITEMS]]
+        if len(found) > MAX_ITEMS:
+            lines.append(f"- …and {len(found) - MAX_ITEMS} more")
+        lines.append("")
+    else:
+        lines += ["Nothing suspicious was observed during install and tests: no credential reads, no outbound "
+                  "requests, no unexpected processes.", ""]
+    if run.get("evidence"):
+        lines += ["**Why** (AI reviewer)", ""] + [f"- {link_refs(p, run_url)}" for p in run["evidence"][:MAX_ITEMS]] + [""]
+    snap = m.get("snapshot") or {}
     if snap and not snap.get("complete", True):
         lines += [f"_The reviewer saw part of this PR: {'; '.join(snap.get('notes') or [])}. "
                   "Install and tests ran on the full head._", ""]
     changes = next((e["data"] for e in events if e["kind"] == "behaviour_diff"), None)
     if changes and changes.get("available"):
         base = (changes.get("base_sha") or "")[:7]
-        lines += [f"**New behaviour introduced by this PR** (compared with its merge base `{base}`, "
-                  "run the same way in a separate microVM)", ""]
         new = changes.get("new") or []
-        lines += [f"- {'⚠ ' if e['containment'] else ''}{e['label']}" for e in new[:MAX_ITEMS]] or ["- none"]
-        if len(new) > MAX_ITEMS:
-            lines.append(f"- …and {len(new) - MAX_ITEMS} more")
+        if new:
+            lines += [f"**New in this PR** (compared with the code before it, `{base}`, run the same way)", ""]
+            lines += [f"- {'⚠ ' if e['containment'] else ''}{e['label']}" for e in new[:MAX_ITEMS]]
+            if len(new) > MAX_ITEMS:
+                lines.append(f"- …and {len(new) - MAX_ITEMS} more")
+        else:
+            lines.append(f"Install and tests behave the same as before this PR (`{base}`)"
+                         + (", so the problem only shows when the code runs." if proven else "."))
         pre = [e for e in changes.get("unchanged") or [] if e["containment"]]
         if pre:
-            lines += ["", f"{len(pre)} risky behaviour{'s' if len(pre) != 1 else ''} already present in the base "
-                      "branch: not introduced by this PR, but still there."]
+            lines += ["", f"{len(pre)} risky behaviour{'s' if len(pre) != 1 else ''} already present before this "
+                      "PR: not introduced by it, but still there."]
         lines.append("")
     elif changes:
-        lines += [f"_Behaviour diff against the base unavailable: {changes.get('reason')}._", ""]
-    if found:
-        lines += ["**What it did during install and test**" + (", and when Airlock called it" if exercised else ""), ""]
-        lines += [f"- {'**PROVEN** ' if e['data'].get('proven') else ''}{e['summary']}"
-                  + (" _(when Airlock called it as the reviewer asked)_" if e["data"].get("stage") == "exercise" else "")
-                  for e in found[:MAX_ITEMS]]
-        if len(found) > MAX_ITEMS:
-            lines.append(f"- …and {len(found) - MAX_ITEMS} more")
-        lines.append("")
-        payload = next((e["data"] for e in found if e["data"].get("payload")), None)
-        if payload:
-            lines += [f"<details><summary>Captured request: {payload.get('method', '')} {payload.get('url', '')}"
-                      "</summary>", "", "```", payload["payload"][:1500].replace("```", "'''"), "```", "",
-                      "The credentials above are Airlock's per-run canaries, not real secrets.", "</details>", ""]
-    else:
-        lines += ["Nothing suspicious was observed during install and test: no credential reads, no outbound "
-                  "requests, no unexpected processes.", ""]
+        lines += [f"_No comparison with the code before this PR: {changes.get('reason')}._", ""]
     cover = what_ran(events)
-    lines += ["**What this covers**", "",
+    lines += ["<details><summary>What this covers</summary>", "",
+              f"- Tested `{head}` in a throwaway VM with fake credentials, reaching only the package registries",
               f"- Ran as an unprivileged user: {', '.join(f'`{c}`' for c in cover['ran']) or 'nothing (see the timeline)'}"
               + (f"; the AI reviewer then ran {cover['agent_commands']} command{'s' if cover['agent_commands'] != 1 else ''}"
                  if cover["agent_commands"] else ""),
               *([f"- Called by Airlock from a fresh copy, as the reviewer asked: "
                  f"{'; '.join(f'`{x}`' for x in cover['exercised'])}"] if cover["exercised"] else []),
               f"- Watched: {cover['watched']}",
-              f"- Not exercised: {cover['not_exercised']}", ""]
-    if run.get("evidence"):
-        lines += ["**Reviewer's evidence**", ""] + [f"- {p}" for p in run["evidence"][:MAX_ITEMS]] + [""]
+              f"- Not exercised: {cover['not_exercised']}"]
+    if proven and len(found) > 1:
+        lines += ["- Everything it did:"] + [f"  - {e['summary']}" for e in found[:MAX_ITEMS]]
+    lines += ["", "</details>", ""]
     if not decision:
         lines += how_to_decide(run_url, held)
     if run.get("decision_note"):

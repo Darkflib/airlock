@@ -131,7 +131,8 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
         if key in seen:
             continue
         seen.add(key)
-        script = argv.split("/")[-1] or argv
+        # Airlock's exercise harness runs the package's code: name the package, not the harness's spec file
+        script = "the package" if "airlock-pristine/exercise.js" in argv else argv.split("/")[-1] or argv
         pid = rec.get("pid")
         if ev == "file_read" and (path.endswith(CANARY_SUFFIXES) or "/.aws/" in path):
             out.append(("canary_read", f"{script} read canary {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))

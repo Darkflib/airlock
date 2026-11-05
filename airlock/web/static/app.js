@@ -397,10 +397,30 @@ const Airlock = (() => {
       sec = s;
     };
     const reveal = (row) => { const d = row.closest('details'); if (d) d.open = true; };
+    // Headers inside a stage, so install, tests, Airlock's runtime calls and the agent's own commands
+    // read as separate blocks. Each exec event comes before the activity it caused.
+    const PHASES = {
+      install: 'Install',
+      tests: 'Tests',
+      runtime: 'Runtime: Airlock runs the code the way an app would, as the agent asked. What happens here counts as proof.',
+      own: 'The agent\'s own commands: shown, but never counted as proof',
+    };
+    const phaseOf = (ev) => {
+      if (ev.kind === 'exercise') return 'runtime';
+      if (ev.kind !== 'exec') return null;
+      if (ev.data.source === 'detonate') return /\bnpm test\b|\bpytest\b/.test(ev.data.cmd || '') ? 'tests' : 'install';
+      if (ev.data.source === 'agent' && sec.phase !== 'own') return 'own';
+      return null;
+    };
 
     function addEvent(ev) {
       if (t0 === null) t0 = ev.ts;
       enterStage(stageOf(ev));
+      const phase = phaseOf(ev);
+      if (phase && phase !== sec.phase) {
+        sec.phase = phase;
+        sec.ol.append(el('li', `phase-head phase-${phase}`, PHASES[phase]));
+      }
       const li = el('li', `ev ${ev.kind}`);
       li.id = `E${ev.id}`;
       const repro = ev.containment && ev.data.stage === 'agent';
@@ -446,6 +466,7 @@ const Airlock = (() => {
         li.append(d);
       }
       sec.ol.append(li);
+      if (location.hash === `#E${ev.id}`) setTimeout(() => flash(ev.id), 0);  // a link from the PR comment
       if (sec.hot && !sec.touched) sec.details.open = true;
       badges(sec);
 
@@ -467,7 +488,7 @@ const Airlock = (() => {
       if (ev.kind === 'canaries_seeded') fact('canaries', (ev.data.files || []).join(', '));
       if (ev.kind === 'agent_start') { $('verdict').textContent = 'Agent investigating…'; fact('agent', ev.data.model); }
       if (ev.kind === 'vm_destroyed') finishStage(sec);
-      if (ev.kind === 'verdict') showVerdict(ev.data.verdict, ev.data.evidence || [], ev.data.turns, ev.data.forced);
+      if (ev.kind === 'verdict') showVerdict(ev.data.verdict, ev.data.evidence || [], ev.data.turns, ev.data.forced, ev.data.one_line);
       if (ev.kind === 'vm_destroyed') fact('lifecycle', 'VM destroyed after run');
     }
 
@@ -521,10 +542,12 @@ const Airlock = (() => {
       box.hidden = false;
     }
 
-    function showVerdict(verdict, evidence, turns, forced) {
+    function showVerdict(verdict, evidence, turns, forced, oneLine) {
       const v = $('verdict');
       v.className = `verdict-big ${verdict}`;
       v.textContent = VERDICT[verdict] || verdict;
+      $('verdict-line').textContent = oneLine || '';
+      $('verdict-line').hidden = !oneLine;
       $('verdict-meta').textContent = turns ? `after ${turns} agent turns${forced ? ' (budget forced)' : ''}` : '';
       const ul = $('evidence');
       ul.replaceChildren();
