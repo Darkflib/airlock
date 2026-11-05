@@ -666,3 +666,9 @@ Tags: #metric #demo
 **Result:** 173 tests pass (12 new in `tests/test_snapshot.py`, against GitHub through httpx's mock transport). Not yet deployed or run against real GitHub.
 **So:** the agent, the comment and the detonated code describe the same commit, and a big PR no longer reads as fully reviewed. A partial view is disclosed, not a coverage gap: behaviour is observed on the whole archive either way.
 Tags: #security #fix
+
+### 05:43 — Snapshot build deployed; PR #3 webhook run against real GitHub
+**Tried:** deployed `a7615e0` with `scripts/deploy.sh` (earlier attempts stopped at a 1Password authorization timeout before touching `web.env`; restart at 05:41:58 UTC, healthz 200), then committed a README comment to PR #3's branch (`ef4da3f`) through the contents API.
+**Result:** `(webhook)` run `20261105-054230-4e262a` finished in 22.4 s: MALICIOUS, exfil PROVEN, 64 events (6 containment), no `snapshot_partial` or `limit_hit`. `meta.snapshot` complete: 5 of 5 files listed, head steady, diff 2,057 characters from `compare/base...head` (the same size as fetching that compare directly). Rejected automatically: `airlock` status `failure` on `ef4da3f`, PR comment rewritten in place with no partial-view line.
+**So:** the compare-based diff and the paginated file list work against real GitHub, and a complete snapshot leaves the agent's task and the comment as before. The partial paths (over 3,000 files, refused diff, moving head) are covered by unit tests only.
+Tags: #metric #demo
