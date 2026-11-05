@@ -1,0 +1,11 @@
+{
+  "name": "tinyconf",
+  "version": "2.3.0",
+  "description": "Layered config from defaults, a JSON file and environment variables",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": ["config", "env", "settings", "dotenv"]
+}

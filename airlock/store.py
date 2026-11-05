@@ -278,13 +278,13 @@ class Store:
         return {"runs": len(ids), "selftests": tests}
 
     def proven_exfil(self, run_id: str) -> bool:
-        """Whether the package itself (not the agent's re-runs) had exfiltration proven by a payload
-        captured on the host (sinkhole request or DnsGuard lookup) carrying this run's canary token.
-        Guest-side telemetry never counts."""
+        """Whether the package itself had exfiltration proven by a payload captured on the host (sinkhole
+        request or DnsGuard lookup) carrying this run's canary token: during detonation, or when Airlock
+        exercised it (airlock/exercise.py). Never the agent's own commands; guest-side telemetry never counts."""
         return self.db.execute(
             "SELECT 1 FROM events WHERE run_id = ? AND json_extract(data, '$.proven') = 1"
             " AND json_extract(data, '$.this_run') = 1 AND json_extract(data, '$.source_kind') IN ('sinkhole', 'dns')"
-            " AND COALESCE(json_extract(data, '$.stage'), '') != 'agent' LIMIT 1", (run_id,)).fetchone() is not None
+            " AND json_extract(data, '$.stage') IN ('detonate', 'exercise') LIMIT 1", (run_id,)).fetchone() is not None
 
     def create_selftest(self, test_id: str, probes: list[dict], submitted_by: str | None = None) -> None:
         self.db.execute("INSERT INTO selftests VALUES (?, ?, ?, ?)",

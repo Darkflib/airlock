@@ -232,11 +232,27 @@ A side finding: some models soft-refused to *write* the simulated stealer fixtur
 
 `airlock/agent.py`, OpenAI-compatible calls to `https://api.vultrinference.com/v1`:
 
-- **Tools:** `exec` (a shell command in the VM, always as `node`), `read_file`, `finish` (verdict, summary, evidence with event ids).
+- **Tools:** `exec` (a shell command in the VM, always as `node`), `read_file`, `exercise` (below; npm packages and PRs), `finish` (verdict, summary, evidence with event ids).
 - **Budget:** 12 turns. The last turn forces `tool_choice=finish`, so every run ends with a verdict.
 - **Grounding:** the agent sees every event, including Airlock's own install command, plus an explicit note when detonation produced no traced activity. Each tool result ends with the events that call produced, so the agent learns the ids it can cite. (Before this, a benign verdict cited "VM started" as evidence that npm install was clean, because the install event had been filtered out of the agent's view; build log 3 Nov 19:36.)
 - **Citation check:** `finish` citing an id that doesn't exist is sent back once, then flagged on the verdict.
 - **Output caps:** stderr trimmed to the last 4 KB; payload bodies to 2,000 characters.
+
+### Exercise: what the agent finds becomes proof
+
+Install and tests only run install-time code. A payload behind a function call or an environment check (`NODE_ENV=production`) stays quiet through detonation, so the deterministic layers alone report "No malicious behaviour observed". The agent is what notices it: it reads the code, sees the condition and reproduces it. But what the agent's own `exec` triggers can never count as proof, because a misled agent could send the canaries itself. So until now, the agent's best finding stayed an opinion.
+
+`exercise` (`airlock/exercise.py`) closes that gap. The agent chooses only *data*: which export to call, JSON arguments, a few allow-listed environment variables (`NODE_ENV`, `CI` and similar, never `NODE_OPTIONS`, `PATH` or `HOME`), and how long to wait. Airlock does the rest:
+
+- the package comes from a **pristine copy** saved root-owned and read-only before the agent got a shell;
+- it is installed into a **fresh directory with an unguessable name**, with its own npm cache, no user npm config and `--ignore-scripts`;
+- first, Airlock **kills every process the package user runs** and credits anything still in flight to the agent;
+- the call is made by **Airlock's own root-owned harness** (`airlock/guest/exercise.js`) under a cleared environment, keeping only the tracer and the guest's TLS trust;
+- package paths with `..` and call paths through `constructor`, `__proto__` or `prototype` are refused.
+
+So whatever is sent during an exercise is the package's own doing. Its events carry stage `exercise`, and proof counts only from an explicit list of stages (`detonate`, `exercise`), never "anything but the agent".
+
+On the `tinyconf` fixture (a config loader whose "usage beacon" posts `~/.npmrc` and `~/.aws/credentials` only when `NODE_ENV=production`), detonation is silent. The agent read `lib/beacon.js`, called `tinyconf.load()` with `NODE_ENV=production` through `exercise`, and the sinkhole captured the POST with this run's token: PROVEN. Unprompted, it then exercised the same call with `NODE_ENV=development` as a control, saw nothing, and cited both. Before `exercise`, the same agent reproduced the theft with its own `exec`. The sinkhole caught it, but it couldn't count: no proof, no automatic rejection (build log 5 Nov).
 
 ### Prompt injection
 
@@ -377,7 +393,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 ## 11. How we tested it
 
 - **Unit tests:** 148, run locally with fakes for microsandbox, the inference API and GitHub (`uv run pytest`).
-- **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 10 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs. **30/30 correct**, exfiltration proven by payload on 15/15 malicious runs, zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
+- **Product regression** (`evals/product_regression.py`) through the real pipeline on the real host: 11 targets × 3 runs across npm tarballs, npm specs, PyPI sdists, real PyPI and three demo PRs, 4 at once (`product-20261105T142257Z`). **33/33 correct**, exfiltration proven by payload on 18/18 malicious runs (on the runtime-only stealer, during the agent's exercise), zero containment events on the 15 benign runs, no inconclusive downgrades, no forced verdicts, zero invalid tool calls. Full table in the README.
 - **Live self-test** on the public site: five fixtures, pass only if stealers are malicious *with payload-proven exfil* and benign ones have zero containment. 5/5 on 4 Nov.
 - **Probes** for specific holes: the DNS gateway probe (failed before the DNS guard, passes after), a malformed-DNS probe, the egress probe, the image probe.
 - **Two independent code reviews**, done from the repo alone: `docs/REVIEW-2026-11-03.md` (9 findings, five of them P1) and `docs/RECHECK-2026-11-04.md` (6 remaining). All 15 are fixed and tested; the lower-priority items still open are listed in section 13.
@@ -408,7 +424,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 - **Sandbox-aware malware.** A payload that checks for a VM, a fake home directory, a known hostname or a 198.18.x.x address, then does nothing, will pass. The sandbox is not disguised.
 - **Delayed or conditional payloads.** Anything that waits (a timer, a date, a CI environment variable that isn't set, a production hostname) won't run during a 480 s detonation.
-- **Runtime-only behaviour.** Airlock runs install and the package's own tests. Code that only misbehaves when *your* application imports it and calls a function is not exercised. (This is also why Go isn't supported: Go modules have no install hooks, so there is nothing to detonate at install time.)
+- **Runtime-only behaviour.** Airlock runs install and the package's own tests. Code that only misbehaves when *your* application imports it and calls a function is exercised only if the agent finds it and asks Airlock to call it (`exercise`, npm and PRs; not Python yet). Code paths it doesn't call stay unexercised. (This is also why Go isn't supported: Go modules have no install hooks, so there is nothing to detonate at install time.)
 - **Pinned TLS** prevents payload capture; we still see the hostname and the attempt.
 - **Encoded exfil** is caught as traffic but is not PROVEN unless the token appears verbatim.
 - **Non-credential theft** (source code, `.env` files we didn't plant, environment variables) is seen as reads and traffic but not proven, because it carries no canary token.

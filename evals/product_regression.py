@@ -26,6 +26,7 @@ TARGETS = [
     ("evals/fixtures/left-padder-hostile.tgz", "malicious", "Node stealer (tarball)"),
     ("evals/fixtures/colorful-logs-shell-stealer.tgz", "malicious", "Shell stealer (tarball)"),
     ("evals/fixtures/left-padder-benign.tgz", "benign", "Benign with postinstall (tarball)"),
+    ("evals/fixtures/tinyconf-runtime-stealer.tgz", "malicious", "Runtime-only stealer (needs the agent's exercise)"),
     ("left-pad@1.3.0", "benign", "Real npm package"),
     ("evals/fixtures/termcolour-utils-stealer.tar.gz", "malicious", "Python stealer sdist (setup.py)"),
     ("evals/fixtures/tinyslug-benign.tar.gz", "benign", "Benign sdist with setup.py work"),
@@ -55,7 +56,7 @@ async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> 
         t0 = time.monotonic()
         try:
             r = await analyse(target, events=EventLog())
-            det = [e for e in r.events if e["containment"] and e["data"].get("stage") == "detonate"]
+            det = [e for e in r.events if e["containment"] and e["data"].get("stage") in ("detonate", "exercise")]
             row = {"verdict": r.verdict, "turns": r.agent.turns, "forced": r.agent.forced,
                    "invalid": r.agent.invalid_calls, "contained": len(det),
                    "proven": any(e["data"].get("proven") for e in det), "error": None,

@@ -72,13 +72,19 @@ def what_ran(events: list[dict]) -> dict:
     ran = [f"{short_cmd(e['data'].get('cmd', ''))} (exit {e['data'].get('exit_code')})" for e in events
            if e["kind"] == "exec" and e["data"].get("source") == "detonate"]
     agent = sum(e["kind"] == "exec" and e["data"].get("source") == "agent" for e in events)
-    return {"ran": ran, "agent_commands": agent, "watched": WATCHED, "not_exercised": NOT_EXERCISED}
+    exercised = [e["summary"].removeprefix("Airlock calls ").split(" from a fresh copy")[0]
+                 for e in events if e["kind"] == "exercise"]
+    not_exercised = NOT_EXERCISED if not exercised else NOT_EXERCISED.replace(
+        "code your application runs after importing the package", "other code your application could call (only the calls listed were made)")
+    return {"ran": ran, "agent_commands": agent, "exercised": exercised, "watched": WATCHED,
+            "not_exercised": not_exercised}
 
 
 def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True) -> str:
     verdict, decision, who = run["verdict"] or "inconclusive", run["decision"], run.get("decided_by") or "a reviewer"
     head = run["meta"].get("head_sha", "")[:7]
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
+    exercised = any(e["data"].get("stage") == "exercise" for e in found)
     lines = [
         f"### Airlock: **{verdict_label(verdict)}**, "
         + ("waiting for a decision" if not decision
@@ -111,8 +117,10 @@ def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True
     elif changes:
         lines += [f"_Behaviour diff against the base unavailable: {changes.get('reason')}._", ""]
     if found:
-        lines += ["**What it did during install and test**", ""]
-        lines += [f"- {'**PROVEN** ' if e['data'].get('proven') else ''}{e['summary']}" for e in found[:MAX_ITEMS]]
+        lines += ["**What it did during install and test**" + (", and when Airlock called it" if exercised else ""), ""]
+        lines += [f"- {'**PROVEN** ' if e['data'].get('proven') else ''}{e['summary']}"
+                  + (" _(when Airlock called it as the reviewer asked)_" if e["data"].get("stage") == "exercise" else "")
+                  for e in found[:MAX_ITEMS]]
         if len(found) > MAX_ITEMS:
             lines.append(f"- …and {len(found) - MAX_ITEMS} more")
         lines.append("")
@@ -129,6 +137,8 @@ def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True
               f"- Ran as an unprivileged user: {', '.join(f'`{c}`' for c in cover['ran']) or 'nothing (see the timeline)'}"
               + (f"; the AI reviewer then ran {cover['agent_commands']} command{'s' if cover['agent_commands'] != 1 else ''}"
                  if cover["agent_commands"] else ""),
+              *([f"- Called by Airlock from a fresh copy, as the reviewer asked: "
+                 f"{'; '.join(f'`{x}`' for x in cover['exercised'])}"] if cover["exercised"] else []),
               f"- Watched: {cover['watched']}",
               f"- Not exercised: {cover['not_exercised']}", ""]
     if run.get("evidence"):

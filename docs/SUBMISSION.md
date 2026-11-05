@@ -18,8 +18,8 @@ Airlock runs every untrusted code change in its own disposable computer. Paste a
 
 Every other address is answered by a fake server that Airlock controls on the host, and nothing is forwarded. So when malicious code sends the fake passwords out, Airlock captures the request, stolen data included: the theft is proven, not guessed. For a pull request, Airlock also runs the code from before the change in a second machine and shows only what is new.
 
-An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then looks inside the same machine and writes a verdict. Every claim cites the event behind it. During the run, the Airlock GitHub App keeps the pull request at "pending", and the repository requires this check, so it cannot be merged. If the theft is proven, Airlock rejects the pull request by itself and posts the evidence. Otherwise a person decides, and only a person can approve.
+An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then investigates. If code only misbehaves when called, the agent has Airlock call it from a clean copy, so that theft counts as proof too. Every claim cites an event. Meanwhile the Airlock GitHub App holds the pull request at "pending", a required check, so it cannot be merged. If the theft is proven, Airlock rejects the pull request by itself and posts the evidence. Otherwise a person decides, and only a person can approve.
 
-Our regression has 10 npm and PyPI scenarios (our own stealers plus real packages), each run 3 times: 30 of 30 correct, with the stolen data captured on all 15 malicious runs. That shows it works; it is not a detection rate. A review takes 12 to 31 seconds and about $0.003 of AI; one $113-a-month server handles about 600 pull requests an hour.
+Our regression has 11 npm and PyPI scenarios (our own stealers plus real packages), each run 3 times: 33 of 33 correct, with the stolen data captured on all 18 malicious runs. It is not a detection rate. A review takes 12 to 31 seconds and about $0.003 of AI; one $113-a-month server handles about 600 pull requests an hour.
 
-Judges can click Run self-test to test five known packages live and see the score.
+Judges can click Run self-test to score five known packages live.

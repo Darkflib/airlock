@@ -4,7 +4,7 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
-- [ ] Run the regression once on the frozen commit; the 30/30 figure on the "under the hood" slide must match it.
+- [ ] Run the regression once on the frozen commit; the 33/33 figure on the "under the hood" slide must match it.
 - [ ] Fresh run of PR #3 to film live.
 - [ ] PR #4 is started on camera by a push. Prepare a one-line README change on the PR #4 branch in GitHub's web editor (don't commit it yet). Check the App's webhook is active: **Advanced → Recent Deliveries** shows a 200. Do one practice push the day before, and check the `(webhook)` run appears within a few seconds.
 - [ ] Don't push to PR #1: a push starts a run and moves its status.
@@ -79,7 +79,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models. Thirty out of thirty correct in our tests. Each review costs well under a cent in AI, and one server handles about six hundred pull requests an hour."
+> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models. Thirty-three out of thirty-three correct in our tests. Each review costs well under a cent in AI, and one server handles about six hundred pull requests an hour."
 
 ### 2:50–3:00 Close
 
@@ -106,5 +106,5 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
-| 30/30, proven 15/15 | `product-20261104T030613Z` (rerun on the frozen commit) |
+| 33/33, proven 18/18 | `product-20261105T142257Z` (rerun on the frozen commit) |
 | About $0.003 of inference per review; about 600 PR runs an hour on one host | median tokens in `product-20261104T030613Z` × mimo-v2.6-flash price; load test BUILD_LOG 5 Nov 13:15 |

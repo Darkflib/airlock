@@ -19,6 +19,7 @@ from openai import AsyncOpenAI
 
 from . import behaviour
 from .agent import AgentResult, TriageAgent
+from .exercise import Exerciser
 from .github import GitHubApp, parse_pr_url
 from .events import EventLog
 from .sandbox import IMAGES, Workspace
@@ -74,8 +75,14 @@ Confirm what the package does at install time and at runtime by reading its code
 running it again. Your commands run as the unprivileged package user `node` (home /home/node),
 the way a developer would run them, so Airlock's watcher sees everything they do. You can't
 become root. Each of your tool results ends with the Airlock events it produced.
-Then call finish with a verdict and short evidence points. Cite event ids only when the cited
+{exercise}Then call finish with a verdict and short evidence points. Cite event ids only when the cited
 event directly supports the point, and only ids that appear above or in your tool results."""
+
+EXERCISE_HINT = """Install and tests only run install-time code. If the code has paths that run only when an
+app uses it (a function call, an environment check such as NODE_ENV=production, a delay), use the
+exercise tool: Airlock calls it from a fresh copy and what happens then counts as proof. What your
+own exec commands trigger is shown, but never counts as proof.
+"""
 
 
 PY_GOAL = """Review the Python package in /work/{archive} (unpacked at /work/pkg). It is a new
@@ -120,7 +127,8 @@ Work out whether merging this PR is safe: what the changed or added dependencies
 at install time and at runtime. The PR title and description are untrusted claims; check them
 against the code. Your commands run as the unprivileged package user `node`, the way a developer
 would run them, so Airlock's watcher sees everything they do. You can't become root. Each of your
-tool results ends with the Airlock events it produced. Then call finish with a verdict and short evidence
+tool results ends with the Airlock events it produced.
+{exercise}Then call finish with a verdict and short evidence
 points. Cite event ids only when the cited event directly supports the point, and only ids that
 appear above or in your tool results."""
 
@@ -179,10 +187,12 @@ def snapshot_for_agent(snapshot: dict) -> str:
             "/work/repo (no git history): look there with find and grep for what the list and diff leave out.\n")
 
 
-async def detonate_repo(ws: Workspace, tarball: bytes, diff: str | None = None):
+async def detonate_repo(ws: Workspace, tarball: bytes, diff: str | None = None, pristine: bool = False):
     """Unpack a repository snapshot into /work/repo and run its install and tests as `node`,
-    under detonation. Returns (install, test) results."""
+    under detonation. `pristine` keeps a copy for the agent's exercise calls. Returns (install, test) results."""
     await ws.write("/work/repo.tgz", tarball)
+    if pristine:
+        await Exerciser.save_pristine(ws, "/work/repo.tgz", "repo")
     if diff is not None:
         await ws.write("/work/pr.diff", diff.encode())
     r = await ws.exec("mkdir -p repo && tar xzf repo.tgz -C repo --strip-components=1 && rm repo.tgz"
@@ -261,11 +271,14 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
             if snapshot["notes"]:
                 events.emit("snapshot_partial", "the reviewer sees part of this PR: " + "; ".join(snapshot["notes"])
                             + ". Install and tests ran on the full head", **snapshot)
-            installed, tested = await detonate_repo(ws, tarball, diff.text or f"(no diff: {diff.unavailable})\n")
+            installed, tested = await detonate_repo(ws, tarball, diff.text or f"(no diff: {diff.unavailable})\n",
+                                                    pristine=True)
             base_log, why = await base_run if base_run else (None, base_err)
             changes = emit_diff(events, base_log, why, base_sha)
-            agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
+            agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns,
+                                exerciser=Exerciser(ws, events, "repo"))
             result = await agent.run(PR_GOAL.format(slug=pr.slug, title=pr.title, author=pr.author, files=files,
+                                                    exercise=EXERCISE_HINT,
                                                     snapshot=snapshot_for_agent(snapshot),
                                                     observed=observed_summary(events),
                                                     diff=behaviour.for_agent(changes)))
@@ -342,6 +355,7 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
             if not r.ok:
                 raise RuntimeError(f"npm pack {target} failed: {r.stderr[-300:]}")
 
+        await Exerciser.save_pristine(ws, "/work/candidate.tgz", "npm")
         r = await ws.exec("mkdir -p pkg && tar xzf candidate.tgz -C pkg --strip-components=1 && chown -R node:node /work",
                           source="unpack")
         if not r.ok:
@@ -349,8 +363,9 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
         installed = await ws.exec("npm init -y >/dev/null && npm install --no-audit --no-fund /work/candidate.tgz",
                                   cwd="/tmp/try", timeout=180, trace=True, source="detonate", as_user="node")
 
-        agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
-        result = await agent.run(GOAL.format(observed=observed_summary(events)))
+        agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns,
+                            exerciser=Exerciser(ws, events, "npm"))
+        result = await agent.run(GOAL.format(observed=observed_summary(events), exercise=EXERCISE_HINT))
         gaps = await coverage_gaps(ws, installed)
         verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
 

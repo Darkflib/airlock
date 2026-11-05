@@ -64,14 +64,15 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 
 | | |
 |---|---|
-| Regression (10 npm/PyPI targets × 3) | **30/30** correct |
-| Malicious runs with exfil proven by payload | **15/15** |
+| Regression (11 npm/PyPI scenarios × 3) | **33/33** correct |
+| Malicious runs with exfil proven by payload | **18/18** |
+| Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
 | Containment events on benign runs | **0** |
 | Median run, end to end | **12–31 s** |
 | Inference per review (median) | **≈ $0.003** |
 | One VX1 host ($113/month), 4 at once | **≈ 620 PR runs/hour** |
 | Whole build to 5 Nov, inference + compute | **$8.26** |
-"10 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 30/30 on the frozen commit and the spend on Sat before exporting.
+"11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.
 
 ## 10. Limits and try it
 

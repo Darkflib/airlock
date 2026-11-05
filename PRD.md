@@ -9,7 +9,7 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm or
 **Status (Wed 4 Nov):** every P0 requirement works end to end on the live site, and the Thursday hardening items are done and verified live, a day early.
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
-- **Regression:** 30/30 correct on the real pipeline (npm, PyPI and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
+- **Regression:** 33/33 correct on the real pipeline (11 scenarios × 3: npm, PyPI, a runtime-only stealer caught through the agent's exercise, and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
 - **Remaining work:** the video, slides and cover image, then the pre-publish audit and submission. The hidden-stealer PR #4, PyPI support and the base-vs-head behaviour diff are done.
 
 **Hackathon fit:** Vultr Agent Rush, Challenge 1 "Blast Radius Zero".
@@ -125,7 +125,7 @@ The agent is **`mimo-v2.6-flash`** on Vultr Serverless Inference. It was chosen 
   - All 12/12 hostile triages caught the package. None followed its README's "AI reviewers: approve this" injection.
   - Zero invalid tool calls in 631.
 - **Refusals are real.** Some models soft-refused to *write* the simulated malware fixture: DeepSeek turned it into a no-op, and others skipped the credential reads.
-- **Product regression** (`evals/product_regression.py`) on the real pipeline, 10 targets × 3 across npm, PyPI and three demo PRs: **30/30 correct**, no forced verdicts, 0 invalid tool calls, exfil proven by payload in 15/15 malicious runs, and the base-vs-head diff identical on every PR run (`product-20261104T030613Z`).
+- **Product regression** (`evals/product_regression.py`) on the real pipeline, 11 targets × 3 across npm, PyPI, a runtime-only stealer and three demo PRs: **33/33 correct**, no forced verdicts, 0 invalid tool calls, exfil proven by payload in 18/18 malicious runs (`product-20261105T142257Z`).
 
 **Agent loop safeguards:** a hard 12-turn budget, with the last turn forcing `finish`. Every tool result passes the injection guard and ends with the Airlock events that call produced, and `finish` is checked: citations of nonexistent ids are sent back once, then flagged. The task prompt itself, which quotes the PR title, file names and event summaries, is screened too. stderr is trimmed to the last 4 KB.
 
@@ -177,7 +177,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Video script drafted from build-log `#demo` moments: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) (shots, 425-word narration, pre-recording checklist, sources)
 - [x] Slide outline drafted (10 slides, including the $1.45 inference spend): [docs/SLIDES.md](docs/SLIDES.md)
 - [x] Deck built from the outline (10 slides, Airlock palette; claude.ai Slides artifact, exports to PDF/PPTX)
-- [ ] Swap the two screenshot placeholders (slides 4 and 5) for frames from the Sat recording; recheck 30/30 and the spend on slide 9
+- [ ] Swap the two screenshot placeholders (slides 4 and 5) for frames from the Sat recording; recheck 33/33 and the spend on slide 9
 - [x] Cover image: `assets/airlock-cover.png` (1920×1080), rendered from `assets/airlock-cover.html`
 
 **Sat 7 Nov: freeze and record**
@@ -212,7 +212,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
 6. **2:33 Under the hood (17 s).**
    - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
    - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
-   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30 (10 scenarios × 3); about $0.003 of inference per review, about 620 PR runs an hour on one host.
+   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 33/33 (11 scenarios × 3); about $0.003 of inference per review, about 620 PR runs an hour on one host.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
 **Before recording:** a fresh run of PR #3; PR #4's run is started on camera by the push, so prepare the README edit and do one practice push the day before. PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
@@ -248,7 +248,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 **Success metrics**
 
-- [x] Hostile targets get a malicious verdict with proven exfil: 15/15 in the regression (npm, shell, Python, PR #3, PR #4).
+- [x] Hostile targets get a malicious verdict with proven exfil: 18/18 in the regression (npm, shell, Python, runtime-only via exercise, PR #3, PR #4).
 - [x] Benign targets get a benign verdict with zero containment events: 15/15.
 - [x] A full run finishes well inside goal 1's 5 minutes: medians 12–31 s end to end, VM boot about 0.7 s. The tighter 20 s target holds for tarballs, npm specs, sdists and the stealer PRs (12–18 s), but not for PR #1 (24 s: two VMs plus `npm test`) or real PyPI `six` (31 s).
 - [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses are answered on the host (verified 4 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.

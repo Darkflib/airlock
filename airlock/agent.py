@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from . import guard
 from .events import EventLog
+from .exercise import TOOL as EXERCISE_TOOL, Exerciser, Request
 from .prcomment import verdict_label
 from .sandbox import PKG_USER, Workspace
 
@@ -76,8 +77,11 @@ def parse_finish(args: dict) -> tuple[str, list[str]]:
 
 
 class TriageAgent:
-    def __init__(self, client: AsyncOpenAI, model: str, ws: Workspace, events: EventLog, *, max_turns: int = 12):
+    def __init__(self, client: AsyncOpenAI, model: str, ws: Workspace, events: EventLog, *, max_turns: int = 12,
+                 exerciser: Exerciser | None = None):
         self.client, self.model, self.ws, self.events, self.max_turns = client, model, ws, events, max_turns
+        self.exerciser = exerciser
+        self.tools = TOOLS[:-1] + [EXERCISE_TOOL, TOOLS[-1]] if exerciser else TOOLS
 
     def _screen(self, text: str, origin: str) -> str:
         clean, findings = guard.screen(text)
@@ -111,6 +115,12 @@ class TriageAgent:
                                    as_user=PKG_USER)
             body = f"exit={r.exit_code}\nstdout:\n{_tail(r.stdout)}\nstderr:\n{_tail(r.stderr)}"
             return self._screen(body, f"exec: {args['cmd'][:60]}")
+        if name == "exercise" and self.exerciser:
+            try:
+                req = Request.parse(args)
+            except ValueError as e:
+                return f"exercise refused: {e}"
+            return self._screen(await self.exerciser.run(req), f"exercise: {req.describe()[:60]}")
         if name == "read_file":
             try:
                 text = await self.ws.read_text(args["path"])
@@ -137,7 +147,7 @@ class TriageAgent:
                 kwargs["tool_choice"] = {"type": "function", "function": {"name": "finish"}}
                 res.forced = True
             resp = await self.client.chat.completions.create(
-                model=self.model, messages=messages, tools=TOOLS, temperature=0.2, max_tokens=8000,
+                model=self.model, messages=messages, tools=self.tools, temperature=0.2, max_tokens=8000,
                 timeout=180, **kwargs)
             if resp.usage:
                 res.prompt_tokens += resp.usage.prompt_tokens or 0

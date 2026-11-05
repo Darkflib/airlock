@@ -17,13 +17,14 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. Proven theft is rejected automatically; anything else waits for a person, and nothing is ever approved automatically.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
-- **Proof.** 30/30 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
+- **Proof.** 33/33 correct (11 scenarios × 3) on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
 - **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser screenshots) was descoped, since the demo repo has no UI; npm and PyPI only. See [the security model](#security-model-and-limits).
 
 ## What we measured, all on Vultr
 
 Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
 
+- **5 Nov, 14:23. Full regression 33/33** ([`product-20261105T142257Z`](evals/results/product-20261105T142257Z/summary.md)): 11 targets × 3 runs, 4 at once, including a new **runtime-only stealer** (`tinyconf`) that is silent through install and tests. The agent read the code, had Airlock **exercise** `load()` with `NODE_ENV=production`, and the theft was proven by payload on 3/3 runs. Exfil proven on all 18 malicious runs, 0 containment events on the 15 benign runs, 0 inconclusive, 0 forced verdicts, 0 invalid tool calls.
 - **4 Nov, 03:06. Full regression 30/30** ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR (under heavy load on 5 Nov, PR #3's count varied from 12 to 14 new; the theft was new and proven every time).
 - **4 Nov, 09:15. Judge access checked with a second GitHub account.** As a guest: only demo runs visible (your uploads 404), deciding or sharing someone else's run 403, PRs from other repos 403, the 16th run in a day 429. Share links open only their own runs; revoking an invite ends its sessions immediately.
 - **4 Nov, 08:45. Live self-test 5/5** (`20261104-084347-33a1a2`): Node, shell and Python stealers malicious with exfil proven by payload (4, 6 and 13 containment events); benign npm and benign Python sdist 0.
@@ -78,7 +79,7 @@ flowchart LR
 1. **Setup** (Airlock code, no AI). A fresh microVM boots in about 0.7 s, with its own kernel, 2 vCPU and 2 GB RAM. Canary credentials carrying a per-run token are planted, and the root watcher starts.
 2. **Acquire.** The control plane fetches the PR head through the GitHub App, or the npm package or uploaded tarball. The VM itself has no GitHub access.
 3. **Detonate.** `npm ci` and `npm test` run as the unprivileged `node` user, with every observation layer on.
-4. **Investigate.** A tool-calling agent (`mimo-v2.6-flash`) reads the code, re-runs what it needs, and must give a verdict within 12 turns. The last turn forces `finish`. Tool output passes a prompt-injection guard before the model sees it, and the PR title and file names are presented as untrusted claims. The agent's commands run as the unprivileged `node` user, never root.
+4. **Investigate.** A tool-calling agent (`mimo-v2.6-flash`) reads the code, re-runs what it needs, and must give a verdict within 12 turns. When the code hides behind a function call or an environment check, it asks Airlock to **exercise** it: Airlock calls that export from a pristine copy with its own harness, so theft caught then counts as proof, while theft triggered by the agent's own commands never does. The last turn forces `finish`. Tool output passes a prompt-injection guard before the model sees it, and the PR title and file names are presented as untrusted claims. The agent's commands run as the unprivileged `node` user, never root.
 5. **Decide.** Proven theft is rejected automatically; anything else waits for a human to approve or reject, on the run page or with a `/airlock approve` or `/airlock reject` comment on the PR (write access required). Only then does Airlock post its final status and comment to the PR. The VM is destroyed when the run ends, whatever the outcome.
 
 **How the network is contained, and how the run is observed:**
@@ -101,22 +102,23 @@ flowchart LR
 
 ## Results
 
-The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target ([`evals/results/product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)). PR runs also detonate the merge base in a second VM; the last column counts behaviours new versus the base (risky ones in brackets), and the regression fails a PR run unless a stealer's exfiltration shows as new, or a benign PR shows no new containment:
+The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run three times on each target, 4 runs at once ([`evals/results/product-20261105T142257Z`](evals/results/product-20261105T142257Z/summary.md)). PR runs also detonate the merge base in a second VM; the last column counts behaviours new versus the base (risky ones in brackets), and the regression fails a PR run unless a stealer's exfiltration shows as new, or a benign PR shows no new containment:
 
-| Target | Ecosystem | Expected | Correct | Containment during install | Exfil proven by payload | New vs base (risky) | Median time |
+| Target | Ecosystem | Expected | Correct | Containment (install, or exercise) | Exfil proven by payload | New vs base (risky) | Median time |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | – | 12.5 s |
-| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | – | 13.2 s |
-| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | – | 13.0 s |
-| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | – | 12.3 s |
-| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | – | 17.2 s |
-| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | – | 16.0 s |
-| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | – | 30.7 s |
-| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 0 (0) every run | 23.8 s |
-| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 13 (6) every run | 16.2 s |
-| Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 10 (5) every run | 18.2 s |
+| Node credential stealer (tarball) | npm | malicious | 3/3 | 4 | 3/3 | – | 19.0 s |
+| Shell credential stealer, no Node code (tarball) | npm | malicious | 3/3 | 6 | 3/3 | – | 16.7 s |
+| Benign package with a postinstall (tarball) | npm | benign | 3/3 | 0 | – | – | 16.9 s |
+| Runtime-only stealer: silent until `load()` runs with `NODE_ENV=production` (tarball) | npm | malicious | 3/3 | 4, all during the agent's exercise | 3/3 | – | 29.3 s |
+| `left-pad@1.3.0` from npm | npm | benign | 3/3 | 0 | – | – | 19.3 s |
+| Python credential stealer in `setup.py` (sdist) | PyPI | malicious | 3/3 | 13 | 3/3 | – | 17.1 s |
+| Benign sdist that still runs `setup.py` work | PyPI | benign | 3/3 | 0 | – | – | 17.4 s |
+| `six==1.17.0` from PyPI | PyPI | benign | 3/3 | 0 | – | – | 34.5 s |
+| Demo PR #1: left-pad bump | npm | benign | 3/3 | 0 | – | 0 (0) every run | 24.8 s |
+| Demo PR #3: vendored stealer, tests pass | npm | malicious | 3/3 | 6 | 3/3 | 13 (6) every run | 23.2 s |
+| Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 11 (6) · 10 (5) · 10 (5) | 29.3 s |
 
-**30/30 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
+**33/33 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 

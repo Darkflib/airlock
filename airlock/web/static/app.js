@@ -343,7 +343,7 @@ const Airlock = (() => {
     const STAGES = {
       setup: ['Setup', 'Fresh microVM, fake credentials planted, package fetched. Airlock code, no AI.'],
       detonate: ['Detonation', 'The package is installed with the tracer on. Anything it tries shows up here.'],
-      agent: ['Agent investigation', 'Commands chosen by the AI reviewer, run inside the same VM.'],
+      agent: ['Agent investigation', 'Commands chosen by the AI reviewer, run inside the same VM. Calls Airlock makes for it ("exercise") count as proof; the agent\'s own commands never do.'],
       verdict: ['Verdict', 'The agent\'s conclusion, then the VM is destroyed. A human decides on the right.'],
       decision: ['Decision', 'What was decided, by whom, and what was posted to GitHub.'],
     };
@@ -513,7 +513,9 @@ const Airlock = (() => {
       const ul = el('ul');
       const ran = c.ran.length ? c.ran.join(', ') : 'nothing (see the timeline)';
       const agent = c.agent_commands ? `; the agent then ran ${c.agent_commands} command${c.agent_commands === 1 ? '' : 's'}` : '';
-      [['Ran as an unprivileged user', ran + agent], ['Watched', c.watched], ['Not exercised', c.not_exercised]]
+      [['Ran as an unprivileged user', ran + agent],
+        ...((c.exercised || []).length ? [['Called by Airlock from a fresh copy, as the agent asked', c.exercised.join('; ')]] : []),
+        ['Watched', c.watched], ['Not exercised', c.not_exercised]]
         .forEach(([k, v]) => { const li = el('li'); li.append(el('strong', '', `${k}: `), document.createTextNode(v)); ul.append(li); });
       box.append(ul);
       box.hidden = false;
