@@ -427,13 +427,24 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 - **Sandbox-aware malware.** A payload that checks for a VM, a fake home directory, a known hostname or a 198.18.x.x address, then does nothing, will pass. The sandbox is not disguised.
 - **Delayed or conditional payloads.** Anything that waits (a timer, a date, a CI environment variable that isn't set, a production hostname) won't run during a 480 s detonation.
-- **Installs that download binaries** (bcrypt from GitHub, puppeteer's Chrome, Prisma's engines) are blocked like any other egress. The install fails or degrades, so the run is inconclusive and needs a person. Allowing known binary hosts would be a policy choice per team, and a new exfil channel.
+- **Installs that download binaries** are blocked like any other egress, so they can't finish. See "Known edge cases" below.
 - **Runtime-only behaviour.** Airlock runs install and the package's own tests. Code that only misbehaves when *your* application imports it and calls a function is exercised only if the agent finds it and asks Airlock to call it (`exercise`, npm and PRs; not Python yet). Code paths it doesn't call stay unexercised. (This is also why Go isn't supported: Go modules have no install hooks, so there is nothing to detonate at install time.)
 - **Pinned TLS** prevents payload capture; we still see the hostname and the attempt.
 - **Encoded exfil** is caught as traffic but is not PROVEN unless the token appears verbatim.
 - **Non-credential theft** (source code, `.env` files we didn't plant, environment variables) is seen as reads and traffic but not proven, because it carries no canary token.
 - **Coverage holes:** the connection poller can miss very short connections; raw-IP refusals in ~7 ms are counted but not attributed; DNS over TCP to the gateway fails closed but isn't recorded; the sinkhole keeps 8,000 characters of a body and the evidence event 2,000, so a token past that isn't matched. The watcher sees programs run and files opened in home directories (where the canaries are), not every file read.
 - **No eBPF.** A custom guest kernel would give syscall-level tracing.
+
+### Known edge cases
+
+Found in the real-package run (`real-packages-20261105T164727Z`, 24 packages × 2):
+
+- **`bcrypt@5.1.1`: inconclusive, 2/2.** `node-pre-gyp` fetches a prebuilt binary from the package's GitHub releases. That's blocked, so it falls back to a source build, which needs Node headers from `nodejs.org`, also blocked. The install exits 1.
+- **`puppeteer@23.11.1`: inconclusive, 2/2.** Its postinstall downloads Chrome from `storage.googleapis.com` (and a version manifest from `googlechromelabs.github.io`). Blocked; the install exits 1.
+- **`prisma@6.2.1`: no malicious behaviour observed, 2/2, with 2–3 contained events.** Its postinstall tries to fetch query engines from `binaries.prisma.sh` (blocked, and the install still succeeds). In the run where the agent exercised it, it also read `~/.npmrc` (presumably for registry settings) and sent nothing. Both are legitimate, and both look like what a stealer does, so they're shown for a person to glance at.
+- **`psutil@6.1.1`: was inconclusive** (no compiler in `python:3.12-slim`). Fixed by moving to the full `python:3.12` image: clean, 2/2.
+
+Why these aren't fixed: a download host that Airlock allows is also a route out for stolen data. Failing closed (inconclusive, with the blocked URLs on the run page) is the safe default. A per-team allowlist of vendor binary hosts, or setting a package's own skip-download variable (`PUPPETEER_SKIP_DOWNLOAD`) during detonation, are possible next steps. Neither is built. Packages that ship binaries through the npm registry as optional dependencies (`sharp`, `esbuild`) are unaffected. Sdists that need other toolchains or system libraries (Rust, database client libraries) would fail like psutil did, but we haven't tested any.
 
 ### AI
 

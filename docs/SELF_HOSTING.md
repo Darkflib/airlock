@@ -218,4 +218,5 @@ The model for each role is in [`roles.toml`](../roles.toml); [`evals/`](../evals
 | `the Airlock GitHub App is not installed on owner/repo` | Install the App on that repo (step 3). |
 | A PR gets no status and no run | The repo isn't in `AIRLOCK_GUEST_REPOS`, or the webhook isn't active. The App's Advanced tab lists recent deliveries and the response to each. |
 | A self-test stealer shows malicious but not **proven** | The sinkhole isn't running: `systemctl status airlock-sinkhole`, and check `~/.mitmproxy/mitmproxy-ca-cert.pem` exists. |
+| A well-known package comes back **inconclusive** with blocked downloads (e.g. bcrypt, puppeteer) | Expected: its install script downloads binaries from outside the registries, and Airlock blocks that, so the install fails. Check the blocked URLs on the run page are the vendor's own, then decide. See "Known edge cases" in the README. |
 | Runs fail with an `ObservationError` | The in-VM watcher didn't start. Usually KVM or microsandbox: run `msb doctor` on the host, and `scripts/check-pins.sh` from your laptop. |
