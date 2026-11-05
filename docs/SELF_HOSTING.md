@@ -182,7 +182,7 @@ You want your App's id next to `airlock`, and `true`.
 | `AIRLOCK_USER_DAILY_RUNS` | `15` | Runs per guest per rolling 24 h (owners are exempt). |
 | `AIRLOCK_GLOBAL_DAILY_RUNS` | `150` | Runs between all guests per rolling 24 h. |
 | `AIRLOCK_WEBHOOK_DAILY_RUNS` | `50` | Automatic PR runs per rolling 24 h. |
-| `AIRLOCK_SLOTS` | core count | Runs at once. Each VM has 2 vCPU and 2 GB; a PR run uses two VMs. CPU is the limit, not memory: past one per core, runs only get slower. |
+| `AIRLOCK_SLOTS` | twice the core count | Runs at once. Each VM has 2 vCPU and 2 GB; a PR run uses two VMs. CPU is the limit, not memory or inference: past two per core, runs only get slower and installs start to fail. |
 | `AIRLOCK_QUEUED_PER_SLOT` | `10` | Guests are turned away (429, with `Retry-After`) once this many runs per slot are waiting. Owners and webhook PRs always get in. |
 | `AIRLOCK_GUEST_UNFINISHED` | `5` | Runs one guest may have waiting or in progress at once (5 is one self-test). |
 | `AIRLOCK_QUEUE_MAX_AGE` | `3600` | Seconds a queued run may wait and still be resumed after a restart. |

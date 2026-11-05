@@ -40,9 +40,10 @@ MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
 # Queue wait excluded. The VM's own 480 s lifetime plus triage; real runs take 12-31 s.
 RUN_DEADLINE = float(os.environ.get("AIRLOCK_RUN_DEADLINE", "600"))
-# Runs at once on this host; default one per core. A package run is one VM (2 vCPU, 2 GB), a PR run
-# two. CPU is the limit: on 4 cores, 4 at once doubled throughput over 2, more only added latency.
-SLOTS = int(os.environ.get("AIRLOCK_SLOTS") or os.cpu_count() or 2)
+# Runs at once on this host; default two per core. A package run is one VM (2 vCPU, 2 GB), a PR run
+# two. CPU is the limit, not inference: on 4 cores, 8 at once gave about 50% more real-package reviews
+# an hour than 4 with no loss of quality; 12 gave no more and made installs fail (build log, 5 Nov).
+SLOTS = int(os.environ.get("AIRLOCK_SLOTS") or 2 * (os.cpu_count() or 1))
 # Back-pressure for guests (owners and webhook runs are exempt): runs waiting across everyone,
 # per slot, and unfinished runs per guest (5: one self-test). A restart resumes queued runs up to
 # QUEUE_MAX_AGE old, and a shutdown waits DRAIN_S for runs in progress (systemd allows 100 s).

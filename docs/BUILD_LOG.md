@@ -841,3 +841,9 @@ Tags: #decision #demo
 **Result:** inference is flat: about 2 s at the median at every level, 29 → 340 calls a minute. The host isn't. Steady-state throughput (n × 3600 ÷ mean run time, worst straggler dropped): 4 at once ≈ 300/h, **8 at once ≈ 455/h** (load 6.7, no extra inconclusive), 12 at once ≈ 450/h (load 14.6, install and tests median 14 → 30 s, agent p90 13.6 s per turn, and 2 extra inconclusive: Prisma's install failed and esbuild ended with no verdict). The batch wall clock at 8 (264/h) was dominated by one puppeteer run whose agent took 357 s for 6 turns: one call hung toward the 180 s inference timeout.
 **So:** two pools wouldn't help: the agent phase also uses CPU (exercise reinstalls the package, the agent runs npm), and the CPU is already saturated at 8. Better levers: default slots of 2 × cores (8 here; it gives +50% on real packages, and the 5 Nov PR load test showed 8 still correct, only slower per run) and a shorter inference timeout so one hung call can't hold a slot for minutes. Scaling past that means more cores (a bigger VX1, or a second host).
 Tags: #metric #decision
+
+### 19:35 — Two runs per core, 60 s per inference call
+**Tried:** acted on the 18:45 measurement: `AIRLOCK_SLOTS` now defaults to 2 × cores (8 on the demo host, was 4), and each agent inference call times out after 60 s (`CALL_TIMEOUT` in `airlock/agent.py`, was 180 s; the client still retries twice).
+**Result:** 409 tests pass, one new: every agent call carries the short timeout. Normal turns take 2–10 s, so 60 s only cuts off hung calls like the one that held a puppeteer run's slot for 357 s.
+**So:** expected throughput on this host is about 455 real-package reviews or about 700 PR runs an hour. README, technical report, slides, self-hosting and PRD now say two per core. Past that the fix is more cores, not more slots.
+Tags: #decision #metric

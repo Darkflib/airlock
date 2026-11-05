@@ -19,6 +19,9 @@ from .sandbox import PKG_USER, Workspace
 
 OUTPUT_TAIL = 4000
 NOTE_EVENTS = 60  # events listed after one tool call
+# Per inference call. Normal turns take 2-10 s; at 180 s one hung call held a run's slot for minutes.
+# The client retries a timed-out call twice (pipeline.inference_client), so one hang now costs a minute.
+CALL_TIMEOUT = 60
 
 SYSTEM = """You are Airlock, a supply-chain security reviewer working inside a disposable microVM.
 The VM has fake canary credentials and default-deny network egress; nothing you run can do harm.
@@ -159,7 +162,7 @@ class TriageAgent:
                 res.forced = True
             resp = await self.client.chat.completions.create(
                 model=self.model, messages=messages, tools=self.tools, temperature=0.2, max_tokens=8000,
-                timeout=180, **kwargs)
+                timeout=CALL_TIMEOUT, **kwargs)
             if resp.usage:
                 res.prompt_tokens += resp.usage.prompt_tokens or 0
                 res.completion_tokens += resp.usage.completion_tokens or 0
