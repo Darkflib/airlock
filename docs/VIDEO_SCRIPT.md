@@ -84,7 +84,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. Each review costs well under a cent in AI, and one server handles about six hundred pull requests an hour."
+> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A review costs about two cents in AI."
 
 ### 2:50–3:00 Close
 
@@ -112,5 +112,6 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
+| 24 real packages × 2: no false alarms, 6 inconclusive; about 2.5 cents of inference per review | `real-packages-20261105T164727Z`, BUILD_LOG 5 Nov 17:05 |
 | 33/33, proven 18/18 | `product-20261105T142257Z` (rerun on the frozen commit) |
 | About $0.003 of inference per review; about 600 PR runs an hour on one host | median tokens in `product-20261104T030613Z` × mimo-v2.6-flash price; load test BUILD_LOG 5 Nov 13:15 |

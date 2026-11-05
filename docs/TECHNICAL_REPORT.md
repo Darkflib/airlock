@@ -248,7 +248,8 @@ Install and tests only run install-time code. A payload behind a function call o
 - it is installed into a **fresh directory with an unguessable name**, with its own npm cache, no user npm config and `--ignore-scripts`;
 - first, Airlock **kills every process the package user runs** and credits anything still in flight to the agent;
 - the call is made by **Airlock's own root-owned harness** (`airlock/guest/exercise.js`) under a cleared environment, keeping only the tracer and the guest's TLS trust;
-- package paths with `..` and call paths through `constructor`, `__proto__` or `prototype` are refused.
+- package paths with `..` and call paths through `constructor`, `__proto__` or `prototype` are refused;
+- arguments and environment values can't name a path outside the fresh copy, a credential file, a token or a network address. Otherwise a legitimate HTTP or upload library, doing as asked, would "send the credentials" on the agent's say-so. The real-package run caught the agent calling `axios.get` on an address of its own choosing, which led to this rule.
 
 So whatever is sent during an exercise is the package's own doing. Its events carry stage `exercise`, and proof counts only from an explicit list of stages (`detonate`, `exercise`), never "anything but the agent".
 
@@ -399,7 +400,9 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Two independent code reviews**, done from the repo alone: `docs/REVIEW-2026-11-03.md` (9 findings, five of them P1) and `docs/RECHECK-2026-11-04.md` (6 remaining). All 15 are fixed and tested; the lower-priority items still open are listed in section 13.
 - **A crash test:** `kill -9` of the web service mid-run, followed by restart, cleanup and a correctly failed run.
 
-**What these numbers are not.** They come from fixtures we wrote, plus a few real benign packages. They are a regression suite, not a detection rate. We have not measured Airlock against real-world malware samples.
+- **Real packages** (`evals/real_packages.tsv`, `real-packages-20261105T164727Z`): 24 popular npm and PyPI packages at pinned versions, twice each, picked for awkward installs (binary downloads, native builds, large trees). **No false alarms.** 42/48 runs gave "No malicious behaviour observed" and 6 were inconclusive (bcrypt and puppeteer download binaries at install time, and Airlock blocks that; psutil can't compile in the slim Python image). Median 46 s and about 100,000 tokens per review, with 16 of 48 runs reaching the 12-turn budget. Throughput was 292 runs an hour at 4 at once with a 1-minute load of 2.4: real reviews are bound by inference, not CPU, so one run per core undersizes the host for them.
+
+**What these numbers are not.** The malicious ones come from fixtures we wrote, and the benign ones from 24 real packages. They are a regression suite and a false-alarm check, not a detection rate. We have not measured Airlock against real-world malware samples.
 
 ## 12. Trade-offs
 
@@ -416,7 +419,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 | `inconclusive` on any coverage gap | Never a false "safe" | More runs need a human look |
 | Automatic rejection on proof only; approval always human | Proven theft is blocked with no wait, and no model's word ever merges code | Everything short of proof (suspicious but unproven, and every clean change) still needs a person; at scale this needs policy (section 14) |
 | One host, SQLite, in-process runners | Simple, fast to build, easy to rebuild | No horizontal scale; one run per core at once |
-| One small, cheap model | About $0.003 of inference per review at the median ($1.52 for the whole build, mostly benchmarking) | Less depth on unusual cases than a large model |
+| One small, cheap model | About $0.003 of inference per review on fixtures, about $0.025 on real packages ($1.52 for the whole build to 5 Nov, mostly benchmarking) | Less depth on unusual cases than a large model |
 
 ## 13. Weaknesses and known limits
 
@@ -424,6 +427,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 - **Sandbox-aware malware.** A payload that checks for a VM, a fake home directory, a known hostname or a 198.18.x.x address, then does nothing, will pass. The sandbox is not disguised.
 - **Delayed or conditional payloads.** Anything that waits (a timer, a date, a CI environment variable that isn't set, a production hostname) won't run during a 480 s detonation.
+- **Installs that download binaries** (bcrypt from GitHub, puppeteer's Chrome, Prisma's engines) are blocked like any other egress. The install fails or degrades, so the run is inconclusive and needs a person. Allowing known binary hosts would be a policy choice per team, and a new exfil channel.
 - **Runtime-only behaviour.** Airlock runs install and the package's own tests. Code that only misbehaves when *your* application imports it and calls a function is exercised only if the agent finds it and asks Airlock to call it (`exercise`, npm and PRs; not Python yet). Code paths it doesn't call stay unexercised. (This is also why Go isn't supported: Go modules have no install hooks, so there is nothing to detonate at install time.)
 - **Pinned TLS** prevents payload capture; we still see the hostname and the attempt.
 - **Encoded exfil** is caught as traffic but is not PROVEN unless the token appears verbatim.
@@ -489,7 +493,7 @@ Runs alongside the stages above. The first slices worth doing are the canaries f
 
 ### 14.5 Business shape
 
-- **Unit cost is low, and mostly compute.** A review uses about 12,000 tokens at the median, about $0.003 of inference. Compute is one VX1 host ($0.153/hour, $113/month) that runs about 620 PR reviews an hour at one per core (load test, 5 November), so compute per review is $113 divided by monthly volume: about 11c at 1,000 reviews a month, about 1c at 10,000. The whole build to 5 November cost $8.26 ($1.52 inference, $6.74 compute). That supports per-seat or per-repo pricing with a generous run allowance.
+- **Unit cost is low.** A review of a real package uses about 100,000 tokens at the median, about $0.025 of inference ($0.003 on small fixtures). Compute is one VX1 host ($0.153/hour, $113/month) that runs about 620 PR reviews an hour at one per core (load test, 5 November), so compute per review is $113 divided by monthly volume: about 11c at 1,000 reviews a month, about 1c at 10,000. The whole build to 5 November cost $8.26 ($1.52 inference, $6.74 compute). That supports per-seat or per-repo pricing with a generous run allowance.
 - **Likely buyers:** platform and security teams in companies with many repos and automated dependency updates; open-source foundations that want a check on maintainers' dependency bumps; package registries that want to detonate new releases before they're widely installed.
 - **Defensibility** isn't the sandbox alone. It is the evidence model (PROVEN vs OBSERVED vs INFERRED, behaviour diff against the base), a growing corpus of behaviour fingerprints across packages, and policy that could let teams skip review for updates that do nothing new (we haven't measured how many that is).
 

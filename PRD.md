@@ -213,7 +213,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
 6. **2:33 Under the hood (17 s).**
    - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
    - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
-   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 33/33 (11 scenarios × 3); about $0.003 of inference per review, about 620 PR runs an hour on one host.
+   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 33/33 (11 scenarios × 3); on 24 real packages no false alarms; about $0.025 of inference per real review.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
 **Before recording:** a fresh run of PR #3; PR #9's run is started on camera by the push, so prepare the README edit and do practice pushes the day before (check the agent uses `exercise`). PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
@@ -251,6 +251,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 - [x] Hostile targets get a malicious verdict with proven exfil: 18/18 in the regression (npm, shell, Python, runtime-only via exercise, PR #3, PR #4).
 - [x] Benign targets get a benign verdict with zero containment events: 15/15.
+- [x] No false alarms on real packages (5 Nov): 24 popular npm/PyPI packages × 2, none malicious or suspicious; 6 inconclusive from installs that download binaries or need a compiler (`real-packages-20261105T164727Z`)
 - [x] A full run finishes well inside goal 1's 5 minutes: medians 12–31 s end to end, VM boot about 0.7 s. The tighter 20 s target holds for tarballs, npm specs, sdists and the stealer PRs (12–18 s), but not for PR #1 (24 s: two VMs plus `npm test`) or real PyPI `six` (31 s).
 - [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses are answered on the host (verified 4 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.
 

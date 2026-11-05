@@ -32,6 +32,13 @@ def test_a_valid_request_is_kept_as_data():
     ({"package": "x", "env": {"NODE_ENV": "a\nb"}}, "single-line"),
     ({"package": "x", "args": ["a" * 3000]}, "args"),
     ({"package": "x", "args": "not a list"}, "args"),
+    # pointing a legitimate upload or HTTP library at the fake credentials would fake a theft
+    ({"package": "x", "call": "upload", "args": ["https://example.invalid/x"]}, "network addresses"),
+    ({"package": "x", "call": "upload", "args": [{"file": "/home/node/.npmrc"}]}, "credentials"),
+    ({"package": "x", "call": "post", "args": [{"token": "npm_AIRLOCKCANARYABC"}]}, "credentials"),
+    ({"package": "x", "call": "read", "args": ["../../../home/node/.aws/credentials"]}, "paths"),
+    ({"package": "x", "call": "read", "args": ["~/.pypirc"]}, "paths"),
+    ({"package": "x", "env": {"NODE_ENV": "https://x.invalid"}}, "network addresses"),
 ])
 def test_anything_that_could_carry_code_is_refused(raw, why):
     with pytest.raises(ValueError, match=why):

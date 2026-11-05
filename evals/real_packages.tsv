@@ -1,0 +1,28 @@
+# Real, popular packages at pinned versions: an outside check on false alarms, completion and review
+# burden (critique points #2 and #6). Chosen for variety, not popularity alone: install scripts that
+# download binaries (and so hit Airlock's blocked egress), native builds, big dependency trees.
+# Columns: target, expected verdict, label. Run: evals/product_regression.py --targets evals/real_packages.tsv
+lodash@4.17.21	benign	lodash: utility library, no scripts
+express@4.21.2	benign	express: web framework, ~30 dependencies
+axios@1.7.9	benign	axios: HTTP client
+chalk@5.4.1	benign	chalk: ESM only
+react@18.3.1	benign	react
+typescript@5.7.3	benign	typescript: one large package
+webpack@5.97.1	benign	webpack: ~80 dependencies
+nodemon@3.1.9	benign	nodemon: file watcher, spawns processes
+core-js@3.40.0	benign	core-js: postinstall prints a banner
+husky@9.1.7	benign	husky: git hooks tool
+esbuild@0.24.2	benign	esbuild: postinstall checks its platform binary
+sharp@0.33.5	benign	sharp: install script, prebuilt native binary
+bcrypt@5.1.1	benign	bcrypt: install downloads a binary from GitHub, else builds
+prisma@6.2.1	benign	prisma: postinstall downloads engines from its CDN
+puppeteer@23.11.1	benign	puppeteer: postinstall downloads Chrome
+pypi:requests==2.32.3	benign	requests
+pypi:urllib3==2.3.0	benign	urllib3
+pypi:click==8.1.8	benign	click
+pypi:flask==3.1.0	benign	flask
+pypi:attrs==24.3.0	benign	attrs
+pypi:pyyaml==6.0.2	benign	PyYAML: optional C extension
+pypi:python-dateutil==2.9.0.post0	benign	python-dateutil: setuptools_scm build
+pypi:tqdm==4.67.1	benign	tqdm
+pypi:psutil==6.1.1	benign	psutil: C extension build

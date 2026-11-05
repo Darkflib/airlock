@@ -40,6 +40,20 @@ CALL = re.compile(r"^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*){0,3}$")
 ENV_ALLOWED = frozenset({"NODE_ENV", "CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_ID", "DEPLOY_ENV", "APP_ENV",
                          "ENV", "ENVIRONMENT", "STAGE", "DEBUG", "TZ", "LANG", "PORT", "HOSTNAME"})
 MAX_ARGS = 2000
+# The agent's data must not point the package at anything: a file outside the fresh copy (the fake
+# credentials), a token, or an address. Otherwise an upload or HTTP library, doing what it was asked,
+# would "send the credentials" or "reach out": the agent's doing, counted as the package's.
+POINTS_AT = re.compile(r"^\s*[/~]|\.\.|[a-z][a-z0-9+.-]*://|AIRLOCKCANARY|AKIA|\.npmrc|\.aws|\.pypirc|/home/", re.I)
+
+
+def _strings(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for k, v in value.items() for s in [str(k), *_strings(v)]]
+    if isinstance(value, list):
+        return [s for v in value for s in _strings(v)]
+    return []
 MAX_WAIT = 15
 
 TOOL = {"type": "function", "function": {
@@ -82,6 +96,9 @@ class Request:
         args = raw.get("args") or []
         if not isinstance(args, list) or len(json.dumps(args)) > MAX_ARGS:
             raise ValueError(f"args must be a JSON array under {MAX_ARGS} characters")
+        if any(POINTS_AT.search(s) for s in _strings(args)):
+            raise ValueError("args can't name paths outside the fresh copy, credentials or network addresses: "
+                             "what the package did with them would be your doing, not the package's")
         env = raw.get("env") or {}
         if not isinstance(env, dict):
             raise ValueError("env must be an object of strings")
@@ -91,6 +108,8 @@ class Request:
         env = {k: str(v)[:200] for k, v in env.items()}
         if any("\n" in v or "\0" in v for v in env.values()):
             raise ValueError("env values must be single-line strings")
+        if any(POINTS_AT.search(v) for v in env.values()):
+            raise ValueError("env values can't name paths, credentials or network addresses")
         try:
             wait_s = max(0, min(MAX_WAIT, int(raw.get("wait_s") or 0)))
         except (TypeError, ValueError):

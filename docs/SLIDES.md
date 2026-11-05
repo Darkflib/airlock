@@ -70,8 +70,9 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Malicious runs with exfil proven by payload | **18/18** |
 | Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
 | Containment events on benign runs | **0** |
-| Median run, end to end | **12–31 s** |
-| Inference per review (median) | **≈ $0.003** |
+| 24 real npm/PyPI packages × 2 | **0 false alarms**, 42 clean, 6 inconclusive (binary downloads blocked) |
+| Median run, end to end | **12–31 s** fixtures, **46 s** real packages |
+| Inference per review (median) | **≈ $0.003** fixtures, **≈ $0.025** real packages |
 | One VX1 host ($113/month), 4 at once | **≈ 620 PR runs/hour** |
 | Whole build to 5 Nov, inference + compute | **$8.26** |
 "11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.

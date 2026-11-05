@@ -60,7 +60,11 @@ async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> 
             row = {"verdict": r.verdict, "turns": r.agent.turns, "forced": r.agent.forced,
                    "invalid": r.agent.invalid_calls, "contained": len(det),
                    "proven": any(e["data"].get("proven") for e in det), "error": None,
-                   "tokens": r.agent.prompt_tokens + r.agent.completion_tokens}
+                   "tokens": r.agent.prompt_tokens + r.agent.completion_tokens,
+                   # enough to look into an unexpected result without the whole timeline
+                   "exercised": sum(e["kind"] == "exercise" for e in r.events),
+                   "gaps": [g for e in r.events if e["kind"] == "coverage_incomplete" for g in e["data"].get("gaps", [])],
+                   "found": [e["summary"][:160] for e in det][:8], "evidence": r.evidence}
             row.update(diff_check(r.events, expected))
         except Exception as e:  # noqa: BLE001
             row = {"verdict": "error", "error": f"{type(e).__name__}: {e}"[:200]}
@@ -99,8 +103,12 @@ async def main() -> None:
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=3)
     ap.add_argument("--prs", action="store_true", help="only the demo PRs (a load test: two VMs per run)")
+    ap.add_argument("--targets", type=Path, help="TSV of target, expected verdict, label (e.g. evals/real_packages.tsv)")
     args = ap.parse_args()
     targets = [t for t in TARGETS if t[0].startswith("https://")] if args.prs else TARGETS
+    if args.targets:
+        targets = [tuple(line.split("\t")[:3]) for line in args.targets.read_text().splitlines()
+                   if line.strip() and not line.startswith("#")]
     gate = asyncio.Semaphore(args.concurrency)
     peak: dict = {}
     stop = asyncio.Event()
@@ -111,20 +119,22 @@ async def main() -> None:
     stop.set()
     await sampler
 
-    out = HERE / "results" / ("product-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    kind = args.targets.stem.replace("_", "-") if args.targets else "product"
+    out = HERE / "results" / (f"{kind}-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
     out.mkdir(parents=True)
     (out / "runs.json").write_text(json.dumps(rows, indent=2))
     lines = [f"# Product regression — {out.name}", "",
-             "| Target | Expected | Correct | Median turns | Forced | Detonation containment | Proven exfil | New vs base (risky) | Median s |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "| Target | Expected | Correct | Verdicts | Median turns | Forced | Containment (install or exercise) | Proven exfil | Exercised | New vs base (risky) | Median s |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for target, expected, label in targets:
         rs = [r for r in rows if r["target"] == target]
         ok = sum(r["ok"] for r in rs)
         good = [r for r in rs if not r.get("error")]
         med = lambda k: statistics.median(r[k] for r in good) if good else "-"  # noqa: E731
-        lines.append(f"| {label} | {expected} | {ok}/{len(rs)} | {med('turns')} | {sum(r.get('forced', False) for r in good)} | "
+        lines.append(f"| {label} | {expected} | {ok}/{len(rs)} | {', '.join(r['verdict'] for r in rs)} | {med('turns')} | "
+                     f"{sum(r.get('forced', False) for r in good)} | "
                      f"{med('contained')} | {sum(r.get('proven', False) for r in good)}/{len(good)} | "
-                     f"{diff_cell(good)} | {med('seconds')} |")
+                     f"{sum(r.get('exercised', 0) > 0 for r in good)}/{len(good)} | {diff_cell(good)} | {med('seconds')} |")
     total = sum(r["ok"] for r in rows)
     lines += ["", f"**{total}/{len(rows)} correct.** Invalid tool calls: {sum(r.get('invalid', 0) for r in rows)}. "
               f"Inconclusive: {sum(r['verdict'] == 'inconclusive' for r in rows)}. Errors: {sum(bool(r.get('error')) for r in rows)}.",

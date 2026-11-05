@@ -32,7 +32,8 @@ Every number below comes from the live VX1 host and Vultr Serverless Inference. 
 - **4 Nov, 02:12. Malformed DNS can't blind the watcher.** A real VM sent truncated queries as `node`; both were logged as `dns_malformed` and the next lookup was still recorded.
 - **4 Nov, 00:29. DNS-label exfil path found and closed.** Before the fix, raw DNS to the gateway resolver went out unrecorded. After it, only registry names resolve and everything else is NXDOMAIN plus a `dns_blocked` event. DNS over TCP is refused but not recorded.
 - **3 Nov. Model choice benchmarked**, not assumed: all 13 catalogue models, about 700 agent calls.
-- **Cost.** A review uses about 12,000 tokens at the median, about **$0.003** of Serverless Inference ($0.02 for the longest in the regression). Compute is one VX1 host at $0.153/hour ($113/month) that runs one review per core: **about 620 PR runs an hour** in a load test (5 Nov), so about 11c of compute per review at 1,000 reviews a month and about 1c at 10,000. The whole build to 5 Nov cost **$8.26**: $1.52 of inference (mostly the 13-model benchmark and evals) and $6.74 of compute.
+- **5 Nov, 16:47. 24 real packages, twice each** ([`real-packages-20261105T164727Z`](evals/results/real-packages-20261105T164727Z/summary.md)): popular npm and PyPI packages at pinned versions, chosen for awkward installs. **No false alarms**: none was called malicious or suspicious. 42 of 48 runs gave "No malicious behaviour observed". **6 were inconclusive**, all because the install failed under Airlock's network rules: bcrypt and puppeteer download binaries from GitHub and Google at install time, and psutil couldn't compile in the slim Python image. Airlock fails closed instead of guessing. Prisma's run was clean but showed blocked downloads and a read of `~/.npmrc` for its registry settings, which is exactly the kind of thing a reviewer is asked to glance at. Real packages are slower and dearer than the fixtures: median 46 s, about 100,000 tokens (16 of 48 hit the 12-turn budget).
+- **Cost.** A review of a small fixture uses about 12,000 tokens at the median, about **$0.003** of Serverless Inference. A real package uses about 100,000, about **$0.025** ($0.043 at most). Compute is one VX1 host at $0.153/hour ($113/month) that runs one review per core: **about 620 PR runs an hour** in a load test (5 Nov), so about 11c of compute per review at 1,000 reviews a month and about 1c at 10,000. The whole build to 5 Nov cost **$8.26**: $1.52 of inference (mostly the 13-model benchmark and evals) and $6.74 of compute.
 - **5 Nov, 13:15. Capacity.** 80/81 PR runs correct at 2–8 at once, none inconclusive; past one per core, runs only get slower (BUILD_LOG 5 Nov 13:15).
 
 What we haven't measured: detection of unseen, real-world malware, or of malware that detects the sandbox and stays quiet.
@@ -119,6 +120,18 @@ The full product pipeline (microVM, watcher, DNS guard, sinkhole, agent) run thr
 | Demo PR #4: stealer hidden as "install analytics" | npm | malicious | 3/3 | 5 | 3/3 | 11 (6) · 10 (5) · 10 (5) | 29.3 s |
 
 **33/33 correct**, zero false-positive containment events on benign targets, no runs downgraded to inconclusive, no forced verdicts, and zero invalid tool calls. The median time is end to end: VM boot, install, tests, AI review and teardown.
+
+### Real packages
+
+Run twice each through the same pipeline ([`real-packages-20261105T164727Z`](evals/results/real-packages-20261105T164727Z/summary.md), list in [`evals/real_packages.tsv`](evals/real_packages.tsv)):
+
+| Packages | Runs | Result |
+| --- | --- | --- |
+| lodash, express, axios, chalk, react, typescript, webpack, nodemon, core-js, husky, esbuild, sharp, prisma | 26 | No malicious behaviour observed, every run |
+| requests, urllib3, click, flask, attrs, PyYAML, python-dateutil, tqdm | 16 | No malicious behaviour observed, every run |
+| bcrypt (binary from GitHub), puppeteer (Chrome from Google), psutil (C build) | 6 | Inconclusive: the install failed, so Airlock won't call it clean |
+
+No run was called malicious or suspicious. The agent used `exercise` on 27 of the 30 npm runs. The arguments it may pass can't name files, credentials or addresses: this run caught it calling `axios.get` on an address of its own choosing, which would have let an HTTP or upload library "send" something on the agent's say-so (fixed and rechecked the same day).
 
 Model selection results are in [`evals/RESULTS.md`](evals/RESULTS.md).
 

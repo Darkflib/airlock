@@ -20,6 +20,6 @@ Every other address is answered by a fake server that Airlock controls on the ho
 
 An AI agent on Vultr Serverless Inference (mimo-v2.6-flash, chosen by testing all 13 models) then investigates. If code only misbehaves when called, the agent has Airlock call it from a clean copy, so that theft counts as proof too. Every claim cites an event. Meanwhile the Airlock GitHub App holds the pull request at "pending", a required check, so it cannot be merged. If the theft is proven, Airlock rejects the pull request by itself and posts the evidence. Otherwise a person decides, and only a person can approve.
 
-Our regression has 11 npm and PyPI scenarios (our own stealers plus real packages), each run 3 times: 33 of 33 correct, with the stolen data captured on all 18 malicious runs. It is not a detection rate. A review takes 12 to 31 seconds and about $0.003 of AI; one $113-a-month server handles about 600 pull requests an hour.
+Our regression (our own stealers plus real packages, 11 scenarios × 3) scored 33 of 33, stolen data captured on all 18 malicious runs. It is not a detection rate. On 24 real packages, run twice: no false alarms, and 6 runs inconclusive where installs download binaries. A real review takes about 46 seconds and 2.5 cents of AI.
 
 Judges can click Run self-test to score five known packages live.
