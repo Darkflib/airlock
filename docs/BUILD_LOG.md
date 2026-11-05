@@ -847,3 +847,9 @@ Tags: #metric #decision
 **Result:** 409 tests pass, one new: every agent call carries the short timeout. Normal turns take 2–10 s, so 60 s only cuts off hung calls like the one that held a puppeteer run's slot for 357 s.
 **So:** expected throughput on this host is about 455 real-package reviews or about 700 PR runs an hour. README, technical report, slides, self-hosting and PRD now say two per core. Past that the fix is more cores, not more slots.
 Tags: #decision #metric
+
+### 20:45 — Real packages at the new default: same quality, one hang not reproduced
+**Tried:** the 24 real packages × 2 again on the deployed code (8 at once, 60 s inference timeout; `real-packages-20261105T203134Z`).
+**Result:** 44/48 as expected: no false alarms, the known inconclusive results (puppeteer ×2, bcrypt once: both downloads blocked) and one error. Steady state about 456 runs an hour (matches the 455 from 18:45), median 59 s, load 7.3, 11.5 GB free; slowest agent loop 150 s (PyYAML), so no call sat on a timeout. The error: one bcrypt run hit the VM's 480 s lifetime (`SandboxNotRunningError`) where every other bcrypt run takes 40–120 s. The harness kept no events for errors, so it now records the last 8 with timings. Eight more bcrypt runs at 8 at once (`bcrypt-20261105T203407Z`): all inconclusive in 57–115 s, no hang.
+**So:** default stays. The hang is rare and contained: the VM lifetime ends it, and in the web app the run fails at the 600 s deadline and its slot frees. If it recurs, the new error field shows where it stopped.
+Tags: #metric #fail

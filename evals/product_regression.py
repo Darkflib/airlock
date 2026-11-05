@@ -53,9 +53,9 @@ def diff_check(events: list[dict], expected: str) -> dict:
 
 async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> dict:
     async with gate:
-        t0 = time.monotonic()
+        t0, log = time.monotonic(), EventLog()
         try:
-            r = await analyse(target, events=EventLog())
+            r = await analyse(target, events=log)
             det = [e for e in r.events if e["containment"] and e["data"].get("stage") in ("detonate", "exercise")]
             row = {"verdict": r.verdict, "turns": r.agent.turns, "forced": r.agent.forced,
                    "invalid": r.agent.invalid_calls, "contained": len(det),
@@ -68,7 +68,9 @@ async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> 
                    "found": [e["summary"][:160] for e in det][:8], "evidence": r.evidence}
             row.update(diff_check(r.events, expected))
         except Exception as e:  # noqa: BLE001
-            row = {"verdict": "error", "error": f"{type(e).__name__}: {e}"[:200]}
+            row = {"verdict": "error", "error": f"{type(e).__name__}: {e}"[:200],
+                   # where it got stuck: the last events, with seconds since the run started
+                   "last": [f"+{ev.ts - log.events[0].ts:.0f}s {ev.kind}: {ev.summary[:120]}" for ev in log.events[-8:]]}
         row.update(target=target, expected=expected, rep=rep, seconds=round(time.monotonic() - t0, 1),
                    ok=row["verdict"] == expected and row.get("diff_ok", True) is not False)
         print(f"  {'PASS' if row['ok'] else 'FAIL'} {target[-48:]:48} {row['verdict']:10} {row['seconds']}s "

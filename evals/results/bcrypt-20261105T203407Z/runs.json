@@ -1,0 +1,277 @@
+[
+  {
+    "verdict": "inconclusive",
+    "turns": 12,
+    "forced": true,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 139183,
+    "exercised": 1,
+    "agent_s": 49.8,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.19.37.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "package.json scripts contain only test and install (node-pre-gyp install --fallback-to-build); no pre/postinstall or prepare hooks exist [E105].",
+      "Install-time network attempts were only the legitimate prebuilt binary from github.com/kelektiv and nodejs.org headers, both blocked by the sandbox [E8][E9][E10].",
+      "bcrypt.js and promises.js require only @mapbox/node-pre-gyp, path, crypto and ./promises; no net/tls/dns/child_process/fetch usage anywhere in the JS [E93].",
+      "Native sources bcrypt_node.cc, bcrypt.cc, blowfish.cc expose only gen_salt/encrypt/compare/get_rounds N-API functions with no system(), exec or network calls [E50][E81].",
+      "Tarball contents match the unpacked tree exactly (bcrypt.js and package.json diffs empty), and exercise require of bcrypt produced no network or file events beyond failing to find the unbuilt binding [E89][E92][E117]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 0,
+    "seconds": 73.4,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 10,
+    "forced": false,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 108287,
+    "exercised": 1,
+    "agent_s": 52.9,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.18.172.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "package.json scripts contain only the standard install hook 'node-pre-gyp install --fallback-to-build'; no postinstall/prepare hooks exist [E93].",
+      "Install-time network calls are the expected prebuilt-binary download from github.com/kelektiv and node headers from nodejs.org, both blocked by the sandbox [E8][E9][E10][E59][E72].",
+      "bcrypt.js requires only node-pre-gyp, path, crypto and ./promises; no http/net/dns/child_process/eval anywhere in the JS [E107].",
+      "Native sources src/bcrypt.cc, blowfish.cc, bcrypt_node.cc implement only bcrypt gensalt/encrypt/compare with no system(), sockets or exec calls [E79][E81].",
+      "Tarball contents match the unpacked files exactly (bcrypt.js and package.json byte-identical), so nothing hidden was added [E98][E101]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 1,
+    "seconds": 76.1,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 9,
+    "forced": false,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 70685,
+    "exercised": 1,
+    "agent_s": 33.4,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.18.211.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "The tarball's sha1 (0f732c6dcb4e12e5b70a25e326a72965879ba6e2) exactly matches npm's published shasum for bcrypt@5.1.1, so the package is byte-identical to the official release [E45][E41].",
+      "The only install script is `node-pre-gyp install --fallback-to-build`; its blocked downloads target github.com/kelektiv/node.bcrypt.js releases and nodejs.org headers \u2014 the hosts declared in package.json's `binary` field [E8][E9][E10].",
+      "All spawned processes during install (node-pre-gyp, node-gyp clean/configure, python3 version probes) are the standard native-build toolchain, with no other network or shell activity [E11][E16][E17][E18].",
+      "Runtime code (bcrypt.js, promises.js) requires only node-pre-gyp's local `find`, the native binding, and node:crypto \u2014 no URLs, child_process, or env-gated branches anywhere in the shipped JS/C++ [E83].",
+      "Requiring the package from a fresh copy produced no side effects beyond failing to find the unbuilt native binding, confirming nothing runs at load time [E78][E79]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 2,
+    "seconds": 57.1,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 10,
+    "forced": false,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 118545,
+    "exercised": 1,
+    "agent_s": 61.7,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.19.155.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "The only lifecycle script is the stock \"install\": \"node-pre-gyp install --fallback-to-build\"; no preinstall/postinstall or other hooks exist [E83][E89].",
+      "Install-time network was limited to the declared binary host github.com and nodejs.org headers \u2014 the normal node-pre-gyp flow \u2014 and was contained [E8][E9][E20].",
+      "A local from-source rebuild ran only node-gyp, python, make and gcc over the package's own three C++ files, with no egress events [E85][E105][E109].",
+      "Requiring the package at runtime only attempts to load its own local bcrypt_lib.node; no DNS lookups, connects, or dotfile reads occurred [E235][E239].",
+      "Static scan of bcrypt.js, promises.js, binding.gyp and src/ found no network, child_process, eval, or env-gated code \u2014 only comment URLs [E53]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 3,
+    "seconds": 85.0,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 12,
+    "forced": true,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 136473,
+    "exercised": 2,
+    "agent_s": 53.6,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.18.111.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "Candidate tarball's sha512 equals npm registry's published dist.integrity for bcrypt@5.1.1, so the package is byte-identical to the official release [E116].",
+      "Install script is only 'node-pre-gyp install --fallback-to-build', which tried to download the prebuilt bcrypt_lib binary from github.com/kelektiv releases and fell back to node-gyp build when egress was blocked [E7][E8][E10].",
+      "All install-time network attempts were the expected prebuilt-binary and node headers downloads, contained by Airlock's fake server, with no other hosts contacted [E8][E9][E20].",
+      "bcrypt.js and promises.js contain no network, child_process, eval, or dotfile access; they only wrap the native binding and crypto.randomBytes for salt generation [E65][E30].",
+      "Native C++ sources (bcrypt.cc, blowfish.cc, bcrypt_node.cc) implement only bcrypt hashing/compare with no system(), popen, or socket calls [E34][E57].",
+      "Exercise calls to hashSync/compareSync from a fresh copy produced no network or file events beyond loading the module, and failed only because the native binding wasn't built in the sandbox [E83][E93]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 4,
+    "seconds": 77.3,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 10,
+    "forced": false,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 104555,
+    "exercised": 1,
+    "agent_s": 40.5,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.18.205.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "Install script is only \"node-pre-gyp install --fallback-to-build\", which fetched the prebuilt binary from github.com/kelektiv/node.bcrypt.js releases and fell back to node-gyp when blocked [E8] [E10] [E13].",
+      "The other blocked fetches are node-gyp downloading official Node headers from nodejs.org, standard for any native module build [E9] [E20].",
+      "All spawned processes during install are node, python3 and sh running node-pre-gyp/node-gyp \u2014 no other executables or scripts ran [E11] [E12] [E16] [E17].",
+      "bcrypt.js contains no network, child_process, eval or env-dependent code; it only wraps the native binding with crypto.randomBytes for salts [E100].",
+      "Exercising bcrypt.hashSync from a fresh copy only attempted to load lib/binding/napi-v3/bcrypt_lib.node and threw because the build was blocked \u2014 no network, dotfile or credential access [E71] [E75]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 5,
+    "seconds": 62.5,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 12,
+    "forced": true,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 138142,
+    "exercised": 1,
+    "agent_s": 59.1,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.19.24.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "package.json has only the standard install script \"node-pre-gyp install --fallback-to-build\"; no postinstall/prepare hooks exist [E42].",
+      "Install-time network calls were only node-pre-gyp fetching the prebuilt bcrypt_lib tarball from github.com/kelektiv and node headers from nodejs.org, both blocked by the sandbox [E8][E9][E10][E20].",
+      "bcrypt.js and promises.js require only node-pre-gyp, path, crypto, and the native binding; no child_process, net, dns, https, or process.env usage anywhere in the package [E68][E71].",
+      "C++ sources (bcrypt_node.cc, bcrypt.cc, blowfish.cc) are the standard OpenBSD bcrypt implementation exposing only gen_salt/encrypt/compare/get_rounds N-API functions, with no system(), popen, or socket calls [E101].",
+      "Exercise run of bcrypt.hash() from a fresh copy produced no network or process events beyond loading the module, confirming runtime behavior matches the reviewed code [E50][E54]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 6,
+    "seconds": 83.2,
+    "ok": false
+  },
+  {
+    "verdict": "inconclusive",
+    "turns": 12,
+    "forced": true,
+    "invalid": 0,
+    "contained": 4,
+    "proven": false,
+    "error": null,
+    "tokens": 166321,
+    "exercised": 0,
+    "agent_s": 91.5,
+    "gaps": [
+      "the install exited 1, so not all of its scripts may have run",
+      "the run produced more than 5000 events, so not all were recorded"
+    ],
+    "found": [
+      "GET https://github.com/kelektiv/node.bcrypt.js/releases/download/v5.1.1/bcrypt_lib-v5.1.1-napi-v3-linux-x64-glibc.tar.gz (0 bytes): answered by Airlock's sinkho",
+      "GET https://nodejs.org/download/release/v26.13.0/node-v26.13.0-headers.tar.gz (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+      "node-pre-gyp install --fallback-to-build tried to reach github.com; contained, never reached the internet",
+      "node looked up nodejs.org; answered with sinkhole address 198.19.165.137"
+    ],
+    "evidence": [
+      "Not a clean result: the install exited 1, so not all of its scripts may have run.",
+      "Not a clean result: the run produced more than 5000 events, so not all were recorded.",
+      "Install script is only \"node-pre-gyp install --fallback-to-build\", which tried the official GitHub release tarball then fell back to node-gyp compile [E8][E10][E113].",
+      "All network attempts during install were the standard prebuilt-binary and node headers downloads, all blocked by Airlock's fake server [E8][E9][E20].",
+      "Package contains 26 files, all standard bcrypt sources, tests and CI configs; no hidden scripts or extra payloads [E60].",
+      "bcrypt.js and promises.js only wrap the native binding: grep found no child_process, eval, fetch or non-comment URLs [E47].",
+      "Full jest suite passed 75/75 and hash/compare/getRounds worked correctly at runtime with no network or dotfile access [E231]."
+    ],
+    "target": "bcrypt@5.1.1",
+    "expected": "benign",
+    "rep": 7,
+    "seconds": 115.1,
+    "ok": false
+  }
+]
