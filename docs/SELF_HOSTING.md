@@ -1,6 +1,6 @@
 # Running your own Airlock
 
-This walks through standing up Airlock from nothing: a KVM host, sign-in, the GitHub App and a protected branch. It takes about an hour, most of it in GitHub's settings pages. The reference instance, `airlock.darkflib.dev`, was built exactly this way.
+This walks through standing up Airlock from nothing: a KVM host, sign-in, the GitHub App and a protected branch. It takes about an hour, most of it in GitHub's settings pages. The reference instance, `airlock.darkflib.dev`, was built this way. On 5 November we followed steps 1, 4, 5 and 7 on a fresh Vultr instance: cloud-init took a few minutes, the deploy 14 seconds, and the five self-test packages and a PR all came out right on the first run.
 
 You will end up with:
 
@@ -102,6 +102,14 @@ op read "$(sed -n 's/^GITHUB_APP_ID="\(.*\)"$/\1/p' .env)"
 
 ## 5. Deploy
 
+SSH to the host once by its DNS name, so its host key is known (the deploy runs ssh and rsync non-interactively):
+
+```bash
+ssh airlock@airlock.example.com true
+```
+
+Then:
+
 ```bash
 scripts/deploy.sh
 ```
@@ -120,7 +128,7 @@ active
 app health: http 200
 ```
 
-The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. The first deploy also builds the Python environment, so give it a few minutes. The first run on a new host pulls the VM images (`node`, `python:3.12-slim`) and is slower than later ones. Run it again after every change; it is safe to repeat.
+The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. On a fresh host the first deploy took 14 seconds, Python environment included. The first run on a new host pulls the VM images (`node`, `python:3.12-slim`) and is slower than later ones. Run it again after every change; it is safe to repeat.
 
 ## 6. Let people in
 
@@ -189,7 +197,7 @@ The model for each role is in [`roles.toml`](../roles.toml); [`evals/`](../evals
 - **Updating:** pull, then `scripts/deploy.sh`. A restart fails any run in progress and releases its PR as `error` on GitHub (push again to rerun); startup also removes any VMs those runs left behind.
 - **What is kept:** each run's evidence lives in SQLite. Uploads are deleted when their run ends. Runs that aren't demo runs are deleted after `AIRLOCK_RETAIN_DAYS`. The sinkhole log is rotated daily, keeping one previous file.
 - **Rebuilding:** the host holds nothing that can't be recreated except `~/.local/share/airlock` (run history) and `~/.config/airlock` (allowlist, invites, share-link ledger, session secret). Copy those two directories if you want to keep them, recreate the instance from cloud-init, and deploy.
-- **Running the CLI on the host** (for debugging): `scripts/remote.sh uv run airlock analyse left-pad@1.3.0` syncs the tree and runs the analysis there with the inference key from 1Password.
+- **Running the CLI on the host** (for debugging): `scripts/remote.sh uv run airlock analyse left-pad@1.3.0` syncs the tree and runs a package analysis there with the inference key from 1Password. A PR also needs the App's credentials, so run it on the host with the service's environment: `ssh airlock@airlock.example.com 'set -a; . ~/.config/airlock/web.env; set +a; cd ~/airlock && uv run airlock analyse https://github.com/OWNER/REPO/pull/N'`. The CLI never posts to GitHub.
 
 ## Without 1Password
 
