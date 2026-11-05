@@ -278,7 +278,7 @@ The App subscribes to **Pull request** events and delivers them to `/api/github/
 
 - **Authenticated by signature, not by login.** GitHub can't sign in, so this one path skips the login check. Instead every delivery must carry `X-Hub-Signature-256`, an HMAC-SHA256 of the raw body made with the App's webhook secret, compared in constant time. A bad or missing signature gets 401 and starts nothing. With no secret configured, the endpoint answers 404: it is off, not open.
 - **Only enabled repos.** Deliveries from other repos the App might be installed on are acknowledged and ignored, so a stranger's install can't spend VM time or inference. Today that is the demo repo (`AIRLOCK_GUEST_REPOS`).
-- **One run per commit.** GitHub redelivers when it times out, so each delivery id is used once, and a head commit that already has a run that didn't fail isn't analysed again.
+- **One run per commit.** GitHub redelivers when it times out, so each delivery id is used once (recorded in SQLite for 7 days, so this holds across restarts), and a head commit that already has a run that didn't fail isn't analysed again.
 - **Its own cap:** 50 automatic runs per rolling 24 hours (`AIRLOCK_WEBHOOK_DAILY_RUNS`), so a burst of pushes can't run up the bill.
 - **Answers at once.** The handler replies 202 with the run's URL and the analysis runs afterwards; GitHub stops waiting after 10 seconds and a run takes 12–31 s.
 - **Same run, same gate.** It starts exactly the run the UI would, attributed to the GitHub user who caused the event and marked `(webhook)`. The App posts `pending`, and the decision is still a person's, with the write-access check below.
@@ -419,7 +419,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy. Per run, sizes are bounded (5 November): a 600 s deadline, 5,000 events, 32 MB per guest log, 64 KB of each command's output, and a 1,000-event backlog per live viewer.
 - **GitHub fetch limits.** The changed-file list stops at GitHub's 3,000 files and the agent's diff at 200,000 characters; either cut is disclosed to the agent, on the run page and in the PR comment (5 November). The diff and archive are pinned to the base and head SHAs, and the file list is read between two reads of the head.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
-- **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3. Redelivery de-duplication is in memory, so a redelivery that arrives across a restart is caught only by the one-run-per-commit check.
+- **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3.
 - **Self-hosting** still depends on personal defaults (domain, SSH key, 1Password item names) and lacks a complete `.env.example` and App setup guide.
 
 ## 14. From prototype to product
