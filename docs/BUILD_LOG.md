@@ -871,3 +871,9 @@ Tags: #win #decision #demo
 **Result:** startup logs `receipt_key=475879ded052c017`. The run (`20261105-213334-de0311`) has a verdict receipt over 38 events; `/verify` on the live site says VALID, and so does `airlock verify` with the key pinned in `docs/SIGNING_KEY.md` and with `--server`. The host has no `sqlite3`, so fetching a bundle there takes the venv's Python. The decision receipt is covered by tests only: no live run was decided, to keep test decisions off the record.
 **So:** every new run is signed; runs from before 21:33 have no receipts.
 Tags: #win #demo
+
+### 21:55 — PR #3 without Airlock: green check, keys gone
+**Tried:** `evals/without_airlock.py` runs a PR as a plain CI job would: a fresh microVM (still never the host) with the same fake `~/.npmrc` and `~/.aws/credentials`, `npm ci` and `npm test` as `node`, and no watcher, sinkhole or AI. The stealer posts to a `.invalid` name, so a stand-in for the attacker's server listens in the VM under that name with a certificate the VM trusts.
+**Result:** 3/3 runs: CI passes (`npm ci` 1.0 s, `npm test` 0.2 s), and one POST delivers both the npm token and the AWS secret to the attacker, in 3.2 s. Worked first time. Airlock on the same PR: MALICIOUS, proven, 3/3, median 23.2 s. [results](../evals/results/without-airlock-20261105T215220Z/summary.md)
+**So:** the README has a before/after table; it's the answer to "why not just run it in CI?" and a candidate 10-second video beat: the green check next to the attacker's log.
+Tags: #metric #demo

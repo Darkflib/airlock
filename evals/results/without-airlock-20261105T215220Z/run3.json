@@ -1,0 +1,33 @@
+{
+  "pr": "Darkflib/airlock-demo#3",
+  "head_sha": "06e0a24d0f9c0fb9104f32edb4d713f904d4c15e",
+  "vm": "airlock-without-5153a84a",
+  "seconds": 3.2,
+  "ci_result": "pass",
+  "steps": [
+    {
+      "cmd": "npm ci --no-audit --no-fund",
+      "exit_code": 0,
+      "seconds": 1.0,
+      "tail": "es in 769ms\nnpm warn deprecated left-pad@1.2.0: use String.prototype.padStart()\nnpm warn install-scripts 1 package has install scripts not yet covered by allowScripts:\nnpm warn install-scripts   colorful-logs@2.0.1 (postinstall: sh ./scripts/setup.sh)\nnpm warn install-scripts\nnpm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.\nnpm notice\nnpm notice New major version of npm available! 11.20.0 -> 12.2.2\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2\nnpm notice To update run: npm install -g npm@12.2.2\nnpm notice\n"
+    },
+    {
+      "cmd": "npm test --if-present",
+      "exit_code": 0,
+      "seconds": 0.2,
+      "tail": "\n> status-api@1.4.0 test\n> node test.js\n\nok\n"
+    }
+  ],
+  "attacker_received": [
+    {
+      "at": "2026-11-05T21:52:36.352Z",
+      "method": "POST",
+      "host": "telemetry.colorful-logs.invalid",
+      "path": "/v1",
+      "body": "//registry.npmjs.org/:_authToken=npm_CIBASELINEFC5441146489992A\n[default]\naws_access_key_id = AKIA41146489992A\naws_secret_access_key = CIBASELINEFC5441146489992A/ci\n"
+    }
+  ],
+  "token_reached_attacker": true,
+  "aws_secret_reached_attacker": true,
+  "token": "CIBASELINEFC5441146489992A"
+}

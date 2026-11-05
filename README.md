@@ -54,6 +54,16 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 
 - **A signed record.** When the verdict is in, Airlock seals the whole timeline (the captured request included), the verdict and what was analysed into a receipt signed with Ed25519; the decision gets a second receipt chained to the first. The PR comment cites its hash. **Verify** on the run page checks both in your browser with this server's public key, and **Change the verdict** shows what a forgery looks like: the hash and signature fail. `airlock verify <bundle> --key <key>` does the same offline.
 
+**The same PR without Airlock.** We ran PR #3 as a plain CI job would: a fresh VM with the same fake credential files, `npm ci` and `npm test`, nothing watching. A stand-in for the attacker's server listened under the stealer's address, since the real one deliberately doesn't exist ([`evals/without_airlock.py`](evals/without_airlock.py), [results](evals/results/without-airlock-20261105T215220Z/summary.md), 5 Nov, 3 runs):
+
+| | Plain CI job | Airlock |
+| --- | --- | --- |
+| Install and tests | pass | pass, same commands |
+| Credential files read | yes, and nothing records it | recorded, with the program that read them |
+| npm token and AWS secret | **reached the attacker**, 3/3 | captured by Airlock's fake server, nothing left, 3/3 |
+| What the reviewer sees | a green check | MALICIOUS, merge held, rejected automatically, signed receipt |
+| Time | 3.2 s | 23.2 s median (two VMs and the AI review) |
+
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and reads **"No malicious behaviour observed"**, listing what ran and what a run like this can't exercise. Airlock never calls a quiet run safe.
 
 ## How it works
