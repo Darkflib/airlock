@@ -29,10 +29,11 @@ from ..prcomment import build_comment, build_progress
 from ..sandbox import sinkhole_log
 from ..store import Store, data_dir
 from . import auth as authmod
+from .access import Viewer
 
 STATIC = Path(__file__).parent / "static"
-GUEST_REPOS = frozenset(r.strip().lower() for r in
-                        os.environ.get("AIRLOCK_GUEST_REPOS", "Darkflib/airlock-demo").split(",") if r.strip())
+# Repos whose PRs run from the webhook and that guests may submit. Unset: none (automatic runs off).
+GUEST_REPOS = frozenset(r.strip().lower() for r in os.environ.get("AIRLOCK_GUEST_REPOS", "").split(",") if r.strip())
 SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~=*-]+)?$", re.I)  # no shell syntax
 MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
@@ -188,7 +189,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     stale = store.fail_stale_runs()
     store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
     github = github or GitHubApp.from_env()
-    public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
+    public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
 
     async def gate_pr(run_id: str, phase: str, log: EventLog) -> None:
         """Hold a PR's merge while it runs: a `pending` airlock status (which branch protection can
@@ -261,35 +262,24 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     webhook_secret = webhook_secret if webhook_secret is not None else os.environ.get("GITHUB_WEBHOOK_SECRET", "")
     webhook_daily = int(os.environ.get("AIRLOCK_WEBHOOK_DAILY_RUNS", 50))
 
-    def is_owner(user: str | None) -> bool:
-        return not auth or (user or "").lower() in owners
-
-    def mine(run: dict, user: str | None) -> bool:
-        return (run.get("submitted_by") or "").lower() == (user or "").lower()
-
-    def readable(run: dict, request: Request) -> bool:
-        return can_read(run, authmod.current_user(request), authmod.current_share(request))
-
-    def can_read(run: dict, user: str | None, share: dict | None) -> bool:
-        """Share-link viewers were already limited to their runs by the auth middleware. A signed-in
-        guest holding a share link may also read the runs it names (reads only: every mutation checks
-        ownership separately)."""
-        if user is None or is_owner(user):
-            return True
-        if run["id"] in ((share or {}).get("runs") or []):
-            return True
-        # An owner's run is shown to guests only when it is demo material: a self-test, a public
-        # npm package or a PR from AIRLOCK_GUEST_REPOS. Uploads and other repos stay private.
-        return mine(run, user) or (bool(run.get("demo")) and (run.get("submitted_by") or "").lower() in owners)
+    def viewer(request: Request, creds: tuple[str | None, dict | None] | None = None) -> Viewer:
+        """Whoever is asking (airlock/web/access.py has the rules): the request's sign-in and share
+        grant as the middleware found them, or `creds` re-read since (a long-lived stream)."""
+        user, share = creds or (authmod.current_user(request), authmod.current_share(request))
+        return Viewer(user, share, owners, signed_in_required=bool(auth))
 
     def get_readable(run_id: str, request: Request) -> dict:
         run = store.get_run(run_id)
-        if not run or not readable(run, request):
-            raise HTTPException(404)
+        if not run or not viewer(request).can_read(run):
+            raise HTTPException(404)  # not 403: an unreadable run is indistinguishable from none
         return run
 
+    def require_change(request: Request, item: dict, refusal: str, by: str = "submitted_by") -> None:
+        if not viewer(request).can_change(item, by):
+            raise HTTPException(403, refusal)
+
     def check_quota(user: str | None, n: int) -> None:
-        if is_owner(user):
+        if Viewer(user, None, owners, bool(auth)).owner:
             return
         since = time.time() - 86400
         if user and store.count_runs(since, user=user) + n > user_daily:
@@ -373,7 +363,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.get("/api/me")
     async def me(request: Request):
         user = authmod.current_user(request)
-        return {"login": user, "auth": bool(auth), "owner": bool(user) and is_owner(user),
+        return {"login": user, "auth": bool(auth), "owner": bool(user) and viewer(request).owner,
                 "share": authmod.current_share(request) is not None and not authmod.current_user(request)}
 
     @app.get("/")
@@ -411,7 +401,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             if github is None:
                 raise HTTPException(400, "GitHub App not configured on this server")
             owner, repo, number = parse_pr_url(spec)
-            if not is_owner(user) and f"{owner}/{repo}".lower() not in GUEST_REPOS:
+            if not viewer(request).can_submit_pr(f"{owner}/{repo}", GUEST_REPOS):
                 raise HTTPException(403, f"guest accounts can analyse PRs from {', '.join(sorted(GUEST_REPOS))} only")
             run_id = runner.start(spec.strip(), f"{owner}/{repo}#{number}", user,
                                   demo=f"{owner}/{repo}".lower() in GUEST_REPOS)
@@ -559,16 +549,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         test = store.get_selftest(test_id)
         if not test:
             raise HTTPException(404)
-        user = authmod.current_user(request)
-        if not is_owner(user) and (test.get("submitted_by") or "").lower() != (user or "").lower():
-            raise HTTPException(403, "you can share only self-tests you started")
-        return share_url([p["run_id"] for p in test["probes"]], test_id, user)
+        require_change(request, test, "you can share only self-tests you started")
+        return share_url([p["run_id"] for p in test["probes"]], test_id, authmod.current_user(request))
 
     @app.post("/api/runs/{run_id}/share")
     async def share_run(run_id: str, request: Request):
         run = get_readable(run_id, request)
-        if not is_owner(authmod.current_user(request)) and not mine(run, authmod.current_user(request)):
-            raise HTTPException(403, "you can share only runs you submitted")
+        require_change(request, run, "you can share only runs you submitted")
         return share_url([run_id], None, authmod.current_user(request))
 
     def my_shares(request: Request) -> list[dict]:
@@ -576,7 +563,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         user = authmod.current_user(request)
         if not auth or not user:
             raise HTTPException(401, "sign in required")
-        return [s for s in auth.shares() if is_owner(user) or (s.get("by") or "").lower() == user.lower()]
+        return [s for s in auth.shares() if viewer(request).can_change(s, by="by")]
 
     @app.get("/api/shares")
     async def list_shares(request: Request, run: str = "", selftest: str = ""):
@@ -593,7 +580,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
 
     @app.get("/api/runs")
     async def list_runs(request: Request):
-        return [r for r in store.list_runs() if readable(r, request)]
+        v = viewer(request)
+        return [r for r in store.list_runs() if v.can_read(r)]
 
     @app.get("/api/runs/{run_id}")
     async def get_run(run_id: str, request: Request):
@@ -616,10 +604,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             if not auth or (not force and time.monotonic() - checked <= 15):
                 return True
             checked = time.monotonic()
-            user, share = authmod.credentials(auth, request)
-            if user:
-                return can_read(store.get_run(run_id), user, share)
-            return bool(share and authmod.share_allows(share, request.method, request.url.path))
+            return viewer(request, authmod.credentials(auth, request)).can_read(store.get_run(run_id))
 
         async def gen():
             still_readable()  # starts the recheck clock
@@ -659,10 +644,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.post("/api/runs/{run_id}/decision")
     async def decide(run_id: str, body: Decision, request: Request):
         run = get_readable(run_id, request)
-        user = authmod.current_user(request)
-        if not is_owner(user) and not mine(run, user):
-            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can decide it")
-        return await apply_decision(run, body.decision, user, body.note, via="web")
+        require_change(request, run, "only the person who submitted this run, or an Airlock owner, can decide it")
+        return await apply_decision(run, body.decision, authmod.current_user(request), body.note, via="web")
 
     async def apply_decision(run: dict, decision: str, user: str | None, note: str, via: str,
                              author: str | None = None) -> dict:
@@ -721,8 +704,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         """Post a decision again after GitHub failed past the automatic retries (an outage)."""
         run = get_readable(run_id, request)
         user = authmod.current_user(request)
-        if not is_owner(user) and not mine(run, user):  # who may, before anything about the run's state
-            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can post it")
+        # who may, before anything about the run's state
+        require_change(request, run, "only the person who submitted this run, or an Airlock owner, can post it")
         m = run["meta"] or {}
         if m.get("kind") != "pr" or not github or not run["decision"]:
             raise HTTPException(409, "nothing to post: not a decided pull request run")
@@ -765,6 +748,17 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     return app
 
 
+def access_summary(cfg: authmod.AuthConfig) -> str:
+    """The effective access settings, printed at startup so a missing or mistyped one is visible."""
+    webhook = "on" if os.environ.get("GITHUB_WEBHOOK_SECRET") and GUEST_REPOS else "off"
+    return (f"access: public_url={cfg.public_url} owners={','.join(sorted(cfg.allowed))} "
+            f"guest_repos={','.join(sorted(GUEST_REPOS)) or '(none)'} webhook={webhook} "
+            f"auto_reject={os.environ.get('AIRLOCK_AUTO_REJECT', '1') != '0'} "
+            f"self_approval={os.environ.get('AIRLOCK_SELF_APPROVAL', '1') != '0'}")
+
+
 def app_factory() -> FastAPI:
-    # Fails closed: refuses to start without OAuth config.
-    return create_app(auth=authmod.AuthConfig.from_env())
+    # Fails closed: refuses to start without OAuth config, an owner and the public URL.
+    cfg = authmod.AuthConfig.from_env()
+    print(access_summary(cfg), flush=True)
+    return create_app(auth=cfg)

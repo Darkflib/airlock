@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -54,16 +55,23 @@ class AuthConfig:
 
     @classmethod
     def from_env(cls) -> "AuthConfig":
-        missing = [k for k in ("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "AIRLOCK_SESSION_SECRET") if not os.environ.get(k)]
+        """The production config. No access setting has a default: who owns the instance and where it
+        lives must be stated, or it doesn't start (a fallback here would be someone else's values)."""
+        required = ("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "AIRLOCK_SESSION_SECRET", "AIRLOCK_PUBLIC_URL",
+                    "AIRLOCK_ALLOWED_USERS")
+        missing = [k for k in required if not os.environ.get(k, "").strip(" ,")]
         if missing:
             raise RuntimeError(f"auth not configured, missing: {', '.join(missing)}")
+        public_url = os.environ["AIRLOCK_PUBLIC_URL"].rstrip("/")
+        if not re.fullmatch(r"https://[A-Za-z0-9.-]+", public_url):
+            raise RuntimeError(f"AIRLOCK_PUBLIC_URL must be https://<domain>, not {public_url!r}")
         default_file = Path.home() / ".config" / "airlock" / "allowed_users"
         return cls(
             client_id=os.environ["GITHUB_CLIENT_ID"],
             client_secret=os.environ["GITHUB_CLIENT_SECRET"],
             session_secret=os.environ["AIRLOCK_SESSION_SECRET"].encode(),
-            public_url=os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/"),
-            allowed=frozenset(u.strip().lower() for u in os.environ.get("AIRLOCK_ALLOWED_USERS", "").split(",") if u.strip()),
+            public_url=public_url,
+            allowed=frozenset(u.strip().lower() for u in os.environ["AIRLOCK_ALLOWED_USERS"].split(",") if u.strip()),
             allowed_file=Path(os.environ.get("AIRLOCK_ALLOWED_USERS_FILE", default_file)),
         )
 

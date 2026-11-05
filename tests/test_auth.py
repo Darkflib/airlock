@@ -110,6 +110,38 @@ def test_app_factory_fails_closed(monkeypatch):
         auth.AuthConfig.from_env()
 
 
+PROD = {"GITHUB_CLIENT_ID": "c", "GITHUB_CLIENT_SECRET": "s", "AIRLOCK_SESSION_SECRET": "x",
+        "AIRLOCK_PUBLIC_URL": "https://airlock.example.com", "AIRLOCK_ALLOWED_USERS": "owner-login"}
+
+
+@pytest.mark.parametrize("unset", ["AIRLOCK_PUBLIC_URL", "AIRLOCK_ALLOWED_USERS"])
+def test_production_needs_its_owners_and_url_stated(monkeypatch, unset):
+    for k, v in PROD.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv(unset, " , ")   # blank counts as unset: no owner list means no owners
+    with pytest.raises(RuntimeError, match=unset):
+        auth.AuthConfig.from_env()
+
+
+@pytest.mark.parametrize("url", ["http://airlock.example.com", "https://airlock.example.com:8443",
+                                 "https://airlock.example.com/app"])
+def test_production_url_is_a_plain_https_origin(monkeypatch, url):
+    for k, v in {**PROD, "AIRLOCK_PUBLIC_URL": url}.items():
+        monkeypatch.setenv(k, v)
+    with pytest.raises(RuntimeError, match="https://<domain>"):
+        auth.AuthConfig.from_env()
+
+
+def test_startup_states_the_access_settings(monkeypatch):
+    from airlock.web import app as app_mod
+    for k, v in {**PROD, "AIRLOCK_ALLOWED_USERS": "Owner-Login,second", "AIRLOCK_PUBLIC_URL": "https://a.example.com/"}.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("GITHUB_WEBHOOK_SECRET", raising=False)
+    line = app_mod.access_summary(auth.AuthConfig.from_env())
+    assert "public_url=https://a.example.com " in line and "owners=owner-login,second" in line
+    assert "guest_repos=darkflib/airlock-demo" in line and "webhook=off" in line
+
+
 def test_share_link_opens_only_that_run_read_only(make_client):
     with make_client() as c:
         sign_in(c)
@@ -175,6 +207,7 @@ def test_invite_cli_revoke_removes_admitted_accounts(tmp_path, monkeypatch, caps
     f = tmp_path / "allowed_users"
     f.write_text("darkflib\njudge-a  # invite lablab 2026-11-04\njudge-b  # invite other 2026-11-04\n")
     for k, v in {"GITHUB_CLIENT_ID": "c", "GITHUB_CLIENT_SECRET": "s", "AIRLOCK_SESSION_SECRET": "x",
+                 "AIRLOCK_PUBLIC_URL": "https://airlock.test", "AIRLOCK_ALLOWED_USERS": "darkflib",
                  "AIRLOCK_ALLOWED_USERS_FILE": str(f)}.items():
         monkeypatch.setenv(k, v)
     invite.main(["revoke", "lablab"])

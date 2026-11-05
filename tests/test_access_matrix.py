@@ -1,6 +1,6 @@
 """Who may do what, as one table: every kind of viewer against every route that reads or changes a run,
-a self-test or a share link. The rules live in several places (the auth middleware, `can_read`, each
-route's ownership check); this is the one place that states them together, so a change to any of them
+a self-test or a share link. The rules are in airlock/web/access.py (`Viewer`), plus the auth middleware
+that keeps signed-out viewers to their share's pages; this states their outcome per route, so a change
 that moves a cell fails here.
 
 Viewers:
@@ -205,6 +205,15 @@ def test_share_links_are_listed_and_revoked_by_their_maker_or_an_owner(world, vi
         assert c.delete(f"/api/shares/{ids['D']}").status_code == 404
         if own:
             assert c.delete(f"/api/shares/{own}").status_code == 200
+
+
+def test_a_viewer_with_no_credentials_reads_and_changes_nothing():
+    from airlock.web.access import Viewer
+    nobody = Viewer(None, None, frozenset({"darkflib"}))
+    run = {"id": "D", "submitted_by": "Darkflib", "demo": 1}
+    assert not nobody.owner and not nobody.can_read(run) and not nobody.can_change(run)
+    assert not nobody.can_change({"by": None}, by="by")          # a link with no maker isn't everyone's
+    assert Viewer(None, None, frozenset(), signed_in_required=False).can_change(run)  # sign-in off: local use
 
 
 @pytest.mark.parametrize("viewer", VIEWERS)

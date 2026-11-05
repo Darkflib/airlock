@@ -92,7 +92,7 @@ cp .env.example .env
 Edit `.env`:
 
 - **The secrets are `op://` references, not values.** Point each at the vault, item and field where you saved it in steps 2 and 3, plus your Vultr Inference key.
-- **The settings are plain values.** `AIRLOCK_HOST` is the SSH target, `AIRLOCK_PUBLIC_URL` is `https://<your domain>`, `AIRLOCK_OWNERS` lists your GitHub login(s), and `AIRLOCK_GUEST_REPOS` lists the repos whose PRs run automatically.
+- **The settings are plain values.** `AIRLOCK_HOST` is the SSH target, `AIRLOCK_PUBLIC_URL` is `https://<your domain>`, `AIRLOCK_OWNERS` lists your GitHub login(s), and `AIRLOCK_GUEST_REPOS` lists the repos whose PRs run automatically. None of these has a default: without an owner list or the public URL the service refuses to start, and without guest repos there are no automatic PR runs and guests can't submit PRs.
 
 `.env` is gitignored. Check each reference resolves before deploying:
 
@@ -128,7 +128,7 @@ active
 app health: http 200
 ```
 
-The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. On a fresh host the first deploy took 14 seconds, Python environment included. The first run on a new host pulls the VM images (`node`, `python:3.12-slim`) and is slower than later ones. Run it again after every change; it is safe to repeat.
+The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. The service logs the access settings it started with; check them with `journalctl -u airlock-web | grep 'access:'`. On a fresh host the first deploy took 14 seconds, Python environment included. The first run on a new host pulls the VM images (`node`, `python:3.12-slim`) and is slower than later ones. Run it again after every change; it is safe to repeat.
 
 ## 6. Let people in
 
