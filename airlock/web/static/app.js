@@ -15,6 +15,12 @@ const Airlock = (() => {
     return new Date(ts * 1000).toLocaleString();
   };
   const pill = (text, cls) => el('span', `pill ${cls || text}`, text);
+  // "benign" is the stored verdict, but a quiet run only shows nothing malicious happened in what
+  // ran, so it is never shown as "benign" or "safe" (airlock/prcomment.py VERDICT_LABEL).
+  const VERDICT = { benign: 'No malicious behaviour observed', malicious: 'Malicious', suspicious: 'Suspicious',
+                    inconclusive: 'Inconclusive' };
+  const SHORT = { benign: 'none observed' };
+  const verdictPill = (v) => { const p = pill(SHORT[v] || v, v); p.title = VERDICT[v] || v; return p; };
 
   // Who is looking: a signed-in reviewer, or someone holding a read-only share link.
   const meP = fetch('/api/me').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
@@ -235,7 +241,7 @@ const Airlock = (() => {
         const td = (child) => { const c = el('td'); if (child) c.append(child); tr.append(c); };
         td(a);
         td(pill(r.status));
-        td(r.verdict ? pill(r.verdict) : el('span', 'muted', '—'));
+        td(r.verdict ? verdictPill(r.verdict) : el('span', 'muted', '—'));
         td(el('span', r.contained ? 'count-hazard' : '', String(r.contained)));
         td(r.decision ? pill(r.decision) : el('span', '', '—'));
         td(el('span', '', ago(r.created)));
@@ -295,7 +301,7 @@ const Airlock = (() => {
         const a = el('a', '', p.label); a.href = `/runs/${p.run_id}`;
         td(a);
         td(pill(p.expect));
-        td(p.verdict ? pill(p.verdict) : pill(p.status));
+        td(p.verdict ? verdictPill(p.verdict) : pill(p.status));
         td(el('span', p.contained ? 'count-hazard' : '', String(p.contained)));
         td(el('span', p.proven ? 'count-hazard' : 'muted', p.proven ? 'PROVEN' : '—'));
         const res = el('td');
@@ -501,10 +507,22 @@ const Airlock = (() => {
       li.append(box);
     }
 
+    function renderCovered(c) {
+      const box = $('covered');
+      box.replaceChildren(el('h3', '', 'What this covers'));
+      const ul = el('ul');
+      const ran = c.ran.length ? c.ran.join(', ') : 'nothing (see the timeline)';
+      const agent = c.agent_commands ? `; the agent then ran ${c.agent_commands} command${c.agent_commands === 1 ? '' : 's'}` : '';
+      [['Ran as an unprivileged user', ran + agent], ['Watched', c.watched], ['Not exercised', c.not_exercised]]
+        .forEach(([k, v]) => { const li = el('li'); li.append(el('strong', '', `${k}: `), document.createTextNode(v)); ul.append(li); });
+      box.append(ul);
+      box.hidden = false;
+    }
+
     function showVerdict(verdict, evidence, turns, forced) {
       const v = $('verdict');
       v.className = `verdict-big ${verdict}`;
-      v.textContent = verdict;
+      v.textContent = VERDICT[verdict] || verdict;
       $('verdict-meta').textContent = turns ? `after ${turns} agent turns${forced ? ' (budget forced)' : ''}` : '';
       const ul = $('evidence');
       ul.replaceChildren();
@@ -544,6 +562,7 @@ const Airlock = (() => {
       }
       $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}${r.submitted_by ? ' · by @' + r.submitted_by : ''}`;
       $('live').hidden = !(r.status === 'running' || r.status === 'queued');
+      if (r.covered && r.status === 'done') renderCovered(r.covered);
       renderPR(r.meta || {});
       renderGate(r);
     }
@@ -617,7 +636,7 @@ const Airlock = (() => {
       if (r.status === 'error') { g.append(el('p', '', `Run failed: ${r.error || 'unknown error'}`)); return; }
       if (r.status !== 'done') { g.append(el('p', '', waiting)); return; }
       g.append(el('p', '', r.verdict === 'benign'
-        ? 'The agent found nothing harmful. Approve to let this change through.'
+        ? 'Nothing malicious happened in what ran (see "What this covers"). That is evidence, not proof of safety: approve if that coverage is enough for this change.'
         : r.verdict === 'inconclusive'
           ? 'Airlock couldn\'t fully observe this change, so it can\'t be called clean. Reject it, or approve only if you have checked it yourself.'
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
@@ -663,10 +682,12 @@ const Airlock = (() => {
       renderHead(first);
       const es = new EventSource(`/api/runs/${id}/events`);
       es.addEventListener('ev', (m) => addEvent(JSON.parse(m.data)));
-      es.addEventListener('done', (m) => {
+      es.addEventListener('done', async (m) => {
         es.close();
         const r = JSON.parse(m.data);
         renderHead(r);
+        const full = await fetch(`/api/runs/${id}`);  // what it covered comes with the run, not the stream
+        if (full.ok) renderHead(await full.json());
         if (r.verdict && $('evidence').childElementCount === 0) showVerdict(r.verdict, r.evidence);
       });
       es.onerror = () => { /* EventSource reconnects on its own; replay is idempotent by id */ };

@@ -69,14 +69,14 @@ def test_pr_run_holds_merge_and_posts_decision_only_after_human(make):
         started, verdict = gh.calls[1], gh.calls[3]
         assert "testing this PR" in started[2] and started[3] is None              # posted
         assert verdict[3] == "https://github.com/Darkflib/airlock-demo/pull/3#issuecomment-1"   # then edited
-        assert "**MALICIOUS**, waiting for a decision" in verdict[2] and "`/airlock approve`" in verdict[2]
-        assert "malicious" in gh.calls[2][3]
+        assert "**Malicious**, waiting for a decision" in verdict[2] and "`/airlock approve`" in verdict[2]
+        assert gh.calls[2][3].startswith("Malicious;")
         out = c.post(f"/api/runs/{run_id}/decision", json={"decision": "rejected", "note": "steals creds"}).json()
     decided = gh.calls[4:]
     assert [x[0] for x in decided] == ["status", "comment"]
     assert decided[0][1:3] == ("abc1234def", "failure") and decided[0][4] == f"https://airlock.test/runs/{run_id}"
     body = decided[1][2]
-    assert "**MALICIOUS**, rejected" in body and "**PROVEN**" in body and "AIRLOCKCANARYABC" in body
+    assert "**Malicious**, rejected" in body and "**PROVEN**" in body and "AIRLOCKCANARYABC" in body
     assert "waiting for a decision" not in body and decided[1][3] == verdict[3]   # the same comment, final
     assert out["meta"]["posted"]["comment_url"].endswith("#issuecomment-1")
 
@@ -244,3 +244,19 @@ def test_nothing_to_post_before_a_decision(make):
         run_id = c.post("/api/runs", data={"spec": PR}).json()["id"]
         wait_done(c, run_id)
         assert c.post(f"/api/runs/{run_id}/post").status_code == 409
+
+
+def test_a_quiet_run_is_shown_as_nothing_observed_with_what_it_covered():
+    from airlock.prcomment import build_comment, verdict_label
+    events = [{"id": 1, "kind": "exec", "summary": "", "containment": False,
+               "data": {"source": "detonate", "cmd": "npm ci --no-audit --no-fund", "exit_code": 0}},
+              {"id": 2, "kind": "exec", "summary": "", "containment": False,
+               "data": {"source": "detonate", "cmd": "npm test --if-present", "exit_code": 0}},
+              {"id": 3, "kind": "exec", "summary": "", "containment": False,
+               "data": {"source": "agent", "cmd": "cat package.json", "exit_code": 0}}]
+    run = {"verdict": "benign", "decision": None, "meta": META, "evidence": [], "model": "m"}
+    body = build_comment(run, events, "https://airlock.test/runs/1")
+    assert verdict_label("benign") == "No malicious behaviour observed" and "BENIGN" not in body.upper().split("**")[1]
+    assert "**No malicious behaviour observed**, waiting for a decision" in body
+    assert "`npm ci --no-audit --no-fund (exit 0)`, `npm test --if-present (exit 0)`" in body
+    assert "the AI reviewer then ran 1 command" in body and "Not exercised:" in body

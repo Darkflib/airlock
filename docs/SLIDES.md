@@ -75,7 +75,7 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 
 ## 10. Limits and try it
 
-- Not caught: malware that detects the sandbox and stays quiet, or waits.
+- Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
 - npm and PyPI only; browser-level behaviour (Pattern B) descoped.
 - **Try it:** airlock.darkflib.dev → Run self-test (five known packages, scored live). Repo: github.com/Darkflib/airlock (MIT).
 

@@ -45,12 +45,41 @@ def build_progress(run: dict, run_url: str, failed: str | None = None, held: boo
         f"[Watch it live]({run_url})"])
 
 
+# How each verdict is shown to people. "benign" stays the stored value, but a quiet run only shows
+# that nothing malicious happened in what ran, so it is never presented as "safe".
+VERDICT_LABEL = {"benign": "No malicious behaviour observed", "malicious": "Malicious",
+                 "suspicious": "Suspicious", "inconclusive": "Inconclusive"}
+WATCHED = ("programs started, files opened in home directories (where the fake credentials are), DNS lookups, "
+           "connections, and what was sent to Airlock's fake server")
+NOT_EXERCISED = ("code your application runs after importing the package, and behaviour that waits, checks for "
+                 "a sandbox, or needs real credentials or a real network")
+
+
+def verdict_label(verdict: str | None) -> str:
+    return VERDICT_LABEL.get(verdict or "inconclusive", (verdict or "inconclusive").capitalize())
+
+
+def short_cmd(cmd: str) -> str:
+    if "pip install" in cmd:
+        return "pip install " + cmd.split()[-1].rsplit("/", 1)[-1]
+    return cmd[:80]
+
+
+def what_ran(events: list[dict]) -> dict:
+    """What this verdict covers: the commands Airlock ran on the package, how many the agent ran,
+    what was watched, and what a run like this never exercises."""
+    ran = [f"{short_cmd(e['data'].get('cmd', ''))} (exit {e['data'].get('exit_code')})" for e in events
+           if e["kind"] == "exec" and e["data"].get("source") == "detonate"]
+    agent = sum(e["kind"] == "exec" and e["data"].get("source") == "agent" for e in events)
+    return {"ran": ran, "agent_commands": agent, "watched": WATCHED, "not_exercised": NOT_EXERCISED}
+
+
 def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True) -> str:
     verdict, decision, who = run["verdict"] or "inconclusive", run["decision"], run.get("decided_by") or "a reviewer"
     head = run["meta"].get("head_sha", "")[:7]
     found = [e for e in events if e["containment"] and e["data"].get("stage") != "agent"]
     lines = [
-        f"### Airlock: **{verdict.upper()}**, "
+        f"### Airlock: **{verdict_label(verdict)}**, "
         + ("waiting for a decision" if not decision
            else f"{decision} automatically: {run['meta']['auto_decision']}" if run["meta"].get("auto_decision")
            else f"{decision} by @{who}"),
@@ -94,6 +123,13 @@ def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True
     else:
         lines += ["Nothing suspicious was observed during install and test: no credential reads, no outbound "
                   "requests, no unexpected processes.", ""]
+    cover = what_ran(events)
+    lines += ["**What this covers**", "",
+              f"- Ran as an unprivileged user: {', '.join(f'`{c}`' for c in cover['ran']) or 'nothing (see the timeline)'}"
+              + (f"; the AI reviewer then ran {cover['agent_commands']} command{'s' if cover['agent_commands'] != 1 else ''}"
+                 if cover["agent_commands"] else ""),
+              f"- Watched: {cover['watched']}",
+              f"- Not exercised: {cover['not_exercised']}", ""]
     if run.get("evidence"):
         lines += ["**Reviewer's evidence**", ""] + [f"- {p}" for p in run["evidence"][:MAX_ITEMS]] + [""]
     if not decision:

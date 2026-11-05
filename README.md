@@ -50,7 +50,7 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 - **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. Cited IDs are checked: a verdict citing an event that doesn't exist is sent back once, then flagged on the page. Whether a real event actually supports the point is still the model's judgement.
 - **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. When exfiltration is proven by a captured payload carrying the run's canary token, Airlock rejects the PR by itself (failure, with the evidence comment). Otherwise only a person's Approve (success) or Reject (failure) sets the final status, and only someone with write access to the repo on GitHub may give it. A failed run sets `error`. Each run keeps one comment on the PR, rewritten as it goes: testing, then the evidence and how to decide, then the decision. Set `AIRLOCK_AUTO_REJECT=0` to leave every decision to a person.
 
-The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and a BENIGN verdict.
+The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and reads **"No malicious behaviour observed"**, listing what ran and what a run like this can't exercise. Airlock never calls a quiet run safe.
 
 ## How it works
 

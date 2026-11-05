@@ -73,7 +73,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Switch to GitHub, PR #1: comment `/airlock approve` (typed ahead, just press Comment). The `airlock` check turns green, the bot's evidence comment appears, and the merge button unlocks.
 
-> "This one is a safe update: nothing new, nothing blocked. Approval is a person's job, done right here in GitHub. Now it can merge."
+> "This one is quiet: nothing new, nothing blocked. Airlock says what it saw, no malicious behaviour observed, not that it's safe. So approval is a person's job, done right here in GitHub. Now it can merge."
 
 ### 2:33–2:50 Under the hood
 

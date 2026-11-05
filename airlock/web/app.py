@@ -26,7 +26,7 @@ from .. import retention
 from ..events import OVERFLOW, EventLog
 from ..github import GitHubApp, parse_pr_url
 from ..pipeline import parse_pypi_spec
-from ..prcomment import build_comment, build_progress
+from ..prcomment import build_comment, build_progress, verdict_label, what_ran
 from ..sandbox import sinkhole_log
 from ..store import Store, data_dir
 from . import auth as authmod
@@ -312,7 +312,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         state, desc = {
             "queued": ("pending", f"Queued ({ahead} ahead); merge waits for a human decision"),
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
-            "verdict": ("pending", f"Verdict: {run['verdict']}; comment /airlock approve or /airlock reject to decide"),
+            "verdict": ("pending", f"{verdict_label(run['verdict'])}; comment /airlock approve or /airlock reject to decide"),
             "error": ("error", "Airlock run failed; rerun it before merging"),
         }[phase]
         try:
@@ -729,7 +729,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             ahead = store.queue_ahead(run)
             run["queue_ahead"] = ahead
             run["queue_eta_s"] = round(math.ceil((ahead + 1) / runner.n_slots) * store.median_run_seconds())
-        return {**run, "events": store.events(run_id)}
+        events = store.events(run_id)
+        return {**run, "events": events, "covered": what_ran(events)}
 
     @app.get("/api/runs/{run_id}/events")
     async def stream(run_id: str, request: Request):

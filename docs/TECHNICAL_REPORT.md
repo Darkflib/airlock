@@ -189,6 +189,7 @@ An encoded or split token (base64, XOR, chunked across requests) is still blocke
 
 - A run doesn't start unless all three watcher parts report ready with no error.
 - After detonation, **coverage gaps** (install failed or timed out, test killed, watcher errors, watcher dead, observation lost during the agent's investigation) turn a `benign` verdict into `inconclusive`. Airlock will say "we may have missed something" rather than "safe".
+- Even a complete, quiet run is never shown as safe. People see **"No malicious behaviour observed"** (the stored verdict is still `benign`), with what it covers: the commands Airlock ran and their exit codes, how many commands the agent ran, what the watcher records, and what a run like this never exercises (code your application runs after importing the package, and behaviour that waits, checks for a sandbox, or needs real credentials or a real network). The run page, the PR comment and the GitHub status all use that wording.
 - Guest DNS parsing is bounds-checked per packet and the observer threads are supervised, after the recheck showed a malformed packet could silently kill the DNS thread (`docs/RECHECK-2026-11-04.md`, R3).
 
 ## 7. Behaviour diff for pull requests
