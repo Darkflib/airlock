@@ -774,3 +774,9 @@ Tags: #metric #decision #fail
 **Result:** 371 tests pass. Three services `active`, healthz 200, restart 13:21:28 UTC. With the service's env, the deployed code resolves 4 slots on the host (no `AIRLOCK_SLOTS` in `web.env`).
 **So:** live capacity is about 620 PR runs an hour, up from about 320. Retried reads have not been exercised live yet.
 Tags: #decision #fix
+
+### 13:42 — The queue survives restarts and deploys; guests get back-pressure
+**Tried:** runs now store their real target (`runs.spec`). At startup, queued runs resume with the same id, and runs cut off mid-way fail with their evidence and are retried once (`recover`, `Runner.resume`). On stop, `Runner.drain` gives runs in progress 75 s. Guests get 429 past 5 unfinished runs or 10 queued per slot, the run page shows queue position, and a webhook PR posts `pending: Queued (N ahead)` before it gets a slot (`9590cc6`). Live test: inserted 6 queued fixture runs, restarted `airlock-web`, then restarted it again 10 s later while 4 were running.
+**Result:** resume worked (6, then the 2 still waiting), but the drain didn't: the second stop took 1 s, and the 4 running runs failed with `SandboxNotRunningError`. systemd's default `KillMode=control-group` sends SIGTERM to the microVMs as well as uvicorn. With `KillMode=mixed`, and a failure while draining left `running` for the retry (`6f25724`), the same test passed. The stop waited 11 s for the 4 runs to finish, and all 6 verdicts were correct (4 malicious, 2 benign).
+**So:** a deploy no longer loses or fails runs that finish within 75 s. The retry of a run still going after 75 s is only covered by unit tests. The 12 "queue test" runs stay in the owner's run list (not demo, so guests don't see them).
+Tags: #fail #fix #decision #demo
