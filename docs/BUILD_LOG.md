@@ -889,3 +889,9 @@ Tags: #demo #decision
 **Result:** 3/3 runs identical; the outside listeners heard nothing. Raw IPs, IPv6, metadata (169.254.169.254, .170.2, 100.100.100.200) and the host's public addresses get `403 network_policy_denied` from microsandbox; host services (22, 1080, 2019, 8000) refuse; `example.com` sent straight to 8.8.8.8 doesn't resolve, so direct DNS never reaches a resolver; ICMP impossible (no ping, `EACCES` on ping sockets). First runs looked alarming ("HTTP 403" from 1.1.1.1, IPv6 "connected") until the bodies showed microsandbox answering. Found: a token in a request URL went unflagged and **did** reach registry.npmjs.org; a token in a DNS name through the system resolver wasn't flagged (lowercased). Both fixed (tracer checks URLs; watcher matches the token case-insensitively, never as proof). Still open: DNS straight to an outside resolver is refused before Airlock sees it, so it's not on the timeline.
 **So:** a README table of what's closed, and two honest new limits. [results](../evals/results/escape-lab-20261105T220624Z/summary.md)
 Tags: #win #fail #metric #demo
+
+### 22:40 — Recording fixes live
+**Tried:** deployed the 22:10 fixes, then ran the escape probe through the whole pipeline on the host (`airlock analyse evals/fixtures/escape-probe.tgz`, AI review included).
+**Result:** MALICIOUS in 49.5 s, 7 turns, 47 containment events. The new flags fired: "sent canary credentials to allowlisted registry.npmjs.org in a request URL: it reached that host" and "put the canary token in a DNS lookup … never left it". The agent cited the registry leak among its points.
+**So:** live runs now show both channels. The escape lab stays an eval of its own; it isn't in the 33/33 regression.
+Tags: #win
