@@ -684,3 +684,9 @@ Tags: #security #fix #metric
 **Result:** 186 tests pass (6 new in `tests/test_retention.py`). Not deployed: Claude Code's permission check refused `scripts/deploy.sh` this time. On the host, the first sweep will delete three uploads from 3 Nov (copies of repo fixtures) and rotate the sinkhole log (first record 3 Nov); no run is old enough to prune.
 **So:** the control plane keeps what it needs for the evidence and deletes the working copies. That matters before the service is opened to judges and the repo made public.
 Tags: #security #fix
+
+### 06:08 — Retention deployed and checked
+**Tried:** Mike deployed `9d410fb` (restart 06:05:05 UTC). Then I pushed `ae0f6ba` to PR #3 to check that a run still finds its captured request after the sinkhole log rotates.
+**Result:** the startup sweep logged `retention: {'uploads': 3, 'runs': 0, 'sinkhole_rotated': True}`: `uploads/` is empty, `sinkhole.jsonl.1` holds the old 172 KB log. The PR #3 webhook run `20261105-060534-9f48a4` wrote to a fresh `sinkhole.jsonl` (419 bytes), finished in 19.0 s, MALICIOUS with one sinkhole-PROVEN exfil, `failure` status posted and its comment written.
+**So:** retention is live and doesn't cost a proof. Each PR #3 run adds its own bot comment, so tidying the older ones stays on the pre-recording checklist.
+Tags: #metric #fix
