@@ -243,6 +243,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 - [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.45 (4 Nov 08:25).
 - [x] Read-only public view for judges, or allowlist only? Both: signed read-only share links to recorded runs, plus an invite link with run caps for judges who want to submit their own (decided Tue 3 Nov). The lablab page is public, so the invite link should be treated as public.
 - [x] Build the obfuscated PR before the video, or after submission? Before, without obfuscation tooling: PR #4 (`tinystamp`, 4 Nov) splits the theft across innocuous-looking files, which is enough to make the diff read as a routine bump. Runtime detection doesn't depend on how readable the code is.
+- [x] Should deleting an account also remove its access? No, for the hackathon: `DELETE /api/me` removes the guest's runs, self-tests and share links and ends their sessions, but the allowlist entry stays, so they can sign in again (decided Thu 5 Nov). A product would handle accounts and access differently anyway, so this isn't the model to build on.
 
 **Success metrics**
 
