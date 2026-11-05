@@ -186,3 +186,23 @@ def test_a_full_queue_turns_guests_away(data, monkeypatch):
         sign_in(c)
         r = c.post("/api/runs", data={"spec": "left-pad"})
     assert r.status_code == 429 and "busy" in r.json()["detail"] and int(r.headers["retry-after"]) >= 30
+
+
+@pytest.mark.anyio
+async def test_a_run_that_fails_during_shutdown_is_left_for_the_retry(data):
+    store = Store(data / "k.db")
+    stop = asyncio.Event()
+
+    async def vm_dies_on_stop(target, *, events, **_):
+        await stop.wait()
+        raise RuntimeError('sandbox "x" is not running')
+    runner = Runner(store, vm_dies_on_stop, slots=1)
+    run_id = runner.start("left-pad", "left-pad")
+    await asyncio.sleep(0.01)
+    drained = asyncio.create_task(runner.drain(5))
+    await asyncio.sleep(0.01)
+    stop.set()
+    await drained
+    run = store.get_run(run_id)
+    assert run["status"] == "running" and not run["error"]
+    assert "interrupted by shutdown" in store.events(run_id)[-1]["summary"]

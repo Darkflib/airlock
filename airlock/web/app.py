@@ -148,6 +148,11 @@ class Runner:
                      limit="run_deadline", seconds=self.deadline)
             end = dict(status="error", error=f"the run passed its {self.deadline:.0f} s deadline")
         except Exception as e:  # noqa: BLE001 - recorded on the run
+            if self.draining:  # the shutdown may have taken the VM with it: leave it `running`, to be retried
+                log.emit("error", f"run interrupted by shutdown: {type(e).__name__}: {str(e)[:300]}")
+                log.close()
+                self.live.pop(run_id, None)
+                return
             log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
             end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
         try:
