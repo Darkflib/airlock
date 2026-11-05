@@ -128,7 +128,7 @@ active
 app health: http 200
 ```
 
-The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. The service logs the access settings it started with; check them with `journalctl -u airlock-web | grep 'access:'`. On a fresh host the first deploy took 14 seconds, Python environment included. The first run on a new host pulls the VM images (`node`, `python:3.12-slim`) and is slower than later ones. Run it again after every change; it is safe to repeat.
+The three `active` lines are `airlock-sinkhole`, `airlock-web` and `caddy`. The service logs the access settings it started with; check them with `journalctl -u airlock-web | grep 'access:'`. On a fresh host the first deploy took 14 seconds, Python environment included. The first run on a new host pulls the VM images (`node`, and `python:3.12`, about 400 MB) and is slower than later ones. Run it again after every change; it is safe to repeat.
 
 ## 6. Let people in
 

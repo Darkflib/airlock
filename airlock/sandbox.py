@@ -41,7 +41,9 @@ PKG_USER, PKG_HOME = "node", "/home/node"   # the node image's unprivileged user
 # To move a pin: `msb image pull node`, then `msb image inspect node` for the new digest; rerun the regression.
 IMAGES = {
     "npm": "node@sha256:6c6f2679f5b655c7c6091a34b81372b5962ca9f25d897a501d613742f922567b",
-    "pypi": "python:3.12-slim@sha256:1148dbb014615300fa7e713b2f94f550c0d1c69780c0805f84f093ceee34dd0b",
+    # Full image, not -slim: sdists with C extensions (psutil, PyYAML's) need gcc and headers to build,
+    # and a build that can't run leaves the install failed and the run inconclusive.
+    "pypi": "python:3.12@sha256:5ff8100ae55a3b9dca6b83c42256685ace77a0205071df19f5cc14902b30a984",
 }
 WATCH_READY = ("watcher", "dns", "fanotify")  # every observer must report ready before a run counts
 ACTIVE_SUBNETS: set[int] = set()  # sinkhole /24s held by live Workspaces in this process
