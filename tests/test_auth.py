@@ -390,3 +390,33 @@ def test_session_without_an_id_is_refused(make_client):
     with make_client() as c:
         c.cookies.set(auth.SESSION_COOKIE, auth.sign(SECRET, {"login": "Darkflib", "exp": time.time() + 60}))
         assert c.get("/api/runs").status_code == 401
+
+
+def test_guest_deletes_their_account(make_client):
+    with make_client() as owner:
+        sign_in(owner)
+        kept = owner.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(owner, kept)
+    with make_client("some-judge") as g, make_client("some-judge") as other_device:
+        sign_in(g), sign_in(other_device)
+        run_id = g.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
+        wait_done(g, run_id)
+        link = g.post(f"/api/runs/{run_id}/share").json()
+        r = g.delete("/api/me")
+        assert r.status_code == 200 and r.json()["deleted"] == {"runs": 1, "selftests": 0, "shares": 1}
+        assert other_device.get("/api/runs").status_code == 401        # every session ended
+        anon = TestClient(g.app, base_url="http://airlock.test")
+        assert anon.get(link["url"].replace("https://airlock.test", ""), follow_redirects=False) \
+            .headers["location"] == "/login?error=share"                # share link revoked
+        time.sleep(0.01)
+        sign_in(g)                                                      # access itself is kept
+        assert [x["id"] for x in g.get("/api/runs").json()] == [kept]  # only the owner's demo run left
+    with make_client() as owner:
+        sign_in(owner)
+        assert [x["id"] for x in owner.get("/api/runs").json()] == [kept]
+
+
+def test_owner_cannot_delete_their_account(make_client):
+    with make_client() as c:
+        sign_in(c)
+        assert c.delete("/api/me").status_code == 403

@@ -10,13 +10,16 @@
 <body>
   <div class="wrap">
     <header class="top">
-      <img src="/static/apple-touch-icon.png" alt="">
-      <div>
-        <div class="brand">AIRLOCK</div>
-        <div class="tag">Dependency detonation chamber</div>
-      </div>
+      <a class="home" href="/" aria-label="Airlock home">
+        <img src="/static/apple-touch-icon.png" alt="">
+        <span>
+          <span class="brand">AIRLOCK</span>
+          <span class="tag">Dependency detonation chamber</span>
+        </span>
+      </a>
+      <nav class="links" aria-label="Main"><a href="/#runs-panel" id="nav-runs">Runs</a></nav>
       <div class="spacer"></div>
-      <nav class="user" id="user"><a href="/">Runs</a></nav>
+      <div class="user" id="user"></div>
     </header>
 
     <section class="hero">
@@ -64,13 +67,18 @@
 
     <div class="hazard-rule" style="margin-top:28px"></div>
 
-    <div class="panel">
-      <h2>Recent runs</h2>
+    <div class="panel" id="runs-panel">
+      <h2 id="runs-title">Recent runs</h2>
       <table class="runs">
         <thead><tr><th>Target</th><th>Status</th><th>Verdict</th><th>Contained</th><th>Decision</th><th>Started</th></tr></thead>
         <tbody id="runs"></tbody>
       </table>
       <div class="empty" id="empty" hidden>No runs yet.</div>
+      <div class="pager" id="pager" hidden>
+        <button type="button" class="ghost" id="prev">‹ Newer</button>
+        <span class="muted" id="page-info"></span>
+        <button type="button" class="ghost" id="next">Older ›</button>
+      </div>
     </div>
   </div>
   <script src="/static/app.js"></script>

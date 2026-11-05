@@ -216,6 +216,17 @@ class Store:
         self.db.commit()
         return len(ids)
 
+    def delete_user(self, login: str) -> dict:
+        """Delete everything a login submitted: its runs with their events, and its self-tests."""
+        ids = [r[0] for r in self.db.execute(
+            "SELECT id FROM runs WHERE LOWER(submitted_by) = LOWER(?)", (login,))]
+        for i in ids:
+            self.db.execute("DELETE FROM events WHERE run_id = ?", (i,))
+            self.db.execute("DELETE FROM runs WHERE id = ?", (i,))
+        tests = self.db.execute("DELETE FROM selftests WHERE LOWER(submitted_by) = LOWER(?)", (login,)).rowcount
+        self.db.commit()
+        return {"runs": len(ids), "selftests": tests}
+
     def proven_exfil(self, run_id: str) -> bool:
         """Whether the package itself (not the agent's re-runs) had exfiltration proven by a payload
         captured on the host (sinkhole request or DnsGuard lookup) carrying this run's canary token.

@@ -366,6 +366,24 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return {"login": user, "auth": bool(auth), "owner": bool(user) and viewer(request).owner,
                 "share": authmod.current_share(request) is not None and not authmod.current_user(request)}
 
+    @app.delete("/api/me")
+    async def delete_account(request: Request):
+        """Delete the signed-in guest's runs, self-tests and share links, then end all their sessions.
+        Access itself (the allowlist) is the operators' to change. Owners' runs are the demo: refused."""
+        user = authmod.current_user(request)
+        if not auth or not user:
+            raise HTTPException(401, "sign in required")
+        if viewer(request).owner:
+            raise HTTPException(403, "owner accounts are managed on the host")
+        mine = [r for r in store.list_runs(limit=-1) if Viewer(user, None, owners).made(r)]
+        if any(r["id"] in runner.live or r["status"] in ("queued", "running") for r in mine):
+            raise HTTPException(409, "a run of yours is still in progress; delete your account once it finishes")
+        gone = {**store.delete_user(user), "shares": auth.revoke_shares_by(user)}
+        auth.revoke_session({"login": user}, everywhere=True)
+        resp = JSONResponse({"deleted": gone})
+        resp.delete_cookie(authmod.SESSION_COOKIE, path="/")
+        return resp
+
     @app.get("/")
     async def index():
         return FileResponse(STATIC / "index.html")
@@ -581,7 +599,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.get("/api/runs")
     async def list_runs(request: Request):
         v = viewer(request)
-        return [r for r in store.list_runs() if v.can_read(r)]
+        return [r for r in store.list_runs(limit=500) if v.can_read(r)]  # the UI pages them
 
     @app.get("/api/runs/{run_id}")
     async def get_run(run_id: str, request: Request):

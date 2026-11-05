@@ -98,6 +98,13 @@ class AuthConfig:
             with f.open("a") as out:
                 out.write(share_id + "\n")
 
+    def revoke_shares_by(self, login: str) -> int:
+        """Revoke every live share link a login made."""
+        mine = [s["id"] for s in self.shares() if s.get("id") and (s.get("by") or "").lower() == login.lower()]
+        for share_id in mine:
+            self.revoke_share(share_id)
+        return len(mine)
+
     def share_revoked(self, share: dict) -> bool:
         # Links minted before ids existed can't be revoked one by one (rotate the secret for those).
         return bool(share.get("id")) and share["id"] in self._lines("revoked_shares")

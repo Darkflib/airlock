@@ -10,13 +10,16 @@
 <body class="hide-exec">
   <div class="wrap">
     <header class="top">
-      <img src="/static/apple-touch-icon.png" alt="">
-      <div>
-        <div class="brand">AIRLOCK</div>
-        <div class="tag">Dependency detonation chamber</div>
-      </div>
+      <a class="home" href="/" aria-label="Airlock home">
+        <img src="/static/apple-touch-icon.png" alt="">
+        <span>
+          <span class="brand">AIRLOCK</span>
+          <span class="tag">Dependency detonation chamber</span>
+        </span>
+      </a>
+      <nav class="links" aria-label="Main"><a href="/#runs-panel" id="nav-runs">Runs</a></nav>
       <div class="spacer"></div>
-      <nav class="user" id="user"><a href="/">← All runs</a></nav>
+      <div class="user" id="user"></div>
     </header>
 
     <div class="run-head">

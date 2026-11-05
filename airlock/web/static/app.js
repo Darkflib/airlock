@@ -19,22 +19,106 @@ const Airlock = (() => {
   // Who is looking: a signed-in reviewer, or someone holding a read-only share link.
   const meP = fetch('/api/me').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 
+  const avatar = (login, size) => {
+    const img = el('img', 'avatar');
+    img.src = `https://github.com/${encodeURIComponent(login)}.png?size=${size * 2}`;
+    img.width = img.height = size;
+    img.alt = '';
+    return img;
+  };
+  const postForm = (action, label, cls, title) => {
+    const form = el('form'); form.method = 'post'; form.action = action;
+    const b = el('button', cls, label);
+    b.type = 'submit';
+    if (title) b.title = title;
+    form.append(b);
+    return form;
+  };
+
+  // Top-right of the nav: the GitHub avatar opens a menu with the account dialog and sign-out.
   async function user() {
-    const nav = $('user');
-    if (!nav) return;
+    const box = $('user');
+    if (!box) return;
     const me = await meP;
-    if (me.share) { nav.replaceChildren(el('span', 'muted', 'Shared read-only view')); return; }
+    if (me.share) { box.replaceChildren(el('span', 'muted', 'Shared read-only view')); return; }
     if (!me.login) return;
-    nav.append(el('span', 'mono', `@${me.login}`));
-    const form = el('form'); form.method = 'post'; form.action = '/auth/logout';
-    form.append(el('button', 'ghost', 'Sign out'));
-    const all = el('form'); all.method = 'post'; all.action = '/auth/logout-everywhere';
-    const allBtn = el('button', 'ghost', 'Sign out everywhere');
-    allBtn.title = 'Ends every session of this account, on every device';
-    all.append(allBtn);
-    nav.append(form, all);
+    const btn = el('button', 'avatar-btn');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.title = `Signed in as @${me.login}`;
+    btn.append(avatar(me.login, 28), el('span', 'caret', '▾'));
+    const menu = el('div', 'menu');
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    const who = el('div', 'menu-who');
+    who.append(el('span', 'muted', 'Signed in as'), el('b', 'mono', `@${me.login}`));
+    const account = el('button', 'menu-item', 'Account…');
+    account.type = 'button';
+    const out = postForm('/auth/logout', 'Sign out', 'menu-item');
+    menu.append(who, account, el('hr'), out);
+    const open = (yes) => { menu.hidden = !yes; btn.setAttribute('aria-expanded', String(yes)); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); open(menu.hidden); });
+    document.addEventListener('click', (e) => { if (!menu.contains(e.target)) open(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') open(false); });
+    account.addEventListener('click', () => { open(false); accountDialog(me); });
+    box.replaceChildren(btn, menu);
   }
   user();
+
+  // Account dialog: who you are, sessions, and (for guests) deleting everything you made.
+  function accountDialog(me) {
+    let dlg = $('account');
+    if (dlg) { dlg.showModal(); return; }
+    dlg = el('dialog', 'modal');
+    dlg.id = 'account';
+    const head = el('div', 'modal-head');
+    const id = el('div');
+    id.append(el('div', 'modal-title mono', `@${me.login}`),
+      el('div', 'muted small', me.owner ? 'Owner: you can see and decide every run.' : 'Guest: you see your own runs and the demo runs.'));
+    const close = el('button', 'ghost icon', '✕');
+    close.type = 'button'; close.title = 'Close';
+    close.addEventListener('click', () => dlg.close());
+    head.append(avatar(me.login, 56), id, close);
+    const gh = el('a', 'small', 'View GitHub profile ↗');
+    gh.href = `https://github.com/${encodeURIComponent(me.login)}`; gh.target = '_blank'; gh.rel = 'noopener';
+    id.append(gh);
+
+    const sessions = el('section', 'modal-sec');
+    sessions.append(el('h3', '', 'Sessions'),
+      el('p', 'muted', 'Signing out everywhere ends every session of this account, on every device, including this one.'),
+      postForm('/auth/logout-everywhere', 'Sign out everywhere', 'ghost'));
+
+    const danger = el('section', 'modal-sec danger');
+    danger.append(el('h3', '', 'Delete account'));
+    if (me.owner) {
+      danger.append(el('p', 'muted', 'Owner accounts hold the demo runs, so they are managed on the host, not here.'));
+    } else {
+      danger.append(el('p', 'muted',
+        'Permanently deletes every run and self-test you submitted, with their timelines, revokes your share links and signs you out everywhere. '
+        + 'Decisions already posted to GitHub stay on GitHub. You keep access, so you can sign in again later.'));
+      const label = el('label', 'small', `Type ${me.login} to confirm`);
+      const input = el('input');
+      input.type = 'text'; input.autocomplete = 'off'; input.spellcheck = false;
+      const go = el('button', 'reject', 'Delete my account');
+      go.type = 'button'; go.disabled = true;
+      const err = el('p', 'err');
+      input.addEventListener('input', () => { go.disabled = input.value.trim().toLowerCase() !== me.login.toLowerCase(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true; go.textContent = 'Deleting…'; err.textContent = '';
+        const r = await fetch('/api/me', { method: 'DELETE' });
+        if (r.ok) { location.href = '/login'; return; }
+        const j = await r.json().catch(() => ({}));
+        err.textContent = j.detail || r.statusText;
+        go.disabled = false; go.textContent = 'Delete my account';
+      });
+      danger.append(label, input, go, err);
+    }
+    dlg.append(head, sessions, danger);
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });  // backdrop
+    document.body.append(dlg);
+    dlg.showModal();
+  }
 
   // Live share links for this page, each revocable on its own.
   async function shareList(btn, query) {
@@ -112,14 +196,32 @@ const Airlock = (() => {
       }
     });
 
+    // Runs, a page at a time. The page survives the 5 s refresh; new runs push older ones down.
+    const PAGE = 10;
+    let page = 0, runs = [];
+    const pages = () => Math.max(1, Math.ceil(runs.length / PAGE));
+    $('prev').addEventListener('click', () => { page--; render(); });
+    $('next').addEventListener('click', () => { page++; render(); });
+    let landed = false;
     const load = async () => {
-      const runs = await (await fetch('/api/runs')).json();
+      runs = await (await fetch('/api/runs')).json();
+      render();
+      if (!landed && location.hash === '#runs-panel') $('runs-panel').scrollIntoView();  // "Runs" in the nav
+      landed = true;
+    };
+    const render = () => {
+      page = Math.min(Math.max(page, 0), pages() - 1);
       const tb = $('runs');
       tb.replaceChildren();
       $('empty').hidden = runs.length > 0;
-      for (const r of runs) {
-        const tr = el('tr');
+      $('pager').hidden = runs.length <= PAGE;
+      $('prev').disabled = page === 0;
+      $('next').disabled = page >= pages() - 1;
+      $('page-info').textContent = `${page * PAGE + 1}–${Math.min(runs.length, (page + 1) * PAGE)} of ${runs.length}`;
+      for (const r of runs.slice(page * PAGE, (page + 1) * PAGE)) {
+        const tr = el('tr', 'link');
         const a = el('a', 'mono', r.target); a.href = `/runs/${r.id}`;
+        tr.addEventListener('click', (e) => { if (!e.target.closest('a') && !getSelection().toString()) location.href = a.href; });
         const td = (child) => { const c = el('td'); if (child) c.append(child); tr.append(c); };
         td(a);
         td(pill(r.status));
@@ -209,6 +311,7 @@ const Airlock = (() => {
       const row = document.getElementById(`E${n}`);
       if (!row) return;
       if (row.classList.contains('exec')) { $('show-exec').checked = true; document.body.classList.remove('hide-exec'); }
+      reveal(row);
       row.scrollIntoView({ behavior: 'smooth', block: 'center' });
       row.classList.add('flash');
       setTimeout(() => row.classList.remove('flash'), 1600);
@@ -225,7 +328,10 @@ const Airlock = (() => {
       agent: ['Agent investigation', 'Commands chosen by the AI reviewer, run inside the same VM.'],
       verdict: ['Verdict', 'The agent\'s conclusion, then the VM is destroyed. A human decides on the right.'],
     };
-    let stage = null, stageSignals = 0;  // non-exec events seen in the current stage
+    // Each stage is a collapsible section, like a CI job's steps: the stage in progress is open, and a
+    // finished one folds away unless it holds something worth seeing or the reader opened or closed it.
+    const HOT = ['error', 'limit_hit', 'coverage_incomplete', 'snapshot_partial', 'guard_flagged', 'citation_invalid'];
+    let stage = null, sec = null;
     const stageOf = (ev) => {
       if (['verdict', 'vm_destroyed', 'error'].includes(ev.kind)) return 'verdict';
       if (ev.kind === 'agent_start' || ev.kind === 'guard_flagged') return 'agent';
@@ -235,18 +341,41 @@ const Airlock = (() => {
       if (src === 'detonate') return 'detonate';
       return stage === 'agent' ? 'agent' : 'setup';
     };
+    const badges = (s) => {
+      const b = [];
+      if (s.contained) b.push(el('span', 'badge hot', `${s.contained} contained`));
+      if (s.name === 'detonate' && s.done && s.signals === 0) b.push(el('span', 'badge ok', '✓ nothing suspicious'));
+      b.push(el('span', 'badge', `${s.events} event${s.events === 1 ? '' : 's'}`));
+      if (s.t1 > s.t0) b.push(el('span', 'badge', `${(s.t1 - s.t0).toFixed(1)}s`));
+      s.badges.replaceChildren(...b);
+    };
+    const finishStage = (s) => {
+      s.done = true;
+      if (s.name === 'detonate' && s.signals === 0) {
+        s.ol.append(el('li', 'stage-note', '✓ Nothing suspicious observed during install: no credential reads, no outbound requests, no spawned processes.'));
+      }
+      if (!s.touched && !s.hot && s.name !== 'verdict') s.details.open = false;
+      badges(s);
+    };
     const enterStage = (next) => {
       if (next === stage) return;
-      if (stage === 'detonate' && stageSignals === 0) {
-        tl.append(el('li', 'stage-note', '✓ Nothing suspicious observed during install: no credential reads, no outbound requests, no spawned processes.'));
-      }
+      if (sec) finishStage(sec);
       stage = next;
-      stageSignals = 0;
       const [title, desc] = STAGES[next];
-      const h = el('li', `stage-head stage-${next}`);
-      h.append(el('span', 'stage-title', title), el('span', 'stage-desc', desc));
-      tl.append(h);
+      const li = el('li', `stage stage-${next}`);
+      const details = el('details');
+      details.open = true;
+      const head = el('summary', 'stage-head');
+      const s = { name: next, details, ol: el('ol', 'stage-events'), badges: el('span', 'stage-badges'),
+        events: 0, signals: 0, contained: 0, hot: false, touched: false, done: false, t0: null, t1: null };
+      head.append(el('span', 'chev'), el('span', 'stage-title', title), el('span', 'stage-desc', desc), s.badges);
+      head.addEventListener('click', () => { s.touched = true; });
+      details.append(head, s.ol);
+      li.append(details);
+      tl.append(li);
+      sec = s;
     };
+    const reveal = (row) => { const d = row.closest('details'); if (d) d.open = true; };
 
     function addEvent(ev) {
       if (t0 === null) t0 = ev.ts;
@@ -255,7 +384,12 @@ const Airlock = (() => {
       li.id = `E${ev.id}`;
       const repro = ev.containment && ev.data.stage === 'agent';
       if (ev.containment) li.classList.add('contain');
-      if (ev.kind !== 'exec' && ev.kind !== 'behaviour_diff') stageSignals++;
+      if (ev.kind !== 'exec' && ev.kind !== 'behaviour_diff') sec.signals++;
+      sec.events++;
+      if (sec.t0 === null) sec.t0 = ev.ts;
+      sec.t1 = ev.ts;
+      if (ev.containment && !repro) { sec.contained++; sec.hot = true; }
+      if (HOT.includes(ev.kind) || (ev.kind === 'behaviour_diff' && (ev.data.new || []).length)) sec.hot = true;
       if (repro) li.classList.add('repro');
       if (ev.kind === 'exec') {
         li.classList.add('exec');
@@ -290,7 +424,9 @@ const Airlock = (() => {
         d.append(pre);
         li.append(d);
       }
-      tl.append(li);
+      sec.ol.append(li);
+      if (sec.hot && !sec.touched) sec.details.open = true;
+      badges(sec);
 
       if (ev.containment && !repro) counts.contain++;
       if (ev.kind === 'canary_read' && !repro) counts.canary++;
@@ -309,6 +445,7 @@ const Airlock = (() => {
       }
       if (ev.kind === 'canaries_seeded') fact('canaries', (ev.data.files || []).join(', '));
       if (ev.kind === 'agent_start') { $('verdict').textContent = 'Agent investigating…'; fact('agent', ev.data.model); }
+      if (ev.kind === 'vm_destroyed') finishStage(sec);
       if (ev.kind === 'verdict') showVerdict(ev.data.verdict, ev.data.evidence || [], ev.data.turns, ev.data.forced);
       if (ev.kind === 'vm_destroyed') fact('lifecycle', 'VM destroyed after run');
     }
@@ -331,7 +468,9 @@ const Airlock = (() => {
         const row = el('li', item.containment ? 'risky' : '');
         row.append(document.createTextNode(item.label + ' '));
         for (const id of (item.ids || []).slice(0, 3)) {
-          const a = el('a', 'ref', `[E${id}]`); a.href = `#E${id}`; row.append(a, document.createTextNode(' '));
+          const a = el('a', 'ref', `[E${id}]`); a.href = `#E${id}`;
+          a.addEventListener('click', (e) => { e.preventDefault(); flash(id); });
+          row.append(a, document.createTextNode(' '));
         }
         ul.append(row);
       }
