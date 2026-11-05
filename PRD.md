@@ -42,11 +42,11 @@ Airlock runs an untrusted dependency change (a GitHub pull request, a new npm or
 1. Analyse a GitHub PR URL or a `package@version` end to end in under 5 minutes, with no host exposure.
 2. Show a behavioural verdict: benign / suspicious / malicious, with the evidence that drove it.
 3. Make every containment event visible in a live timeline. At least two layers: network/VM and LLM context.
-4. Require human approval before any outward action (posting a PR comment, approving a merge).
+4. Require a person's approval before anything merges. Airlock posts its own status and evidence comment, and rejects on its own only when theft is proven by a captured payload; it never approves.
 
 **Non-goals**
 
-- Static CVE scanning (Snyk, OSV and Socket already do this; we may link OSV results, but we don't rebuild them).
+- Static analysis: CVE lookups (Snyk, OSV) and reading package code for risky patterns (Socket's approach). We may link OSV results, but we don't rebuild them. Airlock's difference is what it can show: evidence captured on the host and tied to one run's token, a comparison with the commit before the change, and a merge check that enforces the decision.
 - Ecosystems beyond npm and PyPI in the hackathon build.
 - Defeating sandbox-aware malware that deliberately stays dormant. We note it as a limit and don't claim it.
 - Multi-tenant SaaS, auth, or billing.
@@ -212,7 +212,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
 6. **2:33 Under the hood (17 s).**
    - The architecture diagram: three containment layers, host-captured evidence the guest can't forge.
    - VX1 with KVM: a separate guest kernel, and a rebuild from cloud-init in about 10 minutes.
-   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30; $1.45 of inference for the whole build.
+   - npm and PyPI; 13 Serverless Inference models benchmarked; regression 30/30 (10 scenarios × 3); about $0.003 of inference per review, about 620 PR runs an hour on one host.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
 **Before recording:** a fresh run of PR #3; PR #4's run is started on camera by the push, so prepare the README edit and do one practice push the day before. PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
@@ -241,7 +241,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 
 **Open questions**
 
-- [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Inference spend for the whole build so far: $1.45 (4 Nov 08:25).
+- [x] Submission deadline: Sun 8 Nov, 23:00 GMT (confirmed). Spend for the whole build so far: $8.26 ($1.52 inference, $6.74 compute; 5 Nov).
 - [x] Read-only public view for judges, or allowlist only? Both: signed read-only share links to recorded runs, plus an invite link with run caps for judges who want to submit their own (decided Tue 3 Nov). The lablab page is public, so the invite link should be treated as public.
 - [x] Build the obfuscated PR before the video, or after submission? Before, without obfuscation tooling: PR #4 (`tinystamp`, 4 Nov) splits the theft across innocuous-looking files, which is enough to make the diff read as a routine bump. Runtime detection doesn't depend on how readable the code is.
 - [x] Should deleting an account also remove its access? No, for the hackathon: `DELETE /api/me` removes the guest's runs, self-tests and share links and ends their sessions, but the allowlist entry stays, so they can sign in again (decided Thu 5 Nov). A product would handle accounts and access differently anyway, so this isn't the model to build on.

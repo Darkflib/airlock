@@ -14,7 +14,7 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
 ## 30 seconds for judges
 
-- **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. A human approves or rejects before anything is posted to GitHub.
+- **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. Proven theft is rejected automatically; anything else waits for a person, and nothing is ever approved automatically.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
 - **Proof.** 30/30 correct on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
@@ -24,14 +24,15 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 
 Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
 
-- **4 Nov, 03:06. Full regression 30/30** ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR.
+- **4 Nov, 03:06. Full regression 30/30** ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR (under heavy load on 5 Nov, PR #3's count varied from 12 to 14 new; the theft was new and proven every time).
 - **4 Nov, 09:15. Judge access checked with a second GitHub account.** As a guest: only demo runs visible (your uploads 404), deciding or sharing someone else's run 403, PRs from other repos 403, the 16th run in a day 429. Share links open only their own runs; revoking an invite ends its sessions immediately.
 - **4 Nov, 08:45. Live self-test 5/5** (`20261104-084347-33a1a2`): Node, shell and Python stealers malicious with exfil proven by payload (4, 6 and 13 containment events); benign npm and benign Python sdist 0.
 - **4 Nov, 08:45. Hidden stealer (PR #4) with the behaviour diff, 20.2 s** (`20261104-084529-f40401`): 10 behaviours new in this PR versus its merge base (5 of them containment), 4 unchanged. The sinkhole captured the POST carrying this run's canary token, though the diff reads like a routine bump. The first PR #4 run (02:35, no diff yet) took 13.4 s.
 - **4 Nov, 02:12. Malformed DNS can't blind the watcher.** A real VM sent truncated queries as `node`; both were logged as `dns_malformed` and the next lookup was still recorded.
 - **4 Nov, 00:29. DNS-label exfil path found and closed.** Before the fix, raw DNS to the gateway resolver went out unrecorded. After it, only registry names resolve and everything else is NXDOMAIN plus a `dns_blocked` event. DNS over TCP is refused but not recorded.
 - **3 Nov. Model choice benchmarked**, not assumed: all 13 catalogue models, about 700 agent calls.
-- **Cost: $1.45** of Serverless Inference for the whole build up to 4 Nov 08:25, including that benchmark and every regression (inference only; the VM is billed separately). One review costs a fraction of a cent.
+- **Cost.** A review uses about 12,000 tokens at the median, about **$0.003** of Serverless Inference ($0.02 for the longest in the regression). Compute is one VX1 host at $0.153/hour ($113/month) that runs one review per core: **about 620 PR runs an hour** in a load test (5 Nov), so about 11c of compute per review at 1,000 reviews a month and about 1c at 10,000. The whole build to 5 Nov cost **$8.26**: $1.52 of inference (mostly the 13-model benchmark and evals) and $6.74 of compute.
+- **5 Nov, 13:15. Capacity.** 80/81 PR runs correct at 2–8 at once, none inconclusive; past one per core, runs only get slower (BUILD_LOG 5 Nov 13:15).
 
 What we haven't measured: detection of unseen, real-world malware, or of malware that detects the sandbox and stays quiet.
 

@@ -122,7 +122,7 @@ No single source is trusted for everything. Each has a trust level, and the evid
 - The guest's DNS (served by the watcher) answers any non-registry name with an address in this run's private /24.
 - The microsandbox policy allows that /24 (ports 80, 443, 8080, 8443) plus the registries; everything else is refused by microsandbox itself.
 - microsandbox routes all guest TCP through an outbound proxy: a host-side mitmproxy in SOCKS5 mode (`airlock-sinkhole` unit). This is transparent to the guest; no proxy settings are needed inside.
-- An addon (`airlock/sinkhole/addon.py`) answers every request to 198.18.0.0/15 itself with `{"ok":true}`, writes the full request (method, host, path, headers, body) to a log on the host, and **never connects upstream**. Registry traffic passes through untouched.
+- An addon (`airlock/sinkhole/addon.py`) answers every request to 198.18.0.0/15 itself with `{"ok":true}`, writes the request (method, host, path, headers, and up to 8,000 characters of body, flagged when cut) to a log on the host, and **never connects upstream**. Registry traffic passes through untouched.
 - TLS: microsandbox's TLS inspection is configured to trust mitmproxy's CA upstream, so HTTPS from curl, Python and Node is decrypted and captured.
 
 The spike (`spikes/sinkhole_*.py`, build log 3 Nov 20:07) captured complete POST bodies from curl over HTTPS, Python `urllib` over HTTP and Node `https`, with no changes to the guest.
@@ -399,7 +399,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 | `inconclusive` on any coverage gap | Never a false "safe" | More runs need a human look |
 | Automatic rejection on proof only; approval always human | Proven theft is blocked with no wait, and no model's word ever merges code | Everything short of proof (suspicious but unproven, and every clean change) still needs a person; at scale this needs policy (section 14) |
 | One host, SQLite, in-process runners | Simple, fast to build, easy to rebuild | No horizontal scale; one run per core at once |
-| One small, cheap model | About $1.45 of inference for the whole build; a fraction of a cent per review | Less depth on unusual cases than a large model |
+| One small, cheap model | About $0.003 of inference per review at the median ($1.52 for the whole build, mostly benchmarking) | Less depth on unusual cases than a large model |
 
 ## 13. Weaknesses and known limits
 
@@ -411,13 +411,13 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Pinned TLS** prevents payload capture; we still see the hostname and the attempt.
 - **Encoded exfil** is caught as traffic but is not PROVEN unless the token appears verbatim.
 - **Non-credential theft** (source code, `.env` files we didn't plant, environment variables) is seen as reads and traffic but not proven, because it carries no canary token.
-- **Coverage holes:** the connection poller can miss very short connections; raw-IP refusals in ~7 ms are counted but not attributed; DNS over TCP to the gateway fails closed but isn't recorded; bodies are truncated at 2,000 characters.
+- **Coverage holes:** the connection poller can miss very short connections; raw-IP refusals in ~7 ms are counted but not attributed; DNS over TCP to the gateway fails closed but isn't recorded; the sinkhole keeps 8,000 characters of a body and the evidence event 2,000, so a token past that isn't matched. The watcher sees programs run and files opened in home directories (where the canaries are), not every file read.
 - **No eBPF.** A custom guest kernel would give syscall-level tracing.
 
 ### AI
 
 - The injection guard is pattern-based and can be paraphrased around.
-- The verdict is one model's reading of the evidence. It is explained and cited, but it can be wrong; that is why a human decides.
+- The verdict is one model's reading of the evidence. It is explained and cited, but it can be wrong. So it decides nothing on its own: only a person approves, and the automatic rejection reads the captured payload, never the model's verdict.
 - `roles.toml` names a fallback model, but there is no automatic runtime fallback yet.
 
 ### Platform and operations
@@ -426,9 +426,8 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 - **Retention is simple** (`airlock/retention.py`, 5 November). An uploaded package is deleted when its run ends. Runs that aren't demo runs are deleted with their events after 30 days (`AIRLOCK_RETAIN_DAYS`). Demo runs are kept indefinitely, because share links and the self-test point at them. `sinkhole.jsonl` is rotated once it is a day old or past 16 MB, keeping one previous file, and only while no VM on the host is running. There is no per-tenant policy and no export. Per run, sizes are bounded: a 600 s deadline, 5,000 events, 32 MB per guest log, 64 KB of each command's output, and a 1,000-event backlog per live viewer.
 - **Pinned, not proven by a rebuild.** The VM images are pinned by digest (`IMAGES` in `airlock/sandbox.py`), microsandbox by `uv.lock`, and uv, mitmproxy and Caddy by exact version in cloud-init; `scripts/check-pins.sh` shows a live host matches (5 November). A fresh instance built from the pinned cloud-init gave the same results as the live host (5 November). mitmproxy's own dependencies aren't locked. Pinned Caddy also means its security releases are applied by moving the pin, not automatically.
 - **GitHub fetch limits.** The changed-file list stops at GitHub's 3,000 files and the agent's diff at 200,000 characters; either cut is disclosed to the agent, on the run page and in the PR comment (5 November). The diff and archive are pinned to the base and head SHAs, and the file list is read between two reads of the head.
-- **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
 - **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3.
-- **Self-hosting** still depends on personal defaults (domain, SSH key, 1Password item names) and lacks a complete `.env.example` and App setup guide.
+- **Self-hosting** has a guide (`docs/SELF_HOSTING.md`) and `.env.example` (5 November), and a fresh instance was built from them, but only by us; nobody else has followed it yet. Secrets still come from 1Password.
 
 ## 14. From prototype to product
 
@@ -473,9 +472,9 @@ Runs alongside the stages above. The first slices worth doing are the canaries f
 
 ### 14.5 Business shape
 
-- **Unit cost is low.** Inference for the entire build, including benchmarking 13 models, was about $1.45; one review costs a fraction of a cent. The dominant cost is compute: one or two VMs for 15–30 s per change. That supports per-seat or per-repo pricing with a generous run allowance.
+- **Unit cost is low, and mostly compute.** A review uses about 12,000 tokens at the median, about $0.003 of inference. Compute is one VX1 host ($0.153/hour, $113/month) that runs about 620 PR reviews an hour at one per core (load test, 5 November), so compute per review is $113 divided by monthly volume: about 11c at 1,000 reviews a month, about 1c at 10,000. The whole build to 5 November cost $8.26 ($1.52 inference, $6.74 compute). That supports per-seat or per-repo pricing with a generous run allowance.
 - **Likely buyers:** platform and security teams in companies with many repos and automated dependency updates; open-source foundations that want a check on maintainers' dependency bumps; package registries that want to detonate new releases before they're widely installed.
-- **Defensibility** isn't the sandbox alone. It is the evidence model (PROVEN vs OBSERVED vs INFERRED, behaviour diff against the base), a growing corpus of behaviour fingerprints across packages, and policy that lets teams skip review safely for the 95% of updates that do nothing new.
+- **Defensibility** isn't the sandbox alone. It is the evidence model (PROVEN vs OBSERVED vs INFERRED, behaviour diff against the base), a growing corpus of behaviour fingerprints across packages, and policy that could let teams skip review for updates that do nothing new (we haven't measured how many that is).
 
 ## Appendix: code map
 
@@ -485,7 +484,7 @@ Runs alongside the stages above. The first slices worth doing are the canaries f
 | `airlock/guest/watch.py` | Root watcher in the guest: fanotify, DNS forwarder, `/proc` polling |
 | `airlock/guest/trace.js` | Node preload tracer: request bodies, dotfile reads, child processes |
 | `airlock/guest/pypi_fetch.py` | Fetches a PyPI sdist without running it, sha256-checked |
-| `airlock/sinkhole/addon.py` | mitmproxy addon: answers the fake range, logs full requests, never forwards |
+| `airlock/sinkhole/addon.py` | mitmproxy addon: answers the fake range, logs requests (bodies to 8,000 characters), never forwards |
 | `airlock/dnsguard.py` | Per-run host DNS listener behind the gateway resolver |
 | `airlock/events.py` | Raw records → typed events; exfil source preference |
 | `airlock/behaviour.py` | Fingerprints and the base-vs-head diff |

@@ -20,6 +20,7 @@ A green test run doesn't tell you what the install script did.
 ## 3. What Airlock does
 
 A push to a PR starts it by itself (or paste an npm or PyPI package, or upload a tarball) → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
+Scanners such as Socket read a package's code for risky patterns. Airlock runs the change and keeps what it actually sent, tied to this run's token, compared with the code before the change, and enforced as a merge check.
 *Visual:* four-step strip: Start → Run → Explain → Decide.
 
 ## 4. The money shot: proven exfiltration
@@ -48,7 +49,7 @@ Reads like a routine dependency bump; the theft is split across "install analyti
 
 Three containment layers, evidence the guest can't forge:
 1. **Default-deny egress** (microsandbox policy): registries only.
-2. **Fake DNS + sinkhole** on a per-run /24, plus a host-side DNS guard: captures every request, forwards none.
+2. **Fake DNS + sinkhole** on a per-run /24, plus a host-side DNS guard: answers every non-registry request itself, records it, forwards none.
 3. **In-guest watcher** as root (fanotify, DNS, connections); the package runs as an unprivileged user and can't touch it.
 Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive".
 *Visual:* `docs/architecture.png`.
@@ -67,8 +68,10 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Malicious runs with exfil proven by payload | **15/15** |
 | Containment events on benign runs | **0** |
 | Median run, end to end | **12–31 s** |
-| Inference for the whole build | **≈ $1.45** |
-Recheck the 30/30 on the frozen commit and the spend on Sat before exporting.
+| Inference per review (median) | **≈ $0.003** |
+| One VX1 host ($113/month), 4 at once | **≈ 620 PR runs/hour** |
+| Whole build to 5 Nov, inference + compute | **$8.26** |
+"10 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 30/30 on the frozen commit and the spend on Sat before exporting.
 
 ## 10. Limits and try it
 

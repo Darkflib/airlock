@@ -14,7 +14,7 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 - [ ] Browser: signed in as `Darkflib`, zoom 125%, bookmarks bar hidden, notifications off, one tab for the site and one for GitHub.
 - [ ] Burn in English captions that match the narration word for word; many judges read English more easily than they hear it.
 - [ ] Speak slowly and leave a short pause after each number.
-- [ ] Recheck the inference spend on the Vultr dashboard and update the $1.45 figure if it moved.
+- [ ] Recheck the spend on the Vultr dashboard ($8.26 total on 5 Nov: $1.52 inference, $6.74 compute) and the per-review figures if they moved.
 - [ ] Nothing on screen shows a share-link URL, an invite link, `.env` or a terminal with secrets. Canary values are fine (they're fake and per-run), but don't zoom in on them for long.
 
 ## Shots and narration
@@ -39,7 +39,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Detonation stage: `npm ci` as the unprivileged user. Events land: `cat` reads `.npmrc` and `.aws/credentials`, `curl` is sinkholed, raw-IP connect refused.
 
-> "Now the install runs, as a normal user. A watcher that the package cannot touch records every program, every file it reads, and every connection."
+> "Now the install runs, as a normal user. A watcher that the package cannot touch records the programs it runs, the password files it opens, and where it tries to connect."
 
 **[SCREEN]** The PROVEN exfil row. Expand it: the captured POST body with this run's token highlighted. Hold for three seconds. **This is the money shot.**
 
@@ -79,7 +79,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models. Thirty out of thirty correct in our tests. The AI cost for the whole project: about one dollar fifty."
+> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. We tested all thirteen Serverless Inference models. Thirty out of thirty correct in our tests. Each review costs well under a cent in AI, and one server handles about six hundred pull requests an hour."
 
 ### 2:50–3:00 Close
 
@@ -107,4 +107,4 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 30/30, proven 15/15 | `product-20261104T030613Z` (rerun on the frozen commit) |
-| $1.45 inference | PRD, 4 Nov 08:25 (recheck before recording) |
+| About $0.003 of inference per review; about 600 PR runs an hour on one host | median tokens in `product-20261104T030613Z` × mimo-v2.6-flash price; load test BUILD_LOG 5 Nov 13:15 |
