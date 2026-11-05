@@ -654,3 +654,9 @@ Tags: #security #fix
 **Result:** all four correct: Node stealer MALICIOUS with PROVEN exfil (13.0 s), Python `setup.py` stealer MALICIOUS with PROVEN exfil (24.2 s), benign npm BENIGN (13.7 s), benign sdist BENIGN with 0 containment (15.8 s). Exit codes and output reach the agent (it re-ran the stealer and grepped the source), no spurious `limit_hit` or `coverage_incomplete`, every VM `vm_destroyed`. The first benign npm run showed 1 containment event from the agent `cat`-ing the canary itself; a rerun had 0 (13.9 s).
 **So:** the budgets don't change results on the fixtures. The code is synced to `~/airlock` on the host but `airlock-web` hasn't been restarted, so the live service still runs the earlier build. PR runs (two VMs, GitHub fetch) weren't exercised from the CLI.
 Tags: #metric #fix
+
+### 00:16 — Budgets deployed; PR #3 webhook run on the new build
+**Tried:** deployed `a7e559a` with `scripts/deploy.sh` (no runs live; restart clean, healthz 200), then committed a README comment to PR #3's branch (`0c3e35d`) through the contents API so the webhook would start a run on the hardened build.
+**Result:** `(webhook)` run `20261105-001539-fa523d` started 4 s after the push and finished in 20.7 s: MALICIOUS, exfil to `telemetry.colorful-logs.invalid` PROVEN, 13 behaviours new vs the merge base (6 containment), 64 events (cap 5,000), no `limit_hit` or `coverage_incomplete`, VM destroyed. Rejected automatically: `airlock` status `failure` on the new head and the run's PR comment rewritten in place.
+**So:** the two-VM PR path behaves as before under the budgets. PR #3 now has one more commit and bot comment; PR #4 and PR #1 untouched for filming.
+Tags: #metric #demo
