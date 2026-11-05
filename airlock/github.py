@@ -87,7 +87,7 @@ class GitHubApp:
         self.attempts, self.wait, self.transport = attempts, wait, transport  # about 7 s of backoff by default
 
     async def _retry(self, fn, idempotent: bool = True):
-        """Run a write with backoff on transient failures (also covers minting the token)."""
+        """Run a read or write with backoff on transient failures (also covers minting the token)."""
         async for attempt in AsyncRetrying(retry=retry_if_exception(lambda e: transient(e, idempotent)), reraise=True,
                                            stop=stop_after_attempt(self.attempts),
                                            wait=wait_exponential(multiplier=self.wait, max=10 * self.wait)):
@@ -131,6 +131,9 @@ class GitHubApp:
         """The PR and its changed files, consistent with one head commit. The file list is read
         by PR number, so the head is read again afterwards; if it moved, the list is read again
         (a few times at most, then `head_moved` marks the list as not matching the head)."""
+        return await self._retry(lambda: self._pull_request(owner, repo, number, files))
+
+    async def _pull_request(self, owner: str, repo: str, number: int, files: bool) -> PullRequest:
         async with await self._client(owner, repo) as c:
             pr = (await c.get(f"/repos/{owner}/{repo}/pulls/{number}")).raise_for_status().json()
             listed: list[dict] = []
@@ -162,28 +165,34 @@ class GitHubApp:
         return out
 
     async def tarball(self, owner: str, repo: str, sha: str) -> bytes:
-        async with await self._client(owner, repo) as c:
-            r = await c.get(f"/repos/{owner}/{repo}/tarball/{sha}")
-            r.raise_for_status()
-            return r.content
+        async def get():
+            async with await self._client(owner, repo) as c:
+                r = await c.get(f"/repos/{owner}/{repo}/tarball/{sha}")
+                r.raise_for_status()
+                return r.content
+        return await self._retry(get)
 
     async def merge_base(self, owner: str, repo: str, base: str, head: str) -> str:
         """The commit the PR branched from: comparing against it isolates what the PR itself adds
         (the base branch tip may have moved on since)."""
-        async with await self._client(owner, repo) as c:
-            r = (await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", params={"per_page": 1})).raise_for_status()
-            return r.json()["merge_base_commit"]["sha"]
+        async def get():
+            async with await self._client(owner, repo) as c:
+                r = (await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", params={"per_page": 1})).raise_for_status()
+                return r.json()["merge_base_commit"]["sha"]
+        return await self._retry(get)
 
     async def diff(self, owner: str, repo: str, base: str, head: str, limit: int = DIFF_LIMIT) -> Diff:
         """The PR's diff between two commits (three-dot, as GitHub shows a PR), so it matches the
         archive that was detonated even if the branch moves on. Past `limit` characters it's cut."""
-        async with await self._client(owner, repo) as c:
-            r = await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", headers={"Accept": "application/vnd.github.diff"})
-            if r.status_code in (406, 422):  # "diff too large" and similar: the run goes on without it
-                return Diff("", unavailable=f"GitHub would not produce the diff (HTTP {r.status_code})")
-            r.raise_for_status()
-            text = r.text
-        return Diff(text[:limit], chars=len(text), truncated=len(text) > limit)
+        async def get():
+            async with await self._client(owner, repo) as c:
+                r = await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", headers={"Accept": "application/vnd.github.diff"})
+                if r.status_code in (406, 422):  # "diff too large" and similar: the run goes on without it
+                    return Diff("", unavailable=f"GitHub would not produce the diff (HTTP {r.status_code})")
+                r.raise_for_status()
+                text = r.text
+            return Diff(text[:limit], chars=len(text), truncated=len(text) > limit)
+        return await self._retry(get)
 
     async def comment(self, owner: str, repo: str, number: int, body: str, edit: str | None = None) -> str:
         """Post a comment, or rewrite the one at `edit` (its html_url) in place; returns its html_url.
@@ -205,11 +214,13 @@ class GitHubApp:
 
     async def permission(self, owner: str, repo: str, login: str) -> str:
         """The user's access to the repo: admin, write, read or none (maintain counts as write)."""
-        async with await self._client(owner, repo) as c:
-            r = await c.get(f"/repos/{owner}/{repo}/collaborators/{login}/permission")
-            if r.status_code == 404:
-                return "none"
-            return r.raise_for_status().json()["permission"]
+        async def get():
+            async with await self._client(owner, repo) as c:
+                r = await c.get(f"/repos/{owner}/{repo}/collaborators/{login}/permission")
+                if r.status_code == 404:
+                    return "none"
+                return r.raise_for_status().json()["permission"]
+        return await self._retry(get)
 
     async def status(self, owner: str, repo: str, sha: str, state: str, description: str, target_url: str) -> None:
         async def post():  # idempotent: the latest status for the context wins

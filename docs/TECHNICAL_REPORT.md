@@ -78,6 +78,8 @@ Every step streams to the browser over Server-Sent Events as it happens, and is 
 
 Typical end-to-end times on the regression set: 12–18 s for tarballs, npm specs, sdists and stealer PRs; 24 s for a benign PR (two VMs plus `npm test`); 31 s for `six` from real PyPI. All runs measured on 4 Nov (`product-20261104T030613Z`).
 
+**Capacity (load test, 5 Nov).** Demo PRs only (two VMs each) on the 4 vCPU / 16 GB host: 2 at once gave 321 PR runs an hour (median about 19 s), 4 at once 623 (about 23 s), 6 at once 676 (about 30 s), 8 at once 714 (about 37 s). 80 of 81 runs were correct and none was inconclusive; the one error was GitHub dropping the connection on the first PR read, and reads are now retried. CPU is the limit, not memory: with 16 VMs up, at least 11.4 GB stayed free. So the default is one run per core. Under load the base-vs-head diff for PR #3 varied between 12 and 14 new behaviours (it is 13 at low load); the exfiltration was new and proven on every run. Results: `evals/results/product-20261105T1305*` to `T1313*`.
+
 ## 4. Isolation
 
 ### Why a microVM
@@ -100,7 +102,7 @@ microsandbox also refused to start until its storage root was not group-writable
 - **Two users.** The package installs and tests as `node`. The watcher runs as root, logs to a root-only directory, and can't be killed or read by `node`. Every command the AI agent runs is also `node`, so the model can't damage observation either. That was a finding of the first independent review (`docs/REVIEW-2026-11-03.md`, finding 2) and is now enforced in `airlock/agent.py`.
 - **Images.** npm runs in the stock `node` image; PyPI runs in `python:3.12-slim`, because the `node` image has no pip. The `node` user and the canaries are created in whichever image boots.
 - **PyPI without running code as root.** `pip download` runs `setup.py` to resolve metadata, which would execute the attacker's code as root before detonation. Airlock instead fetches the sdist with a small stdlib script (`airlock/guest/pypi_fetch.py`), checks its sha256 against PyPI, and lets the unprivileged `pip install` be the first thing that runs it.
-- **Limits.** 2 vCPU, 2 GB, 480 s VM lifetime, per-command timeouts, at most 2 concurrent runs on the host. A command killed by a limit becomes a `limit_hit` event.
+- **Limits.** 2 vCPU, 2 GB, 480 s VM lifetime, per-command timeouts, at most one run per core on the host at once (`AIRLOCK_SLOTS`; 4 on the demo host). A command killed by a limit becomes a `limit_hit` event.
 
 ### Lifecycle
 
@@ -396,7 +398,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 | Merge-base diff in a second VM | Shows what the PR adds; less noise for real repos | Doubles VM cost per PR; PR #1 takes 24 s instead of ~13 s |
 | `inconclusive` on any coverage gap | Never a false "safe" | More runs need a human look |
 | Automatic rejection on proof only; approval always human | Proven theft is blocked with no wait, and no model's word ever merges code | Everything short of proof (suspicious but unproven, and every clean change) still needs a person; at scale this needs policy (section 14) |
-| One host, SQLite, in-process runners | Simple, fast to build, easy to rebuild | No horizontal scale; max 2 concurrent runs |
+| One host, SQLite, in-process runners | Simple, fast to build, easy to rebuild | No horizontal scale; one run per core at once |
 | One small, cheap model | About $1.45 of inference for the whole build; a fraction of a cent per review | Less depth on unusual cases than a large model |
 
 ## 13. Weaknesses and known limits
@@ -420,7 +422,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 
 ### Platform and operations
 
-- **One host, two concurrent runs.** No queue beyond that, no autoscaling.
+- **One host, one run per core.** No queue beyond that, no autoscaling.
 - **Retention is simple** (`airlock/retention.py`, 5 November). An uploaded package is deleted when its run ends. Runs that aren't demo runs are deleted with their events after 30 days (`AIRLOCK_RETAIN_DAYS`). Demo runs are kept indefinitely, because share links and the self-test point at them. `sinkhole.jsonl` is rotated once it is a day old or past 16 MB, keeping one previous file, and only while no VM on the host is running. There is no per-tenant policy and no export. Per run, sizes are bounded: a 600 s deadline, 5,000 events, 32 MB per guest log, 64 KB of each command's output, and a 1,000-event backlog per live viewer.
 - **Pinned, not proven by a rebuild.** The VM images are pinned by digest (`IMAGES` in `airlock/sandbox.py`), microsandbox by `uv.lock`, and uv, mitmproxy and Caddy by exact version in cloud-init; `scripts/check-pins.sh` shows a live host matches (5 November). A fresh instance built from the pinned cloud-init gave the same results as the live host (5 November). mitmproxy's own dependencies aren't locked. Pinned Caddy also means its security releases are applied by moving the pin, not automatically.
 - **GitHub fetch limits.** The changed-file list stops at GitHub's 3,000 files and the agent's diff at 200,000 characters; either cut is disclosed to the agent, on the run page and in the PR comment (5 November). The diff and archive are pinned to the base and head SHAs, and the file list is read between two reads of the head.

@@ -39,6 +39,9 @@ MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
 # Queue wait excluded. The VM's own 480 s lifetime plus triage; real runs take 12-31 s.
 RUN_DEADLINE = float(os.environ.get("AIRLOCK_RUN_DEADLINE", "600"))
+# Runs at once on this host; default one per core. A package run is one VM (2 vCPU, 2 GB), a PR run
+# two. CPU is the limit: on 4 cores, 4 at once doubled throughput over 2, more only added latency.
+SLOTS = int(os.environ.get("AIRLOCK_SLOTS") or os.cpu_count() or 2)
 WEBHOOK_ACTIONS = {"opened", "synchronize", "reopened"}  # a new PR, a new push to it, a PR back from closed
 WEBHOOK_LABEL = " (webhook)"
 # `/airlock approve [note]` or `/airlock reject [note]` on its own line of a PR comment
@@ -60,7 +63,7 @@ Gate = Callable[[str, str, EventLog], Awaitable[None]]
 class Runner:
     """Owns live runs: one EventLog per active run, at most `slots` at once."""
 
-    def __init__(self, store: Store, analyse: Analyse, slots: int = 2, gate: Gate | None = None,
+    def __init__(self, store: Store, analyse: Analyse, slots: int = SLOTS, gate: Gate | None = None,
                  deadline: float = RUN_DEADLINE):
         self.store, self.analyse, self.gate, self.deadline = store, analyse, gate, deadline
         self.live: dict[str, EventLog] = {}

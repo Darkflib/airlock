@@ -2,7 +2,7 @@
 # Deploy the current working tree to the host as a systemd service behind Caddy.
 # Secrets are 1Password references in .env (see .env.example); their values travel
 # over SSH stdin only. Settings (not secrets) come from the environment or .env:
-#   AIRLOCK_HOST (ssh target), AIRLOCK_PUBLIC_URL, AIRLOCK_OWNERS, AIRLOCK_GUEST_REPOS
+#   AIRLOCK_HOST (ssh target), AIRLOCK_PUBLIC_URL, AIRLOCK_OWNERS, AIRLOCK_GUEST_REPOS, AIRLOCK_SLOTS
 #   scripts/deploy.sh
 set -eu
 cd "$(dirname "$0")/.."
@@ -16,7 +16,7 @@ APP_ID_REF=$(ref GITHUB_APP_ID); APP_ID_REF="${APP_ID_REF:-$APP_REF/app-id}"
 APP_KEY_REF=$(ref GITHUB_APP_PRIVATE_KEY); APP_KEY_REF="${APP_KEY_REF:-$APP_REF/private-key}"
 HOOK_REF=$(ref GITHUB_WEBHOOK_SECRET); HOOK_REF="${HOOK_REF:-$APP_REF/webhook-secret}"
 setting() { v=$(printenv "$1" || true); [ -n "$v" ] || v=$(ref "$1"); [ -z "$v" ] || printf "%s='%s' " "$1" "$v"; }
-SETTINGS="$(setting AIRLOCK_PUBLIC_URL)$(setting AIRLOCK_OWNERS)$(setting AIRLOCK_GUEST_REPOS)"
+SETTINGS="$(setting AIRLOCK_PUBLIC_URL)$(setting AIRLOCK_OWNERS)$(setting AIRLOCK_GUEST_REPOS)$(setting AIRLOCK_SLOTS)"
 
 rsync -az --delete \
   --exclude .git/ --exclude .env --exclude .venv/ --exclude assets/ \

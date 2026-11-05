@@ -12,7 +12,7 @@ KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_byt
 
 
 def app_with(replies):
-    """A GitHubApp whose status/comment POSTs get `replies` in turn (a status code or an exception)."""
+    """A GitHubApp whose API calls (past the token) get `replies` in turn (a status code or an exception)."""
     writes = []
 
     def handle(req: httpx.Request) -> httpx.Response:
@@ -24,7 +24,7 @@ def app_with(replies):
         reply = replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return httpx.Response(reply, json={"html_url": "https://github.com/c"})
+        return httpx.Response(reply, json={"html_url": "https://github.com/c", "permission": "write"})
     return GitHubApp("1", KEY, wait=0, transport=httpx.MockTransport(handle)), writes
 
 
@@ -73,3 +73,11 @@ def test_comment_is_edited_in_place_or_reposted_if_deleted():
     gh, writes = app_with([404, 201])   # someone deleted it: post a new one
     asyncio.run(gh.comment("o", "r", 4, "body", edit=url))
     assert writes == ["/repos/o/r/issues/comments/77", "/repos/o/r/issues/4/comments"]
+
+
+def test_reads_retry_like_writes():
+    # Seen under load: GitHub dropped the connection on the first PR read and the run failed at 0.1 s.
+    gh, writes = app_with([httpx.RemoteProtocolError("Server disconnected"), 200])
+    assert asyncio.run(gh.permission("o", "r", "someone")) == "write" and len(writes) == 2
+    gh, writes = app_with([404])   # a definite answer is not retried
+    assert asyncio.run(gh.permission("o", "r", "someone")) == "none" and len(writes) == 1

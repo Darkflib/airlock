@@ -3,12 +3,16 @@ on known targets and check the verdicts. Unlike harness.py, this exercises exact
 what the web app runs. Needs the host env (inference key, GitHub App for PRs):
 
   set -a; . ~/.config/airlock/web.env; set +a
-  .venv/bin/python evals/product_regression.py [--runs 3] [--concurrency 3]
+  .venv/bin/python evals/product_regression.py [--runs 3] [--concurrency 3] [--prs]
+
+As a load test, `--prs --concurrency N` runs only the demo PRs (two VMs each), N at once,
+and the summary adds wall time, throughput and the host's peak load and lowest free memory.
 """
 
 import argparse
 import asyncio
 import json
+import os
 import statistics
 import time
 from datetime import datetime, timezone
@@ -74,13 +78,37 @@ def diff_cell(rows: list[dict]) -> str:
                       f"{r['diff_new']} ({r['diff_risky']})" for r in rs)
 
 
+async def sample_host(peak: dict, stop: asyncio.Event) -> None:
+    """Every second: the highest 1-minute load and the lowest MemAvailable (Linux only)."""
+    while not stop.is_set():
+        try:
+            peak["load"] = max(peak.get("load", 0.0), os.getloadavg()[0])
+            avail = next(int(line.split()[1]) for line in open("/proc/meminfo") if line.startswith("MemAvailable"))
+            peak["min_avail_mb"] = min(peak.get("min_avail_mb", avail // 1024), avail // 1024)
+        except (OSError, StopIteration):
+            return
+        try:
+            await asyncio.wait_for(stop.wait(), 1)
+        except TimeoutError:
+            pass
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=3)
+    ap.add_argument("--prs", action="store_true", help="only the demo PRs (a load test: two VMs per run)")
     args = ap.parse_args()
+    targets = [t for t in TARGETS if t[0].startswith("https://")] if args.prs else TARGETS
     gate = asyncio.Semaphore(args.concurrency)
-    rows = await asyncio.gather(*(one(t, exp, rep, gate) for rep in range(args.runs) for t, exp, _ in TARGETS))
+    peak: dict = {}
+    stop = asyncio.Event()
+    sampler = asyncio.create_task(sample_host(peak, stop))
+    t0 = time.monotonic()
+    rows = await asyncio.gather(*(one(t, exp, rep, gate) for rep in range(args.runs) for t, exp, _ in targets))
+    wall = time.monotonic() - t0
+    stop.set()
+    await sampler
 
     out = HERE / "results" / ("product-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
     out.mkdir(parents=True)
@@ -88,7 +116,7 @@ async def main() -> None:
     lines = [f"# Product regression — {out.name}", "",
              "| Target | Expected | Correct | Median turns | Forced | Detonation containment | Proven exfil | New vs base (risky) | Median s |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
-    for target, expected, label in TARGETS:
+    for target, expected, label in targets:
         rs = [r for r in rows if r["target"] == target]
         ok = sum(r["ok"] for r in rs)
         good = [r for r in rs if not r.get("error")]
@@ -97,7 +125,11 @@ async def main() -> None:
                      f"{med('contained')} | {sum(r.get('proven', False) for r in good)}/{len(good)} | "
                      f"{diff_cell(good)} | {med('seconds')} |")
     total = sum(r["ok"] for r in rows)
-    lines += ["", f"**{total}/{len(rows)} correct.** Invalid tool calls: {sum(r.get('invalid', 0) for r in rows)}."]
+    lines += ["", f"**{total}/{len(rows)} correct.** Invalid tool calls: {sum(r.get('invalid', 0) for r in rows)}. "
+              f"Inconclusive: {sum(r['verdict'] == 'inconclusive' for r in rows)}. Errors: {sum(bool(r.get('error')) for r in rows)}.",
+              "", f"Concurrency {args.concurrency}: {len(rows)} runs in {wall:.0f} s wall, "
+              f"{len(rows) / wall * 3600:.0f} runs/hour. Host peak 1-min load {peak.get('load', 0):.1f}, "
+              f"lowest MemAvailable {peak.get('min_avail_mb', '?')} MB."]
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     print(f"results: {out}")

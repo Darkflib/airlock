@@ -225,7 +225,7 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
 | Serverless Inference slow or rate-limited during the live demo | Low–medium | Record the video from real runs; past runs replay from the database; `qwen3.8-27b` fallback in `roles.toml` |
-| A judge abuses access (mass submissions, hostile packages) | Low | GitHub sign-in with an allowlist; 2 concurrent runs; every run is sandboxed and destroyed; guests capped at 15 runs a day each and 150 between them (verified with a second account, 4 Nov) |
+| A judge abuses access (mass submissions, hostile packages) | Low | GitHub sign-in with an allowlist; one run per core at once (4); every run is sandboxed and destroyed; guests capped at 15 runs a day each and 150 between them (verified with a second account, 4 Nov) |
 | Host crash leaves stale VMs or a half-written run | Low | VMs die with their process; at startup, interrupted runs are marked failed and the web service removes its leftover sandboxes (verified 4 Nov) |
 | Judges read it as "just a container" | Medium | Separate kernel (guest 6.12 vs host 6.8); the architecture slide shows all three layers |
 | Sandbox-aware or delayed malware stays quiet | Known limit | Stated openly in the README and slides; not claimed |
