@@ -4,7 +4,8 @@
 # the App private key (base64, one line) and the App's webhook secret (may be
 # empty: automatic PR runs are then off). Writes them
 # only to a mode-600 env file, installs the systemd unit and Caddy config, and
-# restarts both. The session secret is generated once and kept across deploys.
+# restarts both. The session secret and the receipt signing key (an Ed25519 seed,
+# airlock/receipts.py) are generated once and kept across deploys.
 # Settings from the environment: AIRLOCK_PUBLIC_URL (https://<domain>; Caddy gets a
 # certificate for that domain), AIRLOCK_OWNERS (comma-separated GitHub logins) and
 # AIRLOCK_GUEST_REPOS (owner/repo list: automatic PR runs, and guests' PRs).
@@ -38,12 +39,14 @@ umask 077
 CONF=~/.config/airlock
 mkdir -p "$CONF"
 [ -s "$CONF/session_secret" ] || head -c 48 /dev/urandom | base64 | tr -d '\n' > "$CONF/session_secret"
+[ -s "$CONF/signing_key" ] || head -c 32 /dev/urandom | base64 | tr -d '\n' > "$CONF/signing_key"
 [ -f "$CONF/allowed_users" ] || printf '# GitHub logins allowed to sign in, one per line (re-read on every request)\n' > "$CONF/allowed_users"
 {
   printf 'VULTR_INFERENCE_API_KEY=%s\n' "$KEY"
   printf 'GITHUB_CLIENT_ID=%s\n' "$CLIENT_ID"
   printf 'GITHUB_CLIENT_SECRET=%s\n' "$CLIENT_SECRET"
   printf 'AIRLOCK_SESSION_SECRET=%s\n' "$(cat "$CONF/session_secret")"
+  printf 'AIRLOCK_SIGNING_KEY=%s\n' "$(cat "$CONF/signing_key")"
   printf 'AIRLOCK_ALLOWED_USERS=%s\n' "$AIRLOCK_OWNERS"
   printf 'AIRLOCK_PUBLIC_URL=%s\n' "$PUBLIC_URL"
   [ -z "${AIRLOCK_GUEST_REPOS:-}" ] || printf 'AIRLOCK_GUEST_REPOS=%s\n' "$AIRLOCK_GUEST_REPOS"

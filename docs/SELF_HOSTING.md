@@ -117,7 +117,7 @@ scripts/deploy.sh
 This:
 
 1. rsyncs the working tree to `~/airlock` on the host;
-2. reads the secrets with `op read` and pipes them over SSH to [`scripts/install-web.sh`](../scripts/install-web.sh) on the host. That script writes them only to `~/.config/airlock/web.env` (mode 600), generates a session secret once, installs the systemd units and the Caddyfile, and restarts the services.
+2. reads the secrets with `op read` and pipes them over SSH to [`scripts/install-web.sh`](../scripts/install-web.sh) on the host. That script writes them only to `~/.config/airlock/web.env` (mode 600), generates a session secret and a receipt signing key once, installs the systemd units and the Caddyfile, and restarts the services.
 
 It refuses to run if a secret is missing, or if `AIRLOCK_PUBLIC_URL` or `AIRLOCK_OWNERS` isn't set. It ends with:
 
@@ -201,7 +201,7 @@ The model for each role is in [`roles.toml`](../roles.toml); [`evals/`](../evals
 - **Versions:** the VM images are pinned by digest in `airlock/sandbox.py`, microsandbox by `uv.lock`, and uv, mitmproxy and Caddy in cloud-init. `scripts/check-pins.sh` compares a host with all of them. To move a pin, change it there, deploy, run the check, and rerun the self-test.
 - **Updating:** pull, then `scripts/deploy.sh`. A restart fails any run in progress and releases its PR as `error` on GitHub (push again to rerun); startup also removes any VMs those runs left behind.
 - **What is kept:** each run's evidence lives in SQLite. Uploads are deleted when their run ends. Runs that aren't demo runs are deleted after `AIRLOCK_RETAIN_DAYS`. The sinkhole log is rotated daily, keeping one previous file.
-- **Rebuilding:** the host holds nothing that can't be recreated except `~/.local/share/airlock` (run history) and `~/.config/airlock` (allowlist, invites, share-link ledger, session secret). Copy those two directories if you want to keep them, recreate the instance from cloud-init, and deploy.
+- **Rebuilding:** the host holds nothing that can't be recreated except `~/.local/share/airlock` (run history) and `~/.config/airlock` (allowlist, invites, share-link ledger, session secret, receipt signing key: a new key can't vouch for receipts the old one signed). Copy those two directories if you want to keep them, recreate the instance from cloud-init, and deploy.
 - **Running the CLI on the host** (for debugging): `scripts/remote.sh uv run airlock analyse left-pad@1.3.0` syncs the tree and runs a package analysis there with the inference key from 1Password. A PR also needs the App's credentials, so run it on the host with the service's environment: `ssh airlock@airlock.example.com 'set -a; . ~/.config/airlock/web.env; set +a; cd ~/airlock && uv run airlock analyse https://github.com/OWNER/REPO/pull/N'`. The CLI never posts to GitHub.
 
 ## Without 1Password

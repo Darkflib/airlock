@@ -48,6 +48,16 @@ CREATE TABLE IF NOT EXISTS selftests (
   submitted_by TEXT,
   created REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS receipts (   -- signed records of a run (airlock/receipts.py), in chain order
+  run_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  type TEXT NOT NULL,              -- verdict | decision
+  payload TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  key_id TEXT NOT NULL,
+  sig TEXT NOT NULL,
+  PRIMARY KEY (run_id, seq)
+);
 CREATE TABLE IF NOT EXISTS deliveries (  -- GitHub webhook deliveries already handled
   id TEXT PRIMARY KEY,
   seen REAL NOT NULL
@@ -262,6 +272,7 @@ class Store:
             "SELECT id FROM runs WHERE created < ? AND status IN ('done', 'error') AND NOT COALESCE(demo, 0)", (before,))]
         for i in ids:
             self.db.execute("DELETE FROM events WHERE run_id = ?", (i,))
+            self.db.execute("DELETE FROM receipts WHERE run_id = ?", (i,))
             self.db.execute("DELETE FROM runs WHERE id = ?", (i,))
         self.db.commit()
         return len(ids)
@@ -272,6 +283,7 @@ class Store:
             "SELECT id FROM runs WHERE LOWER(submitted_by) = LOWER(?)", (login,))]
         for i in ids:
             self.db.execute("DELETE FROM events WHERE run_id = ?", (i,))
+            self.db.execute("DELETE FROM receipts WHERE run_id = ?", (i,))
             self.db.execute("DELETE FROM runs WHERE id = ?", (i,))
         tests = self.db.execute("DELETE FROM selftests WHERE LOWER(submitted_by) = LOWER(?)", (login,)).rowcount
         self.db.commit()
@@ -285,6 +297,16 @@ class Store:
             "SELECT 1 FROM events WHERE run_id = ? AND json_extract(data, '$.proven') = 1"
             " AND json_extract(data, '$.this_run') = 1 AND json_extract(data, '$.source_kind') IN ('sinkhole', 'dns')"
             " AND json_extract(data, '$.stage') IN ('detonate', 'exercise') LIMIT 1", (run_id,)).fetchone() is not None
+
+    def add_receipt(self, run_id: str, type_: str, rec: dict) -> None:
+        seq = self.db.execute("SELECT COALESCE(MAX(seq), 0) + 1 FROM receipts WHERE run_id = ?", (run_id,)).fetchone()[0]
+        self.db.execute("INSERT INTO receipts VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (run_id, seq, type_, rec["payload"], rec["sha256"], rec["key_id"], rec["sig"]))
+        self.db.commit()
+
+    def receipts(self, run_id: str) -> list[dict]:
+        return [{k: r[k] for k in ("payload", "sha256", "key_id", "sig")} for r in self.db.execute(
+            "SELECT * FROM receipts WHERE run_id = ? ORDER BY seq", (run_id,))]
 
     def create_selftest(self, test_id: str, probes: list[dict], submitted_by: str | None = None) -> None:
         self.db.execute("INSERT INTO selftests VALUES (?, ?, ?, ?)",

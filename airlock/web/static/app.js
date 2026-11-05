@@ -353,6 +353,7 @@ const Airlock = (() => {
     let stage = null, sec = null;
     const stageOf = (ev) => {
       if (ev.kind === 'decision') return 'decision';
+      if (ev.kind === 'receipt') return ev.data.receipt === 'decision' ? 'decision' : 'verdict';
       if (['verdict', 'vm_destroyed', 'error'].includes(ev.kind)) return 'verdict';
       if (stage === 'verdict' || stage === 'decision') return 'decision';  // posted after the run
       if (ev.kind === 'agent_start' || ev.kind === 'guard_flagged') return 'agent';
@@ -588,8 +589,21 @@ const Airlock = (() => {
       $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}${r.submitted_by ? ' · by @' + r.submitted_by : ''}`;
       $('live').hidden = !(r.status === 'running' || r.status === 'queued');
       if (r.covered && r.status === 'done') renderCovered(r.covered);
+      renderReceipt((r.meta || {}).receipt);
       renderPR(r.meta || {});
       renderGate(r);
+    }
+
+    function renderReceipt(rec) {
+      const box = $('receipt');
+      if (!rec) { box.hidden = true; return; }
+      const v = el('a', '', 'Verify'); v.href = `/verify?run=${encodeURIComponent(id)}`;
+      const d = el('a', '', 'Download'); d.href = `/api/runs/${encodeURIComponent(id)}/receipts?download=1`;
+      const hash = el('code', '', `sha256:${rec.sha256.slice(0, 16)}…`); hash.title = rec.sha256;
+      box.replaceChildren(el('span', 'receipt-tag', 'Signed'), document.createTextNode(
+        ` ${rec.count === 1 ? 'verdict receipt' : `${rec.count} receipts, latest the ${rec.type}`} `),
+        hash, document.createTextNode(' · '), v, document.createTextNode(' · '), d);
+      box.hidden = false;
     }
 
     function renderPR(m) {
@@ -719,5 +733,142 @@ const Airlock = (() => {
     })();
   }
 
-  return { index, run, selftest };
+  // /verify: checks a receipt bundle in the browser (airlock/receipts.py has the format). Payloads are
+  // ASCII JSON text carried as strings, so the bytes hashed and signed here are exactly the server's.
+  function verify() {
+    const params = new URLSearchParams(location.search);
+    const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+    const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    let trusted = null, original = null;
+
+    const keyP = (async () => {
+      const box = $('key');
+      try {
+        const r = await fetch('/api/signing-key');
+        if (!r.ok) throw new Error(r.statusText);
+        const k = await r.json();
+        const key = await crypto.subtle.importKey('raw', b64(k.public_key), { name: 'Ed25519' }, false, ['verify']);
+        trusted = { id: k.key_id, key };
+        box.replaceChildren(el('p', '', 'Receipts must be signed by this server\'s Ed25519 key:'),
+          el('p', 'mono', k.key_id), el('p', 'muted',
+            'Its fingerprint is also published in the Airlock repository (docs/SIGNING_KEY.md), so you can check it '
+            + 'without trusting this page. Offline: airlock verify <bundle> --key <public key>.'));
+      } catch (e) {
+        box.replaceChildren(el('p', 'warn', `Can't load or use this server's key (${e.message}). `
+          + 'Your browser may not support Ed25519 in WebCrypto; use airlock verify instead.'));
+      }
+    })();
+
+    async function check(bundle) {
+      await keyP;
+      const results = [];
+      let prev = null, run = null;
+      for (const [i, rec] of (bundle.receipts || []).entries()) {
+        const problems = [];
+        const data = new TextEncoder().encode(rec.payload || '');
+        if (hex(await crypto.subtle.digest('SHA-256', data)) !== rec.sha256) {
+          problems.push('payload doesn\'t match its sha256: it was changed after sealing');
+        }
+        if (!trusted || rec.key_id !== trusted.id) {
+          problems.push(`signed by key ${rec.key_id}, not this server's key`);
+        } else {
+          let good = false;
+          try { good = await crypto.subtle.verify({ name: 'Ed25519' }, trusted.key, b64(rec.sig || ''), data); } catch { good = false; }
+          if (!good) problems.push('signature doesn\'t verify');
+        }
+        let body = {};
+        try { body = JSON.parse(rec.payload); } catch { problems.push('payload isn\'t JSON'); }
+        if ((body.prev ?? null) !== prev) {
+          problems.push(i ? 'chain broken: prev doesn\'t name the receipt before it' : 'the first receipt must have prev null');
+        }
+        if (run !== null && body.run !== run) problems.push('receipt is for a different run');
+        run = body.run; prev = rec.sha256;
+        results.push({ rec, body, problems });
+      }
+      return results;
+    }
+
+    function showSealed(results, ok) {
+      const box = $('sealed');
+      const v = results.find((r) => r.body.type === 'verdict');
+      const d = results.find((r) => r.body.type === 'decision');
+      if (!v) { box.replaceChildren(el('p', 'muted', 'No verdict receipt in this bundle.')); return; }
+      const b = v.body, events = b.events || [];
+      const proven = events.find((e) => e.data && e.data.proven && e.data.this_run);
+      const subj = b.subject || {};
+      const rows = [
+        ['Run', b.run], ['Target', b.target],
+        ...(subj.head_sha ? [['Commit', `${subj.owner}/${subj.repo}#${subj.number} @ ${subj.head_sha.slice(0, 12)}`]] : []),
+        ...(subj.file ? [['File', `${subj.file.name}, sha256 ${subj.file.sha256.slice(0, 16)}…`]] : []),
+        ['Verdict', VERDICT[b.verdict] || b.verdict],
+        ['Theft proven', b.proven_exfil ? 'yes, by a captured payload' : 'no'],
+        ['Events', `${events.length}, ${events.filter((e) => e.containment).length} containment`],
+        ['Sealed', `${b.sealed} by ${b.server}`],
+      ];
+      if (d) rows.push(['Decision', `${d.body.decision} ${d.body.automatic ? 'automatically: ' + d.body.automatic : d.body.by ? 'by @' + d.body.by : ''}, ${d.body.decided}`]);
+      const dl = el('dl', 'sealed');
+      for (const [k, val] of rows) dl.append(el('dt', '', k), el('dd', '', val));
+      box.replaceChildren(...(ok ? [] : [el('p', 'warn', 'Not verified: this is only what the bundle claims.')]), dl);
+      if (proven) box.append(el('p', 'detail', `Proof: ${proven.summary}`));
+    }
+
+    async function run(text) {
+      const out = $('result');
+      let bundle;
+      try { bundle = JSON.parse(text); } catch { out.replaceChildren(el('p', 'warn', 'That isn\'t JSON.')); return; }
+      const results = await check(bundle);
+      const ok = results.length > 0 && results.every((r) => !r.problems.length);
+      const head = el('div', `verdict-big ${ok ? 'benign' : 'malicious'}`, ok ? 'Valid' : 'Invalid');
+      const ul = el('ul', 'receipts');
+      for (const r of results) {
+        const li = el('li', r.problems.length ? 'bad' : 'good');
+        li.append(el('b', '', `${r.problems.length ? '✗' : '✓'} ${r.body.type || 'receipt'} `),
+          el('code', '', `sha256:${(r.rec.sha256 || '').slice(0, 16)}…`));
+        for (const p of r.problems) li.append(el('div', 'detail', p));
+        ul.append(li);
+      }
+      out.replaceChildren(head, ul);
+      if (!results.length) out.append(el('p', 'warn', 'No receipts in this bundle.'));
+      showSealed(results, ok);
+      $('meta').textContent = bundle.run ? `run ${bundle.run}` : '';
+      $('tamper').hidden = !original || text !== original;
+      $('restore').hidden = !original || text === original;
+    }
+
+    $('check').addEventListener('click', () => run($('bundle').value));
+    $('file').addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      original = $('bundle').value = await f.text();
+      run(original);
+    });
+    // The demo of what a forgery looks like: rewrite the sealed verdict, then check again.
+    $('tamper').addEventListener('click', () => {
+      const bundle = JSON.parse(original);
+      const rec = bundle.receipts[0], p = rec.payload;
+      // keys are sorted, so the receipt's own verdict is the last one (the events' come first)
+      const i = p.lastIndexOf('"verdict":"'), j = p.indexOf('"', i + 11);
+      const was = p.slice(i + 11, j);
+      rec.payload = `${p.slice(0, i)}"verdict":"${was === 'benign' ? 'malicious' : 'benign'}"${p.slice(j + 1)}`;
+      $('bundle').value = JSON.stringify(bundle, null, 2);
+      run($('bundle').value);
+    });
+    $('restore').addEventListener('click', () => { $('bundle').value = original; run(original); });
+
+    const want = params.get('run');
+    if (want) {
+      (async () => {
+        const r = await fetch(`/api/runs/${encodeURIComponent(want)}/receipts`);
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          $('result').replaceChildren(el('p', 'warn', `Couldn't load run ${want}'s receipts: ${err.detail || r.statusText}`));
+          return;
+        }
+        original = $('bundle').value = JSON.stringify(await r.json(), null, 2);
+        run(original);
+      })();
+    }
+  }
+
+  return { index, run, selftest, verify };
 })();

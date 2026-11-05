@@ -40,7 +40,8 @@ SESSION_TTL = 7 * 24 * 3600
 STATE_TTL = 600
 SHARE_COOKIE = "airlock_share"
 SHARE_TTL = 60 * 24 * 3600
-PUBLIC_PATHS = ("/auth/", "/static/", "/login", "/healthz", "/s/", "/api/me", "/api/github/webhook")
+PUBLIC_PATHS = ("/auth/", "/static/", "/login", "/healthz", "/s/", "/api/me", "/api/github/webhook",
+                "/verify", "/api/signing-key")
 
 
 @dataclass

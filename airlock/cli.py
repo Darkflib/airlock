@@ -1,9 +1,11 @@
-"""airlock analyse <file.tgz | npm-spec | sdist.tar.gz | pypi:name==version | PR URL> — stream events, print the verdict."""
+"""airlock analyse <file.tgz | npm-spec | sdist.tar.gz | pypi:name==version | PR URL> — stream events, print the verdict.
+airlock verify <bundle.json> --key <base64 public key> | --server <url> — check a run's signed receipts."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import json
 import sys
 from dataclasses import asdict
@@ -45,6 +47,26 @@ async def _main(args: argparse.Namespace) -> int:
     return {"benign": 0, "suspicious": 2, "malicious": 3}.get(report.verdict, 1)
 
 
+def _verify(args: argparse.Namespace) -> int:
+    from . import receipts
+    with open(args.bundle) as f:
+        bundle = json.load(f)
+    if args.key:
+        public = base64.b64decode(args.key)
+    else:  # fetching the key means trusting that server (and TLS) for it; --key pins it instead
+        import httpx
+        public = base64.b64decode(httpx.get(f"{args.server.rstrip('/')}/api/signing-key", timeout=10).json()["public_key"])
+    print(f"trusted key {receipts.key_id(public)}")
+    results = receipts.verify(bundle, {receipts.key_id(public): public})
+    for r in results:
+        print(f"{'OK ' if r['ok'] else 'BAD'} {r['type'] or 'receipt':9} sha256:{r['sha256']}")
+        for p in r["problems"]:
+            print(f"    {p}")
+    ok = bool(results) and all(r["ok"] for r in results)
+    print("valid" if ok else "INVALID" if results else "no receipts in this bundle")
+    return 0 if ok else 1
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="airlock")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -53,8 +75,13 @@ def main() -> None:
     a.add_argument("--model", help="override roles.toml agent model")
     a.add_argument("--max-turns", type=int, default=12)
     a.add_argument("--json", help="write the full report here")
+    v = sub.add_parser("verify", help="check a run's signed receipts offline")
+    v.add_argument("bundle", help="a .receipts.json file from a run page")
+    who = v.add_mutually_exclusive_group(required=True)
+    who.add_argument("--key", help="the server's Ed25519 public key, base64 (docs/SIGNING_KEY.md)")
+    who.add_argument("--server", help="fetch the key from this Airlock server, e.g. https://airlock.darkflib.dev")
     args = ap.parse_args()
-    sys.exit(asyncio.run(_main(args)))
+    sys.exit(_verify(args) if args.cmd == "verify" else asyncio.run(_main(args)))
 
 
 if __name__ == "__main__":

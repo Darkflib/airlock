@@ -52,6 +52,8 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 - **An AI verdict that cites this evidence:** MALICIOUS, with its points linked to the event IDs they rest on. Cited IDs are checked: a verdict citing an event that doesn't exist is sent back once, then flagged on the page. Whether a real event actually supports the point is still the model's judgement.
 - **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. When exfiltration is proven by a captured payload carrying the run's canary token, Airlock rejects the PR by itself (failure, with the evidence comment). Otherwise only a person's Approve (success) or Reject (failure) sets the final status, and only someone with write access to the repo on GitHub may give it. A failed run sets `error`. Each run keeps one comment on the PR, rewritten as it goes: testing, then the evidence and how to decide, then the decision. Set `AIRLOCK_AUTO_REJECT=0` to leave every decision to a person.
 
+- **A signed record.** When the verdict is in, Airlock seals the whole timeline (the captured request included), the verdict and what was analysed into a receipt signed with Ed25519; the decision gets a second receipt chained to the first. The PR comment cites its hash. **Verify** on the run page checks both in your browser with this server's public key, and **Change the verdict** shows what a forgery looks like: the hash and signature fail. `airlock verify <bundle> --key <key>` does the same offline.
+
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and reads **"No malicious behaviour observed"**, listing what ran and what a run like this can't exercise. Airlock never calls a quiet run safe.
 
 ## How it works
@@ -172,6 +174,7 @@ Airlock blocks every download that isn't from a package registry, because an all
 - **Very fast refusals.** A raw-IP connection refused in about 7 ms is *counted* but not attributed to a process.
 - **Pinned TLS** prevents payload capture; we still see the hostname.
 - **Encoded exfil.** Encoded or split canaries are still blocked or captured, but only a verbatim token counts as PROVEN.
+- **Receipts prove integrity, not honesty.** The signing key is generated on the host, like the session secret, so whoever controls the host could sign a false record. A receipt shows the record hasn't changed since Airlock sealed it. Runs from before 5 Nov have none.
 - **DNS over TCP** to the gateway fails closed (SERVFAIL) but isn't recorded as an event.
 - **Coverage.** The connection poller can miss very short-lived activity. The sinkhole keeps 8,000 characters of a request body, and the evidence shown to the agent 2,000.
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
@@ -205,6 +208,7 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
   - They see their own runs and the owners' demo runs (self-tests, npm packages, PRs from the demo repo), but not the owners' uploads or other repos. They approve, reject and share only their own.
   - They can analyse PRs only from `Darkflib/airlock-demo` (`AIRLOCK_GUEST_REPOS`), so an invite never lets anyone speak for another repo through the GitHub App.
   - They're capped at 15 runs a day each and 150 a day between them (`AIRLOCK_USER_DAILY_RUNS`, `AIRLOCK_GLOBAL_DAILY_RUNS`).
+- **Verify** on a run page (or `/verify?run=<id>`, which needs no sign-in for the page itself) checks the run's signed receipts in the browser; **Download** saves them for `uv run airlock verify <file> --key <public key>`.
 - **Share read-only link** on a run or self-test page mints a signed link, valid for 60 days, that opens only that run (or that self-test and its probe runs), with no sign-in and no approve or reject buttons.
 
 ## Repository map
@@ -215,6 +219,7 @@ uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json re
 | `airlock/guest/watch.py`, `airlock/guest/trace.js`, `airlock/guest/pypi_fetch.py` | In-guest watcher (fanotify, DNS, TCP), Node tracer, and the PyPI sdist fetcher (downloads, never builds) |
 | `airlock/sinkhole/addon.py` | mitmproxy addon that answers and logs sinkholed requests |
 | `airlock/events.py` | Raw observations → typed containment events (PROVEN / inferred) |
+| `airlock/receipts.py`, `airlock/web/static/verify.html` | Ed25519-signed, chained receipts for each verdict and decision, and the in-browser verifier |
 | `airlock/agent.py`, `airlock/guard.py` | Turn-budgeted triage agent; prompt-injection guard |
 | `airlock/pipeline.py`, `airlock/github.py`, `airlock/prcomment.py` | Package and PR pipelines, the GitHub App client, the PR comment |
 | `airlock/web/` | Control plane: GitHub OAuth + allowlist, live SSE timeline, approval gate |

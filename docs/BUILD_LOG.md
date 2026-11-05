@@ -853,3 +853,21 @@ Tags: #decision #metric
 **Result:** 44/48 as expected: no false alarms, the known inconclusive results (puppeteer ×2, bcrypt once: both downloads blocked) and one error. Steady state about 456 runs an hour (matches the 455 from 18:45), median 59 s, load 7.3, 11.5 GB free; slowest agent loop 150 s (PyYAML), so no call sat on a timeout. The error: one bcrypt run hit the VM's 480 s lifetime (`SandboxNotRunningError`) where every other bcrypt run takes 40–120 s. The harness kept no events for errors, so it now records the last 8 with timings. Eight more bcrypt runs at 8 at once (`bcrypt-20261105T203407Z`): all inconclusive in 57–115 s, no hang.
 **So:** default stays. The hang is rare and contained: the VM lifetime ends it, and in the web app the run fails at the 600 s deadline and its slot frees. If it recurs, the new error field shows where it stopped.
 Tags: #metric #fail
+
+### 20:41 — Retitled: "Airlock: Catch Stolen Keys Before You Merge"
+**Tried:** acted on the competitor review. Replaced "Dependency Detonation Chamber" in the lablab title, slide 1, the PRD heading, the web UI tag (index, run, login, self-test pages) and the cover kicker; re-rendered `assets/airlock-cover.png`.
+**Result:** `scripts/check-submission.py` passes (title 43 chars). Only the competitor notes still use the old words.
+**So:** the title now says what only we do (keep the stolen data, block the merge). The web UI change goes live on the next `scripts/deploy.sh`.
+Tags: #decision
+
+### 21:30 — Signed receipts for every verdict and decision
+**Tried:** an Ed25519 receipt over the timeline, verdict and subject when the verdict is in, and a decision receipt chained to it (`airlock/receipts.py`). Run page Verify/Download, public `/verify` page, `airlock verify` CLI, receipt hash in the PR comment. Key generated once on the host, like the session secret.
+**Result:** 418 tests pass (9 new). Locally in the browser pane: WebCrypto Ed25519 verifies both receipts; "Change the verdict" turns the sealed MALICIOUS into "No malicious behaviour observed" and the page goes INVALID (hash and signature). First tamper rewrote the first `"verdict"` in the payload, which was inside the events, not the receipt's own verdict: fixed to change the last one (keys are sorted).
+**So:** payloads are carried as ASCII JSON strings, so the browser hashes exactly the signed bytes with no canonicalisation to get wrong. Not deployed yet (the deploy needs the owner's go-ahead); after it, pin the key in `docs/SIGNING_KEY.md`.
+Tags: #win #decision #demo
+
+### 21:40 — Receipts live
+**Tried:** deployed the 21:30 work; the host generated its key on install (`~/.config/airlock/signing_key`, mode 600). Ran `left-pad@1.3.0` on the live site.
+**Result:** startup logs `receipt_key=475879ded052c017`. The run (`20261105-213334-de0311`) has a verdict receipt over 38 events; `/verify` on the live site says VALID, and so does `airlock verify` with the key pinned in `docs/SIGNING_KEY.md` and with `--server`. The host has no `sqlite3`, so fetching a bundle there takes the venv's Python. The decision receipt is covered by tests only: no live run was decided, to keep test decisions off the record.
+**So:** every new run is signed; runs from before 21:33 have no receipts.
+Tags: #win #demo

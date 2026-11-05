@@ -173,5 +173,10 @@ def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True
         lines += how_to_decide(run_url, held)
     if run.get("decision_note"):
         lines += [f"> {run['decision_note']}", ""]
-    lines.append(f"[Full run timeline]({run_url}) · reviewer model `{run.get('model') or '?'}`")
+    footer = f"[Full run timeline]({run_url}) · reviewer model `{run.get('model') or '?'}`"
+    if rec := m.get("receipt"):
+        base, run_id = run_url.rsplit("/runs/", 1)
+        footer += (f" · signed {rec['type']} receipt `sha256:{rec['sha256'][:16]}` "
+                   f"([verify]({base}/verify?run={run_id}))")
+    lines.append(footer)
     return "\n".join(lines)

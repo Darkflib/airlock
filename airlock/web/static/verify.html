@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Airlock · verify a receipt</title>
+  <link rel="icon" href="/static/favicon-32x32.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="home" href="/" aria-label="Airlock home">
+        <img src="/static/apple-touch-icon.png" alt="">
+        <span>
+          <span class="brand">AIRLOCK</span>
+          <span class="tag">Catch stolen keys before you merge</span>
+        </span>
+      </a>
+      <nav class="links" aria-label="Main"><a href="/#runs-panel" id="nav-runs">Runs</a></nav>
+      <div class="spacer"></div>
+      <div class="user" id="user"></div>
+    </header>
+    <main>
+
+    <div class="run-head">
+      <h1>Verify a receipt</h1>
+      <span class="meta" id="meta"></span>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Receipts</h2>
+        <div class="body">
+          <p class="muted">Every verdict and decision is signed by Airlock with Ed25519, and each receipt names the one
+            before it. This page checks them here in your browser: the SHA-256 of each payload, its signature against
+            this server's public key, and the chain. Nothing is sent anywhere.</p>
+          <label class="sr-only" for="bundle">Receipt bundle (JSON)</label>
+          <textarea id="bundle" class="bundle" spellcheck="false" placeholder="Paste a receipt bundle (.receipts.json), or choose the file below"></textarea>
+          <div class="row verify-row">
+            <input type="file" id="file" accept=".json,application/json" aria-label="Receipt bundle file">
+            <button type="button" id="check">Verify</button>
+            <button type="button" class="ghost" id="tamper" hidden>Change the verdict</button>
+            <button type="button" class="ghost" id="restore" hidden>Restore the original</button>
+          </div>
+          <div id="result" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>What was sealed</h2>
+          <div class="body" id="sealed"><p class="muted">Load a bundle to see what it records.</p></div>
+        </div>
+        <div class="panel">
+          <h2>Trusted key</h2>
+          <div class="body" id="key"><p class="muted">Loading this server's public key…</p></div>
+        </div>
+      </div>
+    </div>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>Airlock.verify();</script>
+</body>
+</html>

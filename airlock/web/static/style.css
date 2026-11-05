@@ -345,3 +345,20 @@ ul.shares button { padding: 2px 10px; font-size: 12px; }
 .stage-events .phase-runtime { border-left-color: var(--cyan, #4fd1e8); }
 .stage-events .phase-own { color: var(--muted); font-weight: 500; }
 .verdict-line { margin: 0 0 8px; font-size: 15px; line-height: 1.4; color: var(--text); }
+
+/* signed receipts: the run page's line, and /verify */
+.receipt { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.receipt-tag { color: var(--good); font-weight: 600; }
+textarea.bundle {
+  width: 100%; min-height: 220px; background: var(--panel-2); border: 1px solid var(--field-line); border-radius: 8px;
+  color: var(--text); font: 12px/1.4 var(--mono); padding: 10px; resize: vertical;
+}
+#result .detail, #sealed .detail { color: var(--muted); font: 12px var(--mono); white-space: pre-wrap; margin-top: 4px; overflow-wrap: anywhere; }
+.verify-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+ul.receipts { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+ul.receipts li.good b { color: var(--good); }
+ul.receipts li.bad b { color: var(--bad); }
+dl.sealed { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+dl.sealed dt { color: var(--muted); }
+dl.sealed dd { margin: 0; overflow-wrap: anywhere; }
+#result p.warn, #key p.warn, #sealed p.warn { color: var(--warn); font-weight: 600; }

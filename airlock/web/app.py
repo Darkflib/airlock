@@ -27,6 +27,7 @@ from ..events import OVERFLOW, EventLog
 from ..github import GitHubApp, parse_pr_url
 from ..pipeline import parse_pypi_spec
 from ..prcomment import build_comment, build_progress, verdict_label, what_ran
+from ..receipts import FORMAT as RECEIPTS_FORMAT, Signer, utc
 from ..sandbox import sinkhole_log
 from ..store import Store, data_dir
 from . import auth as authmod
@@ -67,6 +68,7 @@ SELFTEST = [
 
 Analyse = Callable[..., Awaitable[object]]
 Gate = Callable[[str, str, EventLog], Awaitable[None]]
+Seal = Callable[[str, str, EventLog], None]
 
 
 class Runner:
@@ -75,8 +77,8 @@ class Runner:
     their spec, so a restart can resume them."""
 
     def __init__(self, store: Store, analyse: Analyse, slots: int | None = None, gate: Gate | None = None,
-                 deadline: float = RUN_DEADLINE):
-        self.store, self.analyse, self.gate, self.deadline = store, analyse, gate, deadline
+                 deadline: float = RUN_DEADLINE, seal: Seal | None = None):
+        self.store, self.analyse, self.gate, self.deadline, self.seal = store, analyse, gate, deadline, seal
         self.live: dict[str, EventLog] = {}
         self.n_slots = slots = slots or SLOTS
         self.slots = asyncio.Semaphore(slots)
@@ -161,6 +163,8 @@ class Runner:
             if "meta" in end:  # keep what the gate recorded while it ran (status sync, comment url)
                 end["meta"] = {**(self.store.get_run(run_id)["meta"] or {}), **end["meta"]}
             self.store.update_run(run_id, **{k: v for k, v in end.items() if k != "status"})
+            if self.seal and end["status"] == "done":  # before the gate, so the PR comment can cite it
+                self.seal(run_id, target, log)
             if self.gate:
                 await self.gate(run_id, "verdict" if end["status"] == "done" else "error", log)
         finally:
@@ -262,7 +266,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                github: GitHubApp | None = None, user_daily: int | None = None,
                global_daily: int | None = None, webhook_secret: str | None = None,
                reap: Callable[[], Awaitable[tuple[list[str], list[str]]]] | None = None,
-               drain_s: float = DRAIN_S) -> FastAPI:
+               drain_s: float = DRAIN_S, signer: Signer | None = None) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config.
 
     Owners are the logins in AIRLOCK_ALLOWED_USERS; everyone else signed in is a guest (e.g. a
@@ -281,6 +285,53 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
 
+    def add_receipt(run_id: str, body: dict) -> dict:
+        """Sign `body` as the next receipt in the run's chain; the run's meta keeps the latest one's hash."""
+        prior = store.receipts(run_id)
+        rec = signer.seal({**body, "run": run_id, "server": public_url, "sealed": utc(),
+                           "prev": prior[-1]["sha256"] if prior else None})
+        store.add_receipt(run_id, body["type"], rec)
+        store.update_run(run_id, meta={**(store.get_run(run_id)["meta"] or {}), "receipt": {
+            "sha256": rec["sha256"], "type": body["type"], "count": len(prior) + 1, "key_id": rec["key_id"]}})
+        return rec
+
+    def seal_verdict(run_id: str, target: str, log: EventLog) -> None:
+        """The verdict receipt: everything the run recorded up to its verdict, and what was analysed."""
+        if not signer:
+            return
+        run = store.get_run(run_id)
+        m = run["meta"] or {}
+        subject = {k: m[k] for k in PR_KEYS if k in m}
+        path = Path(target)
+        if path.is_file():  # an upload or a fixture: name the exact bytes
+            subject["file"] = {"name": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        else:
+            subject["spec"] = target
+        try:
+            rec = add_receipt(run_id, {"type": "verdict", "target": run["target"], "subject": subject,
+                                       "verdict": run["verdict"], "evidence": run["evidence"], "model": run["model"],
+                                       "proven_exfil": store.proven_exfil(run_id), "events": store.events(run_id)})
+            log.emit("receipt", f"verdict receipt signed: sha256 {rec['sha256'][:16]}…", sha256=rec["sha256"],
+                     key_id=rec["key_id"], receipt="verdict", source="airlock")
+        except Exception as e:  # noqa: BLE001 - an unsigned run is still a run; say so on its timeline
+            log.emit("error", f"signing the verdict receipt failed: {type(e).__name__}: {str(e)[:200]}")
+
+    def seal_decision(run_id: str) -> None:
+        """The decision receipt, chained to the verdict receipt it decided."""
+        if not signer:
+            return
+        run = store.get_run(run_id)
+        m = run["meta"] or {}
+        try:
+            rec = add_receipt(run_id, {"type": "decision", "decision": run["decision"], "by": run["decided_by"],
+                                       "via": m.get("decided_via") or ("airlock" if m.get("auto_decision") else None),
+                                       "automatic": m.get("auto_decision"), "note": run["decision_note"] or "",
+                                       "decided": utc(run["decided"]), "subject": {k: m[k] for k in PR_KEYS if k in m}})
+            store.append_event(run_id, "receipt", f"decision receipt signed: sha256 {rec['sha256'][:16]}…",
+                               sha256=rec["sha256"], key_id=rec["key_id"], receipt="decision", source="airlock")
+        except Exception as e:  # noqa: BLE001
+            store.append_event(run_id, "error", f"signing the decision receipt failed: {type(e).__name__}: {str(e)[:200]}")
+
     async def gate_pr(run_id: str, phase: str, log: EventLog) -> None:
         """Hold a PR's merge while it runs: a `pending` airlock status (which branch protection can
         require to be success) from the moment the head is fetched until a human decides. Only the
@@ -295,6 +346,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             reason = "exfiltration proven by a captured payload"
             if store.claim_decision(run_id, "rejected", None, meta_patch={"auto_decision": reason}):
                 log.emit("decision", f"rejected automatically: {reason}", source="airlock")
+                seal_decision(run_id)
                 await post_to_pr(store.get_run(run_id))
                 return
         async with commit_lock(m):
@@ -348,7 +400,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     def commit_lock(m: dict) -> asyncio.Lock:
         return locks.setdefault((m["owner"].lower(), m["repo"].lower(), m["head_sha"]), asyncio.Lock())
     self_approval = os.environ.get("AIRLOCK_SELF_APPROVAL", "1") != "0"
-    runner = Runner(store, analyse, gate=gate_pr)
+    runner = Runner(store, analyse, gate=gate_pr, seal=seal_verdict)
     user_daily = user_daily if user_daily is not None else int(os.environ.get("AIRLOCK_USER_DAILY_RUNS", 15))
     global_daily = global_daily if global_daily is not None else int(os.environ.get("AIRLOCK_GLOBAL_DAILY_RUNS", 150))
     owners = auth.allowed if auth else frozenset()
@@ -476,6 +528,17 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.get("/healthz")
     async def healthz():
         return {"ok": True}
+
+    @app.get("/verify")
+    async def verify_page():
+        return FileResponse(STATIC / "verify.html")
+
+    @app.get("/api/signing-key")
+    async def signing_key():
+        """The public key receipts are signed with. Public: checking a receipt needs no sign-in."""
+        if not signer:
+            raise HTTPException(404, "this server doesn't sign receipts")
+        return signer.published()
 
     @app.get("/api/me")
     async def me(request: Request):
@@ -733,6 +796,18 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         events = store.events(run_id)
         return {**run, "events": events, "covered": what_ran(events)}
 
+    @app.get("/api/runs/{run_id}/receipts")
+    async def receipts(run_id: str, request: Request, download: bool = False):
+        """The run's signed receipts as one bundle, checkable offline (/verify, `airlock verify`)."""
+        get_readable(run_id, request)
+        recs = store.receipts(run_id)
+        if not recs:
+            raise HTTPException(404, "no signed receipts for this run (it has no verdict yet, or predates signing)")
+        bundle = {"format": RECEIPTS_FORMAT, "run": run_id, "server": public_url, "receipts": recs,
+                  "check": f"{public_url}/verify, or `airlock verify` with this server's key from {public_url}/api/signing-key"}
+        headers = {"Content-Disposition": f'attachment; filename="airlock-{run_id}.receipts.json"'} if download else {}
+        return JSONResponse(bundle, headers=headers)
+
     @app.get("/api/runs/{run_id}/events")
     async def stream(run_id: str, request: Request):
         get_readable(run_id, request)
@@ -817,6 +892,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                                      "decide that one instead")
         store.append_event(run_id, "decision", f"{decision} by @{user}" + (" in a GitHub comment" if via == "github" else ""),
                            source="github" if via == "github" else "airlock")
+        seal_decision(run_id)
         run = store.get_run(run_id)
         if run["meta"].get("kind") == "pr" and github:
             await post_to_pr(run)
@@ -905,5 +981,8 @@ def access_summary(cfg: authmod.AuthConfig) -> str:
 def app_factory() -> FastAPI:
     # Fails closed: refuses to start without OAuth config, an owner and the public URL.
     cfg = authmod.AuthConfig.from_env()
-    print(access_summary(cfg), flush=True)
-    return create_app(auth=cfg)
+    signer = Signer.from_env()
+    if signer is None:
+        raise RuntimeError("AIRLOCK_SIGNING_KEY is not set: every verdict and decision must be signed")
+    print(access_summary(cfg) + f" receipt_key={signer.key_id}", flush=True)
+    return create_app(auth=cfg, signer=signer)
