@@ -4,7 +4,7 @@ Draft, 4 Nov. Ten slides for the lablab submission and the "under the hood" beat
 
 ## 1. Title
 
-**Airlock: Dependency Detonation Chamber**
+**Airlock: Catch Stolen Keys Before You Merge**
 Every untrusted change gets its own disposable computer.
 Vultr Agent Rush, Challenge 1 "Blast Radius Zero" · airlock.darkflib.dev
 *Visual:* logo on navy; the cover image if it's ready.

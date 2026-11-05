@@ -4,7 +4,7 @@ Limits from the form: title 5–50 characters; short description 50–255; long 
 
 ## Submission Title
 
-Airlock: Dependency Detonation Chamber
+Airlock: Catch Stolen Keys Before You Merge
 
 ## Short Description
 
