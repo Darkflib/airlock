@@ -768,3 +768,9 @@ Tags: #decision #demo
 **Result:** 80/81 correct, no inconclusive results. Throughput: 2 at once 321 PR runs/h (median about 19 s); 4 at once 623/h (about 23 s); 6 at once 676/h (about 30 s); 8 at once 714/h (about 37 s), with 1-min load 13.1. CPU is the limit; memory isn't (at least 11.4 GB free with 16 VMs up). One failure at concurrency 4: `RemoteProtocolError: Server disconnected` 0.1 s in, fetching the PR from GitHub, before any VM booted. Only GitHub writes are retried. Under load the PR #3 behaviour diff wobbled between 12 (5) and 14 (7) new (risky) where it had been 13 (6) every time. Exfil was still new and proven on every run.
 **So:** 4 slots doubles capacity at almost no latency cost; past 4 you only add latency. Per-review compute at that capacity is $0.153/h ÷ 623 ≈ $0.00025 at full use, or $113/month ÷ volume in practice. The "diff identical on every run" claim only holds at low load. Results: `evals/results/product-20261105T1305*`–`T1313*`.
 Tags: #metric #decision #fail
+
+### 13:22 — One run per core by default; GitHub reads retried; deployed
+**Tried:** `AIRLOCK_SLOTS` now defaults to `os.cpu_count()` (slow is fine for users, errors aren't). GitHub reads (PR, tarball, merge base, diff, permission) go through the same tenacity backoff as writes, with a unit test that replays the `RemoteProtocolError` from the load test. Docs that said "2 concurrent runs" now say one per core. Deployed `a54430e` with `scripts/deploy.sh`.
+**Result:** 371 tests pass. Three services `active`, healthz 200, restart 13:21:28 UTC. With the service's env, the deployed code resolves 4 slots on the host (no `AIRLOCK_SLOTS` in `web.env`).
+**So:** live capacity is about 620 PR runs an hour, up from about 320. Retried reads have not been exercised live yet.
+Tags: #decision #fix
