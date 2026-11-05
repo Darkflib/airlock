@@ -269,6 +269,7 @@ Installed on selected repositories only, with:
 | Contents | read | Downloading the head and merge-base archives; computing the merge base |
 | Pull requests | write | Reading the PR, its files and diff; posting the evidence comment |
 | Commit statuses | write | Posting the `airlock` status that branch protection requires |
+| Issues | read | Receiving `issue_comment` events, for the `/airlock approve` and `/airlock reject` commands |
 
 It cannot push code, merge, change settings or read secrets.
 
@@ -432,7 +433,6 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 - Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [a day]
 - Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [half a day]
 - Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [half a day]
-- Complete self-hosting docs: `.env.example`, App creation, OAuth callback, branch protection. [half a day]
 
 ### 14.2 Fit into how teams work (2–4 weeks)
 

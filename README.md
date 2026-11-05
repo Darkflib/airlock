@@ -163,11 +163,12 @@ uv run airlock analyse evals/fixtures/colorful-logs-shell-stealer.tgz
 uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json report.json
 ```
 
-**Run your own:**
-1. Create a Vultr VX1 instance with `infra/cloud-init.yaml` as user data.
-2. Point DNS at it.
-3. Put the secrets in 1Password: the inference key, the GitHub OAuth client, and the GitHub App ID and key.
+**Run your own:** [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) goes from a blank KVM host to a protected branch in about an hour:
+1. Create the host from `infra/cloud-init.yaml`.
+2. Create a GitHub OAuth App for sign-in and a GitHub App for the merge gate.
+3. Fill in `.env` from [`.env.example`](.env.example) with 1Password references.
 4. Run `scripts/deploy.sh`.
+5. Require the `airlock` status in branch protection.
 
 **Access.**
 - `scripts/allow.sh add <github-login>` allows a known account.

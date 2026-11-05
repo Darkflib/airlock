@@ -5,5 +5,7 @@
 #   scripts/invite.sh revoke <id>                                stop the link and remove its accounts
 # Everyone admitted is in allowed_users tagged "# invite <id>", so scripts/allow.sh works on them too.
 set -eu
-HOST="${AIRLOCK_HOST:-airlock@airlock.darkflib.dev}"
+ENV="$(dirname "$0")/../.env"
+HOST="${AIRLOCK_HOST:-$(sed -n 's/^AIRLOCK_HOST="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$ENV" 2>/dev/null)}"
+HOST="${HOST:-airlock@airlock.darkflib.dev}"
 ssh "$HOST" "set -a; . ~/.config/airlock/web.env; set +a; cd ~/airlock && .venv/bin/python -m airlock.web.invite $*"

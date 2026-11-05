@@ -4,7 +4,9 @@
 #   scripts/remote.sh uv run airlock analyse evals/fixtures/left-padder-hostile.tgz
 set -eu
 cd "$(dirname "$0")/.."
-HOST="${AIRLOCK_HOST:-airlock@airlock.darkflib.dev}"
+ENV="$(dirname "$0")/../.env"
+HOST="${AIRLOCK_HOST:-$(sed -n 's/^AIRLOCK_HOST="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$ENV" 2>/dev/null)}"
+HOST="${HOST:-airlock@airlock.darkflib.dev}"
 REF=$(sed -n 's/^VULTR_INFERENCE_API_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' .env)
 
 rsync -az --delete \

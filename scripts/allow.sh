@@ -5,7 +5,9 @@
 #   scripts/allow.sh rm <login>      revoke (also ends their current session)
 # Accounts admitted by an invite link carry a "# invite <id>" tag; see scripts/invite.sh.
 set -eu
-HOST="${AIRLOCK_HOST:-airlock@airlock.darkflib.dev}"
+ENV="$(dirname "$0")/../.env"
+HOST="${AIRLOCK_HOST:-$(sed -n 's/^AIRLOCK_HOST="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$ENV" 2>/dev/null)}"
+HOST="${HOST:-airlock@airlock.darkflib.dev}"
 FILE='~/.config/airlock/allowed_users'
 case "${1:-list}" in
   list) ssh "$HOST" "grep -v '^#' $FILE || true" ;;
