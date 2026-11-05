@@ -660,3 +660,9 @@ Tags: #metric #fix
 **Result:** `(webhook)` run `20261105-001539-fa523d` started 4 s after the push and finished in 20.7 s: MALICIOUS, exfil to `telemetry.colorful-logs.invalid` PROVEN, 13 behaviours new vs the merge base (6 containment), 64 events (cap 5,000), no `limit_hit` or `coverage_incomplete`, VM destroyed. Rejected automatically: `airlock` status `failure` on the new head and the run's PR comment rewritten in place.
 **So:** the two-VM PR path behaves as before under the budgets. PR #3 now has one more commit and bot comment; PR #4 and PR #1 untouched for filming.
 Tags: #metric #demo
+
+### 00:30 — PR snapshots pinned to one head, partial views disclosed
+**Tried:** second hardening follow-up. The archive was fetched by head SHA but the file list and diff by PR number, so a push mid-fetch could mix commits; the list stopped at 100 files and the diff at 200,000 characters with no marker. Now the diff comes from `compare/base...head` (three-dot, as GitHub shows a PR); the file list reads every page up to GitHub's 3,000 between two reads of the head, re-reading up to 3 times if it moved, else `head_moved`. A diff GitHub refuses (406/422 for very large PRs) used to fail the whole run; now the run goes on without it. When the list or diff is partial, a `snapshot_partial` event (Setup stage), the agent's task, the run page's decision panel and the PR comment say what's missing; install and tests always ran on the full head. Comment commands read the head without the file list.
+**Result:** 173 tests pass (12 new in `tests/test_snapshot.py`, against GitHub through httpx's mock transport). Not yet deployed or run against real GitHub.
+**So:** the agent, the comment and the detonated code describe the same commit, and a big PR no longer reads as fully reviewed. A partial view is disclosed, not a coverage gap: behaviour is observed on the whole archive either way.
+Tags: #security #fix
