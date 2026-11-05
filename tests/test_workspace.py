@@ -137,7 +137,7 @@ def test_runs_left_running_by_a_dead_server_are_failed_on_startup(tmp_path):
     store.update_run("a", status="running")
     store.create_run("b", "y")
     store.update_run("b", status="done")
-    assert store.fail_stale_runs() == 1
+    assert store.fail_stale_runs() == ["a"]
     assert store.get_run("a")["status"] == "error" and store.get_run("b")["status"] == "done"
 
 

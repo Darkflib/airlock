@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS selftests (
   submitted_by TEXT,
   created REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS deliveries (  -- GitHub webhook deliveries already handled
+  id TEXT PRIMARY KEY,
+  seen REAL NOT NULL
+);
 """
 
 
@@ -176,12 +180,31 @@ class Store:
             return names.count(user.lower())
         return sum(n not in exclude for n in names)
 
-    def fail_stale_runs(self) -> int:
-        """Runs left queued or running by a previous process can never finish: mark them failed."""
-        cur = self.db.execute("UPDATE runs SET status = 'error', error = 'the server restarted during this run',"
-                              " finished = ? WHERE status IN ('queued', 'running')", (time.time(),))
+    def fail_stale_runs(self) -> list[str]:
+        """Runs left queued or running by a previous process can never finish: mark them failed.
+        Returns their ids, so the caller can tell GitHub about the PRs they were holding."""
+        ids = [r[0] for r in self.db.execute("SELECT id FROM runs WHERE status IN ('queued', 'running')")]
+        self.db.executemany("UPDATE runs SET status = 'error', error = 'the server restarted during this run',"
+                            " finished = ? WHERE id = ?", [(time.time(), i) for i in ids])
         self.db.commit()
-        return cur.rowcount
+        return ids
+
+    def unposted_decisions(self, since: float) -> list[str]:
+        """PR runs decided since a time whose decision never reached GitHub, neither posted nor
+        failed (a restart between recording the decision and posting it)."""
+        return [r[0] for r in self.db.execute(
+            "SELECT id FROM runs WHERE decision IS NOT NULL AND decided >= ? AND json_extract(meta, '$.kind') = 'pr'"
+            " AND json_extract(meta, '$.posted') IS NULL ORDER BY decided", (since,))]
+
+    def seen_delivery(self, delivery: str) -> bool:
+        return self.db.execute("SELECT 1 FROM deliveries WHERE id = ?", (delivery,)).fetchone() is not None
+
+    def add_delivery(self, delivery: str, keep: float = 7 * 86400) -> None:
+        """Record a handled webhook delivery; GitHub redelivers for days at most, so older ones are dropped."""
+        now = time.time()
+        self.db.execute("DELETE FROM deliveries WHERE seen < ?", (now - keep,))
+        self.db.execute("INSERT OR IGNORE INTO deliveries VALUES (?, ?)", (delivery, now))
+        self.db.commit()
 
     def proven_exfil(self, run_id: str) -> bool:
         """Whether the package itself (not the agent's re-runs) had exfiltration proven by a payload

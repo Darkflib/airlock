@@ -109,6 +109,17 @@ class Runner:
                 self.live.pop(run_id, None)
 
 
+class StoredNotes:
+    """`emit` for a run that is no longer live: appends to its stored events (a fresh EventLog
+    would restart ids at 1 and overwrite them)."""
+
+    def __init__(self, store: Store, run_id: str):
+        self.store, self.run_id = store, run_id
+
+    def emit(self, kind: str, summary: str, **data) -> dict:
+        return self.store.append_event(self.run_id, kind, summary, **data)
+
+
 def judge_probe(run: dict, proven: bool, expect: str) -> tuple[str, str]:
     """(pass | fail | pending, why). A stealer passes only with exfil proven by payload;
     a benign package passes only with zero containment events."""
@@ -166,7 +177,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         from ..sandbox import reap_leftovers
         analyse, reap = real_analyse, reap or reap_leftovers
     store = store or Store()
-    store.fail_stale_runs()
+    stale = store.fail_stale_runs()
     store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "https://airlock.darkflib.dev").rstrip("/")
@@ -241,7 +252,6 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     owners = auth.allowed if auth else frozenset()
     webhook_secret = webhook_secret if webhook_secret is not None else os.environ.get("GITHUB_WEBHOOK_SECRET", "")
     webhook_daily = int(os.environ.get("AIRLOCK_WEBHOOK_DAILY_RUNS", 50))
-    deliveries: set[str] = set()  # GitHub redelivers on timeouts; one run per delivery
 
     def is_owner(user: str | None) -> bool:
         return not auth or (user or "").lower() in owners
@@ -299,7 +309,31 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                     print(f"startup: removed {len(removed)} leftover sandbox(es) {removed}; failed {failed}", flush=True)
             except Exception as e:  # never block startup on cleanup
                 print(f"startup: sandbox cleanup failed: {type(e).__name__}: {e}", flush=True)
+        app.state.reconcile = asyncio.create_task(reconcile(stale))
         yield
+
+    async def reconcile(stale: list[str]) -> None:
+        """Finish what the last process left half-done on GitHub, in the background. A PR whose run it
+        was holding stays `pending` (unmergeable) until told the run failed; a decision recorded just
+        before it stopped never got its status and comment. Both re-check that the run is still the
+        latest of its commit (gate_writes, post_to_pr), so a newer review is never overwritten."""
+        if not github:
+            return
+        for run_id in stale:
+            run = store.get_run(run_id)
+            m = run["meta"] or {}
+            if m.get("kind") != "pr" or not m.get("head_sha"):
+                continue  # queued, or failed before the PR was fetched: no status was set
+            try:
+                async with commit_lock(m):
+                    await gate_writes(run_id, "error", StoredNotes(store, run_id))
+            except Exception as e:  # noqa: BLE001 - one PR must not stop the others
+                print(f"startup: releasing {run_id} on GitHub failed: {type(e).__name__}: {e}", flush=True)
+        for run_id in store.unposted_decisions(time.time() - 86400):
+            try:
+                await post_to_pr(store.get_run(run_id))
+            except Exception as e:  # noqa: BLE001
+                print(f"startup: posting {run_id}'s decision failed: {type(e).__name__}: {e}", flush=True)
 
     app = FastAPI(title="Airlock", lifespan=lifespan)
     app.state.runner = runner
@@ -393,13 +427,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             return {"ignored": f"{slug} is not enabled for automatic runs"}
         delivery = request.headers.get("x-github-delivery", "")
         owner, repo = slug.split("/", 1)
-        seen = bool(delivery) and delivery in deliveries
+        seen = bool(delivery) and store.seen_delivery(delivery)
         if seen or (done := store.run_of_commit(owner, repo, pr["head"]["sha"], pr["number"])):
             return {"ignored": "already analysed", "run": None if seen else done}
         if store.count_targets(time.time() - 86400, WEBHOOK_LABEL) >= webhook_daily:
             raise HTTPException(429, f"daily limit of {webhook_daily} automatic runs reached")
-        if delivery:
-            deliveries.add(delivery)
+        if delivery:  # in the database: GitHub redelivers on timeouts, also across our restarts
+            store.add_delivery(delivery)
         url = f"https://github.com/{slug}/pull/{pr['number']}"
         run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True)
         return JSONResponse({"id": run_id, "url": f"{public_url}/runs/{run_id}"}, status_code=202)
@@ -421,10 +455,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             return {"ignored": "not an /airlock command on a pull request"}
         if sender.get("type") == "Bot":
             return {"ignored": "comments from bots"}
-        if delivery and delivery in deliveries:
+        if delivery and store.seen_delivery(delivery):
             return {"ignored": "already handled"}
         if delivery:
-            deliveries.add(delivery)
+            store.add_delivery(delivery)
         owner, repo = payload["repository"]["full_name"].split("/", 1)
         number, user = pr["number"], sender["login"]
         decision = "approved" if cmd.group(1).lower() == "approve" else "rejected"
