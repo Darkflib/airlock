@@ -327,13 +327,16 @@ const Airlock = (() => {
       detonate: ['Detonation', 'The package is installed with the tracer on. Anything it tries shows up here.'],
       agent: ['Agent investigation', 'Commands chosen by the AI reviewer, run inside the same VM.'],
       verdict: ['Verdict', 'The agent\'s conclusion, then the VM is destroyed. A human decides on the right.'],
+      decision: ['Decision', 'What was decided, by whom, and what was posted to GitHub.'],
     };
     // Each stage is a collapsible section, like a CI job's steps: the stage in progress is open, and a
     // finished one folds away unless it holds something worth seeing or the reader opened or closed it.
     const HOT = ['error', 'limit_hit', 'coverage_incomplete', 'snapshot_partial', 'guard_flagged', 'citation_invalid'];
     let stage = null, sec = null;
     const stageOf = (ev) => {
+      if (ev.kind === 'decision') return 'decision';
       if (['verdict', 'vm_destroyed', 'error'].includes(ev.kind)) return 'verdict';
+      if (stage === 'verdict' || stage === 'decision') return 'decision';  // posted after the run
       if (ev.kind === 'agent_start' || ev.kind === 'guard_flagged') return 'agent';
       if (ev.kind === 'behaviour_diff') return 'detonate';
       const src = ev.data.source || ev.data.stage;
@@ -354,7 +357,7 @@ const Airlock = (() => {
       if (s.name === 'detonate' && s.signals === 0) {
         s.ol.append(el('li', 'stage-note', '✓ Nothing suspicious observed during install: no credential reads, no outbound requests, no spawned processes.'));
       }
-      if (!s.touched && !s.hot && s.name !== 'verdict') s.details.open = false;
+      if (!s.touched && !s.hot && !['verdict', 'decision'].includes(s.name)) s.details.open = false;
       badges(s);
     };
     const enterStage = (next) => {
@@ -495,13 +498,16 @@ const Airlock = (() => {
       ul.replaceChildren();
       for (const point of evidence) {
         const li = el('li');
-        for (const part of String(point).split(/(\[E\d+\])/g)) {
-          const m = part.match(/^\[E(\d+)\]$/);
-          if (m) {
-            const a = el('a', 'ref', part); a.href = `#E${m[1]}`;
-            a.addEventListener('click', (e) => { e.preventDefault(); flash(m[1]); });
+        // "[E9]" or a list such as "[E11, E12, E15]": each id becomes its own link.
+        for (const part of String(point).split(/(\[E\d+(?:,\s*E\d+)*\])/g)) {
+          if (!/^\[E\d+(?:,\s*E\d+)*\]$/.test(part)) { if (part) li.append(document.createTextNode(part)); continue; }
+          part.slice(1, -1).split(/,\s*/).forEach((ref, i) => {
+            if (i) li.append(document.createTextNode(' '));
+            const n = ref.slice(1);
+            const a = el('a', 'ref', `[${ref}]`); a.href = `#E${n}`;
+            a.addEventListener('click', (e) => { e.preventDefault(); flash(n); });
             li.append(a);
-          } else if (part) li.append(document.createTextNode(part));
+          });
         }
         ul.append(li);
       }
