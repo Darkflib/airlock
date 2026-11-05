@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Callable
@@ -29,25 +30,70 @@ class Event:
         return {**asdict(self), "containment": self.containment}
 
 
+# Budgets. A package controls how many events its run produces (every file it opens, every name it
+# looks up), so a run keeps at most MAX_EVENTS. Past that only the events a verdict depends on are
+# kept, and the run is marked truncated, which makes a quiet result inconclusive (observation_ok).
+MAX_EVENTS = int(os.environ.get("AIRLOCK_MAX_EVENTS", "5000"))
+ALWAYS_KEEP = {"verdict", "error", "coverage_incomplete", "vm_destroyed", "behaviour_diff", "citation_invalid"}
+HARD_EXTRA = 200  # what ALWAYS_KEEP may add past the cap
+SUBSCRIBER_BACKLOG = 1000  # events a live viewer may fall behind by before its stream is ended
+OVERFLOW = Event("stream_overflow", "this viewer fell too far behind; reconnect to replay")
+
+
 class EventLog:
     """Append-only event list with async subscribers (for SSE later)."""
 
-    def __init__(self, on_emit: Callable[[Event], None] | None = None) -> None:
+    def __init__(self, on_emit: Callable[[Event], None] | None = None, max_events: int | None = None) -> None:
         self.events: list[Event] = []
         self._subscribers: list[asyncio.Queue[Event | None]] = []
         self._on_emit = on_emit
+        self.max_events = MAX_EVENTS if max_events is None else max_events
+        self.truncated = 0  # events dropped past the cap
+        self._kept_proof = False
+
+    def _keep(self, kind: str, data: dict) -> bool:
+        n = len(self.events)
+        if n < self.max_events:
+            return True
+        if n >= self.max_events + HARD_EXTRA:
+            return False
+        if kind == "canary_exfil" and data.get("proven") and not self._kept_proof:
+            self._kept_proof = True  # proof still decides the gate, however noisy the run was
+            return True
+        return kind in ALWAYS_KEEP
 
     def emit(self, kind: str, summary: str, **data) -> Event:
-        ev = Event(kind=kind, summary=summary, data=data, id=len(self.events) + 1)
+        if not self._keep(kind, data):
+            self.truncated += 1
+            if self.truncated == 1:
+                self._append(Event("limit_hit", f"more than {self.max_events} events: Airlock stopped recording "
+                                   "routine events for this run, so a quiet result can't be trusted",
+                                   {"limit": "events", "max_events": self.max_events}))
+            return Event(kind=kind, summary=summary, data=data)  # not recorded: id 0
+        return self._append(Event(kind=kind, summary=summary, data=data))
+
+    def _append(self, ev: Event) -> Event:
+        ev.id = len(self.events) + 1
         self.events.append(ev)
         if self._on_emit:
             self._on_emit(ev)
-        for q in self._subscribers:
-            q.put_nowait(ev)
+        for q in list(self._subscribers):
+            self._offer(q, ev)
         return ev
 
+    def _offer(self, q: asyncio.Queue, item: Event | None) -> None:
+        """A viewer that stopped reading must not grow memory: past the backlog its queue is emptied
+        and ended with OVERFLOW. The stream closes and the browser reconnects, replaying from the store."""
+        try:
+            q.put_nowait(item)
+        except asyncio.QueueFull:
+            self.unsubscribe(q)
+            while not q.empty():
+                q.get_nowait()
+            q.put_nowait(OVERFLOW)
+
     def subscribe(self) -> asyncio.Queue[Event | None]:
-        q: asyncio.Queue[Event | None] = asyncio.Queue()
+        q: asyncio.Queue[Event | None] = asyncio.Queue(maxsize=SUBSCRIBER_BACKLOG)
         self._subscribers.append(q)
         return q
 
@@ -57,8 +103,8 @@ class EventLog:
 
     def close(self) -> None:
         """Tell subscribers the stream has ended."""
-        for q in self._subscribers:
-            q.put_nowait(None)
+        for q in list(self._subscribers):
+            self._offer(q, None)
 
     def containment(self) -> list[Event]:
         return [e for e in self.events if e.containment]

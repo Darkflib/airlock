@@ -165,7 +165,8 @@ async def detonate_repo(ws: Workspace, tarball: bytes, diff: str | None = None):
                       " && chown -R node:node /work", source="unpack")
     if not r.ok:
         raise RuntimeError(f"unpacking the repository failed: {r.stderr[-300:]}")
-    install = "npm ci" if "package-lock.json" in (await ws.exec("ls", cwd="/work/repo", source="unpack")).stdout else "npm install"
+    # Asked directly: a listing is capped output, and a repo can bury the lockfile under thousands of names.
+    install = "npm ci" if (await ws.exec("test -f package-lock.json", cwd="/work/repo", source="unpack")).ok else "npm install"
     installed = await ws.exec(f"{install} --no-audit --no-fund", cwd="/work/repo", timeout=240, trace=True,
                               source="detonate", as_user="node")
     tested = await ws.exec("npm test --if-present", cwd="/work/repo", timeout=120, trace=True,

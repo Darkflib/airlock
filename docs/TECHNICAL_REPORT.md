@@ -416,8 +416,7 @@ Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owner
 ### Platform and operations
 
 - **One host, two concurrent runs.** No queue beyond that, no autoscaling.
-- **No end-to-end deadline per run.** The VM has a 480 s lifetime, but repeated inference calls are not capped by an overall timer.
-- **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy, and there is no backpressure on event queues.
+- **Retention.** Uploaded files, sinkhole logs and event data have no retention or cleanup policy. Per run, sizes are bounded (5 November): a 600 s deadline, 5,000 events, 32 MB per guest log, 64 KB of each command's output, and a 1,000-event backlog per live viewer.
 - **GitHub fetch limits.** The changed-file list stops at 100 files and the diff at 200,000 characters without a completeness marker. Files and diff are fetched by PR number while the archive is fetched by head SHA, so a push mid-run could mismatch.
 - **Reproducibility.** cloud-init installs moving versions of uv, microsandbox and mitmproxy, so the host is *rebuildable*, not fully *reproducible*.
 - **Automatic runs cover one repo.** The webhook acts only on repos in `AIRLOCK_GUEST_REPOS`; turning it on per installation needs the multi-tenant work in 14.3. Redelivery de-duplication is in memory, so a redelivery that arrives across a restart is caught only by the one-run-per-commit check.
@@ -430,8 +429,8 @@ Grouped by what they unlock. Effort in brackets assumes one experienced engineer
 ### 14.1 Harden what exists (about a week)
 
 - Paginate GitHub files and diffs; pin everything to the head SHA; mark truncation. [a day]
-- End-to-end run deadline with cancellation; runtime model fallback. [a day]
-- Retention and backpressure: delete uploads and logs after N days, cap event and log sizes. [a day]
+- Runtime model fallback. [half a day] (The end-to-end run deadline, event and log caps and viewer backpressure are done.)
+- Retention: delete uploads and logs after N days. [half a day]
 - Decode common encodings (base64, hex, URL, gzip) before the token match, so encoded exfil can be PROVEN. [a day]
 - Record DNS-over-TCP attempts; raise payload capture beyond 2,000 characters with a size cap. [half a day]
 - Pin versions in cloud-init and publish the image digests, so a rebuild is reproducible. [half a day]

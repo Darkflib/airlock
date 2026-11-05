@@ -46,6 +46,13 @@ SINKHOLE_PORTS = (80, 443, 8080, 8443)
 # without touching a CLI run or a regression on the same host. airlock-web.service sets "web".
 OWNER_LABEL = "airlock-owner"
 VM_OWNER = os.environ.get("AIRLOCK_VM_OWNER", "cli")
+# Output budgets. Package code decides how much it prints and how much its activity makes the tracer
+# and watcher log, so nothing from the guest is read whole. Command output keeps each stream's tail
+# (the agent sees the last 4 KB; the pipeline reads exit codes and last lines). Guest logs are read in
+# chunks from where the last read stopped, up to a total per log; past it the run is marked incomplete.
+OUTPUT_CAP = 64 * 1024
+LOG_CHUNK = 1024 * 1024
+LOG_BUDGET = int(os.environ.get("AIRLOCK_LOG_BUDGET", str(32 * 1024 * 1024)))
 
 
 async def reap_leftovers(owner: str = VM_OWNER) -> tuple[list[str], list[str]]:
@@ -125,8 +132,9 @@ class Workspace:
         # Truncate the label, never the random suffix, so concurrent runs can't share a VM name.
         self.name = re.sub(r"[^a-z0-9-]", "-", f"airlock-{label}".lower())[:50] + f"-{secrets.token_hex(4)}"
         self.canary_token = "AIRLOCKCANARY" + secrets.token_hex(8).upper()
-        self._trace_seen = 0
-        self._watch_seen = 0
+        self._log_off = {TRACE_LOG: 0, WATCH_LOG: 0}  # bytes of complete lines already read
+        self._log_over: set[str] = set()  # logs that passed LOG_BUDGET
+        self._execs = 0
         self._watch = WatchTranslator(allow_hosts)
         self._emitted: set[tuple] = set()
         self._proven_exfil: set[str] = set()
@@ -253,6 +261,10 @@ class Workspace:
                                      timeout=10)).stdout_text.strip() == "up"
         if errors:
             return False, "watcher errors: " + "; ".join(errors)[:200]
+        if self._log_over:
+            return False, f"the guest logs passed Airlock's {LOG_BUDGET // 2**20} MB budget, so not all activity was read"
+        if self.events.truncated:
+            return False, f"the run produced more than {self.events.max_events} events, so not all were recorded"
         if not alive:
             return False, "the in-guest watcher stopped during the run"
         return True, ""
@@ -263,14 +275,24 @@ class Workspace:
         env = {"NODE_OPTIONS": "--require=/opt/airlock-trace/trace.js"} if trace else None
         await self.sb.fs.mkdir(cwd)
         run = f"runuser -u {as_user} -- sh -c {shlex.quote(cmd)}" if as_user else cmd
+        # Output goes to root-only files in the guest and only each stream's tail comes back.
+        self._execs += 1
+        o, e = f"/opt/airlock/exec{self._execs}.out", f"/opt/airlock/exec{self._execs}.err"
+        tails = f"tail -c {OUTPUT_CAP} {o} 2>/dev/null; tail -c {OUTPUT_CAP} {e} >&2 2>/dev/null; rm -f {o} {e}"
         try:
-            out = await self.sb.shell(run, cwd=cwd, env=env, timeout=timeout)
+            out = await self.sb.shell(f"sh -c {shlex.quote(run)} >{o} 2>{e}; rc=$?; {tails}; exit $rc",
+                                      cwd=cwd, env=env, timeout=timeout)
             res = ExecResult(out.exit_code, out.stdout_text, out.stderr_text)
-        except Exception as e:  # noqa: BLE001 - surfaced as a result
-            timed_out = "Timeout" in type(e).__name__
-            res = ExecResult(124 if timed_out else 1, "", f"{type(e).__name__}: {e}", timed_out=timed_out)
+        except Exception as ex:  # noqa: BLE001 - surfaced as a result
+            timed_out = "Timeout" in type(ex).__name__
+            res = ExecResult(124 if timed_out else 1, "", f"{type(ex).__name__}: {ex}", timed_out=timed_out)
             if timed_out:
                 self.events.emit("limit_hit", f"command killed after {timeout:.0f}s", cmd=cmd[:200])
+                try:  # what it printed before it was killed is still worth seeing
+                    got = await self.sb.shell(tails, timeout=10)
+                    res.stdout, res.stderr = got.stdout_text, got.stderr_text + "\n" + res.stderr
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
         self.events.emit("exec", f"$ {cmd[:120]} → exit {res.exit_code}", cmd=cmd, cwd=cwd,
                          exit_code=res.exit_code, source=source, user=as_user or "root")
         await self.collect_trace(stage=source, settle=bool(as_user) or "runuser" in cmd)
@@ -283,14 +305,8 @@ class Workspace:
             await asyncio.sleep(0.6)
         # Sinkhole first: when it captured the request, its report carries the payload.
         found = self._read_sinkhole() + self._read_dns()
-        out = await self.sb.shell(f"cat {TRACE_LOG} 2>/dev/null || true", timeout=10)
-        lines = out.stdout_text.splitlines()
-        new, self._trace_seen = lines[self._trace_seen:], len(lines)
-        found += events_from_trace("\n".join(new), self.allow_hosts)
-        out = await self.sb.shell(f"cat {WATCH_LOG} 2>/dev/null || true", timeout=10)
-        lines = out.stdout_text.splitlines()
-        new, self._watch_seen = lines[self._watch_seen:], len(lines)
-        found += self._watch.feed("\n".join(new))
+        found += events_from_trace(await self._read_log(TRACE_LOG), self.allow_hosts)
+        found += self._watch.feed(await self._read_log(WATCH_LOG))
         for kind, summary, data in found:
             target = (data.get("path") or data.get("host") or data.get("cmd") or "").split(":")[0]
             if kind == "canary_exfil":
@@ -303,6 +319,33 @@ class Workspace:
                 continue
             self._emitted.add(key)
             self.events.emit(kind, summary, stage=stage, **data)
+
+    async def _read_log(self, path: str) -> str:
+        """New complete lines of a guest log since the last read, in LOG_CHUNK pieces, never past
+        LOG_BUDGET bytes in all. A line longer than a chunk is skipped (the package wrote it, or it's
+        unparseable anyway)."""
+        lines: list[str] = []
+        while path not in self._log_over:
+            off = self._log_off[path]
+            if off >= LOG_BUDGET:
+                self._log_over.add(path)
+                self.events.emit("limit_hit", f"guest log {path} passed {LOG_BUDGET // 2**20} MB: the rest wasn't read",
+                                 limit="log_budget", path=path)
+                break
+            out = await self.sb.shell(f"tail -c +{off + 1} {path} 2>/dev/null | head -c {LOG_CHUNK} || true", timeout=20)
+            chunk = getattr(out, "stdout_bytes", None)
+            chunk = out.stdout_text.encode() if chunk is None else chunk
+            complete, nl, _ = chunk.rpartition(b"\n")
+            if not nl:
+                if len(chunk) >= LOG_CHUNK:  # one oversized line: skip past it
+                    self._log_off[path] = off + len(chunk)
+                    continue
+                break  # nothing new, or a line still being written
+            self._log_off[path] = off + len(complete) + 1
+            lines.append(complete.decode(errors="replace"))
+            if len(chunk) < LOG_CHUNK:
+                break
+        return "\n".join(lines)
 
     def _read_dns(self) -> list[tuple[str, str, dict]]:
         """Lookups that bypassed the watcher's resolver and reached this run's DnsGuard."""

@@ -16,6 +16,7 @@ from .events import EventLog
 from .sandbox import PKG_USER, Workspace
 
 OUTPUT_TAIL = 4000
+NOTE_EVENTS = 60  # events listed after one tool call
 
 SYSTEM = """You are Airlock, a supply-chain security reviewer working inside a disposable microVM.
 The VM has fake canary credentials and default-deny network egress; nothing you run can do harm.
@@ -95,7 +96,11 @@ class TriageAgent:
         new = self.events.events[start:]
         if not new:
             return ""
-        lines = "\n".join(f"[E{e.id}] {e.kind}: {e.summary}" for e in new)
+        # Containment first, then the rest, NOTE_EVENTS in all: a noisy call can't flood the context.
+        shown = sorted(sorted(new, key=lambda e: not e.containment)[:NOTE_EVENTS], key=lambda e: e.id)
+        lines = "\n".join(f"[E{e.id}] {e.kind}: {e.summary}" for e in shown)
+        if len(new) > len(shown):
+            lines += f"\n...and {len(new) - len(shown)} more routine events (not shown)"
         return "\n\nAirlock events from this call:\n" + self._screen(lines, "event summaries")
 
     async def _tool(self, name: str, args: dict) -> str:

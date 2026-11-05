@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..events import EventLog
+from ..events import OVERFLOW, EventLog
 from ..github import GitHubApp, parse_pr_url
 from ..pipeline import parse_pypi_spec
 from ..prcomment import build_comment, build_progress
@@ -34,6 +34,8 @@ GUEST_REPOS = frozenset(r.strip().lower() for r in
 SPEC = re.compile(r"^(@[a-z0-9][\w.-]*/)?[a-z0-9][\w.-]*(@[\w.^~=*-]+)?$", re.I)  # no shell syntax
 MAX_SPEC = 214  # npm's own package-name limit
 MAX_UPLOAD = 20 * 1024 * 1024
+# Queue wait excluded. The VM's own 480 s lifetime plus triage; real runs take 12-31 s.
+RUN_DEADLINE = float(os.environ.get("AIRLOCK_RUN_DEADLINE", "600"))
 WEBHOOK_ACTIONS = {"opened", "synchronize", "reopened"}  # a new PR, a new push to it, a PR back from closed
 WEBHOOK_LABEL = " (webhook)"
 # `/airlock approve [note]` or `/airlock reject [note]` on its own line of a PR comment
@@ -55,8 +57,9 @@ Gate = Callable[[str, str, EventLog], Awaitable[None]]
 class Runner:
     """Owns live runs: one EventLog per active run, at most `slots` at once."""
 
-    def __init__(self, store: Store, analyse: Analyse, slots: int = 2, gate: Gate | None = None):
-        self.store, self.analyse, self.gate = store, analyse, gate
+    def __init__(self, store: Store, analyse: Analyse, slots: int = 2, gate: Gate | None = None,
+                 deadline: float = RUN_DEADLINE):
+        self.store, self.analyse, self.gate, self.deadline = store, analyse, gate, deadline
         self.live: dict[str, EventLog] = {}
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
@@ -80,9 +83,16 @@ class Runner:
                 if self.gate:
                     await self.gate(run_id, "started", log)
             try:
-                report = await self.analyse(target, events=log, on_pr=on_pr)
+                # One deadline over the whole run, inference included. Cancelling unwinds through each
+                # Workspace's exit, so its VMs are destroyed (vm_destroyed) before the run reads as failed.
+                async with asyncio.timeout(self.deadline):
+                    report = await self.analyse(target, events=log, on_pr=on_pr)
                 end = dict(status="done", verdict=report.verdict, evidence=report.evidence, model=report.model,
                            meta=getattr(report, "meta", {}) or {})
+            except TimeoutError:
+                log.emit("limit_hit", f"run stopped at the {self.deadline:.0f} s overall deadline",
+                         limit="run_deadline", seconds=self.deadline)
+                end = dict(status="error", error=f"the run passed its {self.deadline:.0f} s deadline")
             except Exception as e:  # noqa: BLE001 - recorded on the run
                 log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
                 end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
@@ -575,6 +585,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                         yield ": keepalive\n\n"
                         continue
                     if not still_readable():  # checked before sending what arrived, not after
+                        return
+                    if ev is OVERFLOW:  # this viewer fell behind: end without `done`, the browser replays
                         return
                     if ev is None:
                         break
