@@ -192,7 +192,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [ ] Pre-publish audit: scan git history for secrets and share-link tokens; `.env` holds only `op://` references. First pass 5 Nov: both repos clean (`scripts/audit-history.py`); rerun on the final commits before flipping visibility
 - [ ] Make `Darkflib/airlock` public (MIT)
 - [ ] `Darkflib/airlock-demo` goes public (decided 5 Nov), so PR links in bot comments and slides work for judges. Before: tidy runs and bot comments; close test PRs #5-#7. README warning that PRs #3/#4 carry deliberate (unroutable) stealers: done 5 Nov via PR #8
-- [ ] `scripts/check-submission.py` passes (long description at 1903/2000: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
+- [ ] `scripts/check-submission.py` passes (long description at 1997/2000 on 5 Nov: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
 
 **If anything slips,** cut slide polish and the cover image first. Never the video or the pre-publish audit.
 
