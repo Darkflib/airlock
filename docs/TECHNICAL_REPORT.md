@@ -367,6 +367,8 @@ The site is private: every page and API call needs a signed-in, allowlisted user
 
 Second-account testing (build log 4 Nov 09:15) confirmed: guests can't see owners' uploads (404), can't decide or share owners' runs (403), can't submit PRs from other repos (403), hit 429 on the 16th run, and lose access immediately on revoke.
 
+**The rules in one place.** `airlock/web/access.py` defines a `Viewer` (a signed-in login, a share grant, or both) with `can_read`, `can_change` and `can_submit_pr`, and every route and the live event stream's recheck ask it. The production config has no access defaults: it won't start without the public URL and an owner list, guest repos default to none, and it logs the settings it started with.
+
 **The rules as one table.** [`tests/test_access_matrix.py`](../tests/test_access_matrix.py) states who may do what in one place. It covers seven kinds of viewer: signed out, a share link to a run, a share link to a self-test, an owner, two guests, and a guest who also holds a share link. These are checked against four runs (an owner's demo run, an owner's upload, each guest's own) and every route that reads or changes a run, a self-test or a share link: 175 cells. Writing it found two inconsistencies, both fixed. The run page answered 200 for a run the API would 404, which confirmed the run existed. "Post again" said "nothing to post" before checking who was asking.
 
 ## 11. How we tested it
