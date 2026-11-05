@@ -184,6 +184,8 @@ def test_deciding_a_pr_needs_github_write_access(tmp_path, monkeypatch, perm, co
     statuses = [x[2] for x in gh.calls if x[0] == "status"]
     if code == 200:
         assert run["decision"] == "approved" and statuses[-1] == "success"
+        # the shown verdict, not the stored one ("benign" reads "no malicious behaviour observed")
+        assert [x[3] for x in gh.calls if x[0] == "status"][-1] == "approved by @Darkflib (malicious)"
     else:
         assert run["decision"] is None and "success" not in statuses  # still held at pending
         assert "Darkflib/airlock-demo" in r.json()["detail"]

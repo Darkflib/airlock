@@ -877,7 +877,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         m, run_url = run["meta"], f"{public_url}/runs/{run['id']}"
         state = "success" if run["decision"] == "approved" else "failure"
         desc = (f"rejected automatically: {m['auto_decision']}" if m.get("auto_decision")
-                else f"{run['decision']} by @{run['decided_by']} (verdict: {run['verdict']})")
+                else f"{run['decision']} by @{run['decided_by']} ({verdict_label(run['verdict']).lower()})")
         try:
             await github.status(m["owner"], m["repo"], m["head_sha"], state, desc, run_url)
             url = await github.comment(m["owner"], m["repo"], m["number"],
