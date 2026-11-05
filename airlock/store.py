@@ -206,6 +206,16 @@ class Store:
         self.db.execute("INSERT OR IGNORE INTO deliveries VALUES (?, ?)", (delivery, now))
         self.db.commit()
 
+    def prune_runs(self, before: float) -> int:
+        """Delete finished runs created before a time, with their events, except demo runs."""
+        ids = [r[0] for r in self.db.execute(
+            "SELECT id FROM runs WHERE created < ? AND status IN ('done', 'error') AND NOT COALESCE(demo, 0)", (before,))]
+        for i in ids:
+            self.db.execute("DELETE FROM events WHERE run_id = ?", (i,))
+            self.db.execute("DELETE FROM runs WHERE id = ?", (i,))
+        self.db.commit()
+        return len(ids)
+
     def proven_exfil(self, run_id: str) -> bool:
         """Whether the package itself (not the agent's re-runs) had exfiltration proven by a payload
         captured on the host (sinkhole request or DnsGuard lookup) carrying this run's canary token.

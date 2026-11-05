@@ -21,10 +21,12 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .. import retention
 from ..events import OVERFLOW, EventLog
 from ..github import GitHubApp, parse_pr_url
 from ..pipeline import parse_pypi_spec
 from ..prcomment import build_comment, build_progress
+from ..sandbox import sinkhole_log
 from ..store import Store, data_dir
 from . import auth as authmod
 
@@ -64,12 +66,16 @@ class Runner:
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
 
-    def start(self, target: str, label: str, user: str | None = None, demo: bool = False) -> str:
+    def start(self, target: str, label: str, user: str | None = None, demo: bool = False,
+              upload: Path | None = None) -> str:
+        """`upload`: the run's uploaded package, deleted when the run ends (its evidence is in the store)."""
         run_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
         self.store.create_run(run_id, label, submitted_by=user, demo=demo)
         log = EventLog(on_emit=lambda ev: self.store.add_event(run_id, ev))
         self.live[run_id] = log
         task = asyncio.create_task(self._run(run_id, target, log))
+        if upload:
+            task.add_done_callback(lambda _: upload.unlink(missing_ok=True))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
         return run_id
@@ -174,8 +180,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     so an invite link that spreads can't run up the bill or speak for a repo through the App."""
     if analyse is None:
         from ..pipeline import analyse as real_analyse
-        from ..sandbox import reap_leftovers
-        analyse, reap = real_analyse, reap or reap_leftovers
+        from ..sandbox import reap_leftovers, vms_active
+        analyse, reap, idle_check = real_analyse, reap or reap_leftovers, vms_active
+    else:
+        idle_check = None  # tests: no VMs to ask about, so the sinkhole log is never rotated
     store = store or Store()
     stale = store.fail_stale_runs()
     store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
@@ -310,7 +318,20 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             except Exception as e:  # never block startup on cleanup
                 print(f"startup: sandbox cleanup failed: {type(e).__name__}: {e}", flush=True)
         app.state.reconcile = asyncio.create_task(reconcile(stale))
+        app.state.retention = asyncio.create_task(retain_forever())
         yield
+        app.state.retention.cancel()
+
+    async def retain_forever() -> None:
+        while True:
+            try:
+                done = await retention.sweep(store, uploads, sinkhole_log(), live=bool(runner.live),
+                                             vms_active=idle_check)
+                if done["uploads"] or done["runs"] or done["sinkhole_rotated"]:
+                    print(f"retention: {done}", flush=True)
+            except Exception as e:  # noqa: BLE001 - try again next time
+                print(f"retention failed: {type(e).__name__}: {e}", flush=True)
+            await asyncio.sleep(retention.SWEEP_EVERY_S)
 
     async def reconcile(stale: list[str]) -> None:
         """Finish what the last process left half-done on GitHub, in the background. A PR whose run it
@@ -386,7 +407,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             if not path.name.endswith(ext):
                 path = path.with_name(path.name + ext)
             path.write_bytes(data)
-            run_id = runner.start(str(path), name, user)
+            run_id = runner.start(str(path), name, user, upload=path)
         elif parse_pr_url(spec):
             if github is None:
                 raise HTTPException(400, "GitHub App not configured on this server")

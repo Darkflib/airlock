@@ -22,7 +22,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from microsandbox import Action, Destination, Network, NetworkPolicy, OutboundProxy, Protocol, Rule, Sandbox
+from microsandbox import (Action, Destination, Network, NetworkPolicy, OutboundProxy, Protocol, Rule, Sandbox,
+                          SandboxStatus)
 from microsandbox.types import DnsConfig, TlsConfig
 
 from .dnsguard import DnsGuard
@@ -73,6 +74,18 @@ async def reap_leftovers(owner: str = VM_OWNER) -> tuple[list[str], list[str]]:
         cursor = page.next_cursor
         if not cursor:
             return removed, failed
+
+
+async def vms_active() -> bool:
+    """Whether any VM on this host might be running, whoever started it (CLI and regression runs too)."""
+    cursor = None
+    while True:
+        page = await Sandbox.list_with(cursor=cursor)
+        if any(h.status not in (SandboxStatus.STOPPED, SandboxStatus.CRASHED) for h in page.sandboxes):
+            return True
+        cursor = page.next_cursor
+        if not cursor:
+            return False
 
 
 def sinkhole_available() -> bool:
@@ -150,7 +163,8 @@ class Workspace:
         t0 = time.monotonic()
         extra = {"proxy": OutboundProxy.socks5(SINKHOLE_ADDR)} if self.sinkhole else {}
         log = sinkhole_log()
-        self._sink_offset = log.stat().st_size if log.exists() else 0
+        st = log.stat() if log.exists() else None
+        self._sink_offset, self._sink_inode = (st.st_size, st.st_ino) if st else (0, None)
         self.dns = DnsGuard(self.allow_hosts)
         try:
             dns_port = await self.dns.start()
@@ -369,6 +383,8 @@ class Workspace:
         if not log.exists():
             return []
         with open(log) as f:
+            if (ino := os.fstat(f.fileno()).st_ino) != self._sink_inode:  # rotated (airlock.retention)
+                self._sink_offset, self._sink_inode = 0, ino
             f.seek(self._sink_offset)
             chunk = f.read()
         complete, _, _ = chunk.rpartition("\n")
