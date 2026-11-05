@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import secrets
@@ -42,6 +43,13 @@ RUN_DEADLINE = float(os.environ.get("AIRLOCK_RUN_DEADLINE", "600"))
 # Runs at once on this host; default one per core. A package run is one VM (2 vCPU, 2 GB), a PR run
 # two. CPU is the limit: on 4 cores, 4 at once doubled throughput over 2, more only added latency.
 SLOTS = int(os.environ.get("AIRLOCK_SLOTS") or os.cpu_count() or 2)
+# Back-pressure for guests (owners and webhook runs are exempt): runs waiting across everyone,
+# per slot, and unfinished runs per guest (5: one self-test). A restart resumes queued runs up to
+# QUEUE_MAX_AGE old, and a shutdown waits DRAIN_S for runs in progress (systemd allows 100 s).
+QUEUED_PER_SLOT = int(os.environ.get("AIRLOCK_QUEUED_PER_SLOT", 10))
+GUEST_UNFINISHED = int(os.environ.get("AIRLOCK_GUEST_UNFINISHED", 5))
+QUEUE_MAX_AGE = float(os.environ.get("AIRLOCK_QUEUE_MAX_AGE", 3600))
+DRAIN_S = float(os.environ.get("AIRLOCK_DRAIN_S", 75))
 WEBHOOK_ACTIONS = {"opened", "synchronize", "reopened"}  # a new PR, a new push to it, a PR back from closed
 WEBHOOK_LABEL = " (webhook)"
 # `/airlock approve [note]` or `/airlock reject [note]` on its own line of a PR comment
@@ -61,62 +69,98 @@ Gate = Callable[[str, str, EventLog], Awaitable[None]]
 
 
 class Runner:
-    """Owns live runs: one EventLog per active run, at most `slots` at once."""
+    """Owns live runs: one EventLog per active run, at most `slots` at once. Waiting runs get slots
+    first come, first served (asyncio's semaphore is FIFO) and stay `queued` in the store, with
+    their spec, so a restart can resume them."""
 
-    def __init__(self, store: Store, analyse: Analyse, slots: int = SLOTS, gate: Gate | None = None,
+    def __init__(self, store: Store, analyse: Analyse, slots: int | None = None, gate: Gate | None = None,
                  deadline: float = RUN_DEADLINE):
         self.store, self.analyse, self.gate, self.deadline = store, analyse, gate, deadline
         self.live: dict[str, EventLog] = {}
+        self.n_slots = slots = slots or SLOTS
         self.slots = asyncio.Semaphore(slots)
         self.tasks: set[asyncio.Task] = set()
+        self.draining = False  # shutting down: hand out no more slots; waiting runs stay queued
 
     def start(self, target: str, label: str, user: str | None = None, demo: bool = False,
-              upload: Path | None = None) -> str:
-        """`upload`: the run's uploaded package, deleted when the run ends (its evidence is in the store)."""
+              upload: Path | None = None, meta: dict | None = None) -> str:
+        """`upload`: the run's uploaded package, deleted when the run ends (its evidence is in the store).
+        `meta`: known before the run starts (a webhook PR's head), so the PR can show it's queued."""
         run_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
-        self.store.create_run(run_id, label, submitted_by=user, demo=demo)
-        log = EventLog(on_emit=lambda ev: self.store.add_event(run_id, ev))
-        self.live[run_id] = log
-        task = asyncio.create_task(self._run(run_id, target, log))
-        if upload:
-            task.add_done_callback(lambda _: upload.unlink(missing_ok=True))
-        self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        self.store.create_run(run_id, label, submitted_by=user, demo=demo, spec=target, meta=meta)
+        self._launch(run_id, target, upload)
         return run_id
 
-    async def _run(self, run_id: str, target: str, log: EventLog) -> None:
-        async with self.slots:
-            self.store.update_run(run_id, status="running")
+    def resume(self, run: dict) -> None:
+        """A run a previous process left queued: same id, so links to it keep working."""
+        upload = Path(run["spec"]) if Path(run["spec"]).parent == data_dir() / "uploads" else None
+        self._launch(run["id"], run["spec"], upload)
 
-            async def on_pr(meta: dict) -> None:  # the PR is fetched: record it, then block its merge
-                self.store.update_run(run_id, meta=meta)
-                if self.gate:
-                    await self.gate(run_id, "started", log)
-            try:
-                # One deadline over the whole run, inference included. Cancelling unwinds through each
-                # Workspace's exit, so its VMs are destroyed (vm_destroyed) before the run reads as failed.
-                async with asyncio.timeout(self.deadline):
-                    report = await self.analyse(target, events=log, on_pr=on_pr)
-                end = dict(status="done", verdict=report.verdict, evidence=report.evidence, model=report.model,
-                           meta=getattr(report, "meta", {}) or {})
-            except TimeoutError:
-                log.emit("limit_hit", f"run stopped at the {self.deadline:.0f} s overall deadline",
-                         limit="run_deadline", seconds=self.deadline)
-                end = dict(status="error", error=f"the run passed its {self.deadline:.0f} s deadline")
-            except Exception as e:  # noqa: BLE001 - recorded on the run
-                log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
-                end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
-            try:
-                # the status reflects the outcome before the run reads as finished
-                if "meta" in end:  # keep what the gate recorded while it ran (status sync, comment url)
-                    end["meta"] = {**(self.store.get_run(run_id)["meta"] or {}), **end["meta"]}
-                self.store.update_run(run_id, **{k: v for k, v in end.items() if k != "status"})
-                if self.gate:
-                    await self.gate(run_id, "verdict" if end["status"] == "done" else "error", log)
-            finally:
-                self.store.update_run(run_id, status=end["status"], finished=time.time())
-                log.close()
+    def _launch(self, run_id: str, target: str, upload: Path | None) -> None:
+        log = EventLog(on_emit=lambda ev: self.store.add_event(run_id, ev))
+        self.live[run_id] = log
+        task = asyncio.create_task(self._run(run_id, target, log, upload))
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+
+    async def drain(self, timeout: float) -> None:
+        """Stop starting runs and give those in progress `timeout` seconds to finish. Whatever is
+        still running then is cancelled (its VMs are destroyed) and left `running`, so the next
+        start retries it; runs still waiting are left `queued`, so the next start resumes them."""
+        self.draining = True
+        if self.tasks:
+            await asyncio.wait(set(self.tasks), timeout=timeout)
+        left = set(self.tasks)
+        for t in left:
+            t.cancel()
+        if left:
+            await asyncio.wait(left, timeout=10)
+
+    async def _run(self, run_id: str, target: str, log: EventLog, upload: Path | None) -> None:
+        run = self.store.get_run(run_id)
+        if self.gate and (run["meta"] or {}).get("kind") == "pr":
+            await self.gate(run_id, "queued", log)  # the PR shows it's waiting, not silently unheld
+        async with self.slots:
+            if self.draining:
                 self.live.pop(run_id, None)
+                return
+            self.store.update_run(run_id, status="running", started=time.time())
+            try:
+                await self._detonate(run_id, target, log)
+            finally:
+                if upload and self.store.get_run(run_id)["status"] != "running":
+                    upload.unlink(missing_ok=True)  # a run cut off by shutdown keeps it for its retry
+
+    async def _detonate(self, run_id: str, target: str, log: EventLog) -> None:
+        async def on_pr(meta: dict) -> None:  # the PR is fetched: record it, then block its merge
+            self.store.update_run(run_id, meta={**(self.store.get_run(run_id)["meta"] or {}), **meta})
+            if self.gate:
+                await self.gate(run_id, "started", log)
+        try:
+            # One deadline over the whole run, inference included. Cancelling unwinds through each
+            # Workspace's exit, so its VMs are destroyed (vm_destroyed) before the run reads as failed.
+            async with asyncio.timeout(self.deadline):
+                report = await self.analyse(target, events=log, on_pr=on_pr)
+            end = dict(status="done", verdict=report.verdict, evidence=report.evidence, model=report.model,
+                       meta=getattr(report, "meta", {}) or {})
+        except TimeoutError:
+            log.emit("limit_hit", f"run stopped at the {self.deadline:.0f} s overall deadline",
+                     limit="run_deadline", seconds=self.deadline)
+            end = dict(status="error", error=f"the run passed its {self.deadline:.0f} s deadline")
+        except Exception as e:  # noqa: BLE001 - recorded on the run
+            log.emit("error", f"run failed: {type(e).__name__}: {str(e)[:300]}")
+            end = dict(status="error", error=f"{type(e).__name__}: {e}"[:500])
+        try:
+            # the status reflects the outcome before the run reads as finished
+            if "meta" in end:  # keep what the gate recorded while it ran (status sync, comment url)
+                end["meta"] = {**(self.store.get_run(run_id)["meta"] or {}), **end["meta"]}
+            self.store.update_run(run_id, **{k: v for k, v in end.items() if k != "status"})
+            if self.gate:
+                await self.gate(run_id, "verdict" if end["status"] == "done" else "error", log)
+        finally:
+            self.store.update_run(run_id, status=end["status"], finished=time.time())
+            log.close()
+            self.live.pop(run_id, None)
 
 
 class StoredNotes:
@@ -171,11 +215,48 @@ def github_time(ts: str | None) -> float | None:
         return None
 
 
+PR_KEYS = ("kind", "owner", "repo", "number", "head_sha")
+
+
+def recover(store: Store, now: float | None = None) -> tuple[list[str], list[dict], list[dict]]:
+    """What a previous process left unfinished: (failed run ids, for reconcile to release on GitHub;
+    queued runs to resume as they are; interrupted runs to retry once, as new runs). A run that was
+    running lost its VM part-way, so it fails, keeping its partial evidence, and a fresh run replaces it."""
+    now = time.time() if now is None else now
+    queued, running = store.unfinished_runs()
+    stale, resume, retry = [], [], []
+
+    def lost(run: dict) -> str | None:
+        spec = run.get("spec")
+        if not spec:
+            return "it predates resumable runs"
+        if Path(spec).parent == data_dir() / "uploads" and not Path(spec).is_file():
+            return "its upload is gone"
+        if parse_pr_url(spec) and (newer := store.newer_run_of_spec(run)):
+            return f"run {newer} of the same PR is newer"  # it tests the PR's current head anyway
+        return None
+    for run in running:
+        store.fail_run(run["id"], "the server restarted during this run")
+        stale.append(run["id"])
+        m = run["meta"] or {}
+        if not m.get("retry_of") and not run["target"].startswith("self-test:") and not lost(run):
+            retry.append(run)  # once: a run that brings the server down must not loop
+    for run in queued:
+        why = "it waited over an hour" if now - run["created"] > QUEUE_MAX_AGE else lost(run)
+        if why:
+            store.fail_run(run["id"], f"not resumed after a restart: {why}")
+            stale.append(run["id"])
+        else:
+            resume.append(run)
+    return stale, resume, retry
+
+
 def create_app(store: Store | None = None, analyse: Analyse | None = None,
                auth: authmod.AuthConfig | None = None, exchange: authmod.GithubLogin | None = None,
                github: GitHubApp | None = None, user_daily: int | None = None,
                global_daily: int | None = None, webhook_secret: str | None = None,
-               reap: Callable[[], Awaitable[tuple[list[str], list[str]]]] | None = None) -> FastAPI:
+               reap: Callable[[], Awaitable[tuple[list[str], list[str]]]] | None = None,
+               drain_s: float = DRAIN_S) -> FastAPI:
     """auth=None disables sign-in (tests only); app_factory always passes a config.
 
     Owners are the logins in AIRLOCK_ALLOWED_USERS; everyone else signed in is a guest (e.g. a
@@ -189,8 +270,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     else:
         idle_check = None  # tests: no VMs to ask about, so the sinkhole log is never rotated
     store = store or Store()
-    stale = store.fail_stale_runs()
-    store.backfill_demo(GUEST_REPOS)  # nothing survives a restart: those runs' VMs and tasks are gone
+    stale, resume, retry = recover(store)
+    store.backfill_demo(GUEST_REPOS)
     github = github or GitHubApp.from_env()
     public_url = auth.public_url if auth else os.environ.get("AIRLOCK_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
 
@@ -222,7 +303,9 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             log.emit("github_status", f"not updating the GitHub status: run {newer} of the same commit is newer",
                      superseded_by=newer, source="github")
             return
+        ahead = store.queue_ahead(run) if phase == "queued" else 0
         state, desc = {
+            "queued": ("pending", f"Queued ({ahead} ahead); merge waits for a human decision"),
             "started": ("pending", "Detonating in a microVM; merge waits for a human decision"),
             "verdict": ("pending", f"Verdict: {run['verdict']}; comment /airlock approve or /airlock reject to decide"),
             "error": ("error", "Airlock run failed; rerun it before merging"),
@@ -240,7 +323,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         # One comment per run, rewritten as it goes, so the PR itself shows progress and how to decide.
         run_url, extra = f"{public_url}/runs/{run_id}", {}
         held = gate["synced"]  # the comment must not claim the merge is held when the status write failed
-        body = (build_progress(run, run_url, held=held) if phase == "started"
+        body = (build_progress(run, run_url, held=held, queued=ahead if phase == "queued" else None)
+                if phase in ("queued", "started")
                 else build_progress(run, run_url, failed=run.get("error") or "unknown error", held=held)
                 if phase == "error" else build_comment(run, store.events(run_id), run_url, held=held))
         try:
@@ -290,6 +374,18 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if store.count_runs(since, exclude=owners) + n > global_daily:
             raise HTTPException(429, "Airlock's daily run limit for guests is used up; try again tomorrow")
 
+    def check_queue(user: str | None, n: int) -> None:
+        """Back-pressure: past these, a guest is told to come back rather than left waiting."""
+        if Viewer(user, None, owners, bool(auth)).owner:
+            return
+        if user and store.count_unfinished(user) + n > GUEST_UNFINISHED:
+            raise HTTPException(429, f"you have runs waiting or in progress; at most {GUEST_UNFINISHED} at once",
+                                headers={"Retry-After": "60"})
+        if store.count_queued() + n > QUEUED_PER_SLOT * runner.n_slots:
+            wait = round(store.count_queued() / runner.n_slots * store.median_run_seconds())
+            raise HTTPException(429, f"Airlock is busy: {store.count_queued()} runs are waiting; try again in a few minutes",
+                                headers={"Retry-After": str(max(30, wait))})
+
     def share_url(runs: list[str], selftest: str | None, by: str | None) -> dict:
         if not auth:
             raise HTTPException(400, "share links need sign-in configured")
@@ -310,10 +406,22 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
                     print(f"startup: removed {len(removed)} leftover sandbox(es) {removed}; failed {failed}", flush=True)
             except Exception as e:  # never block startup on cleanup
                 print(f"startup: sandbox cleanup failed: {type(e).__name__}: {e}", flush=True)
+        for run in resume:
+            runner.resume(run)
+        for run in retry:
+            m = run["meta"] or {}
+            again = runner.start(run["spec"], run["target"], run["submitted_by"], demo=bool(run["demo"]),
+                                 upload=Path(run["spec"]) if Path(run["spec"]).parent == uploads else None,
+                                 # the PR keeps one comment: the retry rewrites the dead run's
+                                 meta={**{k: m[k] for k in (*PR_KEYS, "comment_url") if k in m}, "retry_of": run["id"]})
+            store.update_run(run["id"], meta={**m, "retried_as": again})
+        if resume or retry:
+            print(f"startup: resumed {len(resume)} queued run(s); retried {len(retry)} interrupted", flush=True)
         app.state.reconcile = asyncio.create_task(reconcile(stale))
         app.state.retention = asyncio.create_task(retain_forever())
         yield
         app.state.retention.cancel()
+        await runner.drain(drain_s)
 
     async def retain_forever() -> None:
         while True:
@@ -337,7 +445,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             run = store.get_run(run_id)
             m = run["meta"] or {}
             if m.get("kind") != "pr" or not m.get("head_sha"):
-                continue  # queued, or failed before the PR was fetched: no status was set
+                continue  # failed before the PR was known: no status was set
             try:
                 async with commit_lock(m):
                     await gate_writes(run_id, "error", StoredNotes(store, run_id))
@@ -400,6 +508,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     async def submit(request: Request, spec: str = Form(""), file: UploadFile | None = File(None)):
         user = authmod.current_user(request)
         check_quota(user, 1)
+        check_queue(user, 1)
         if file and file.filename:
             data = await file.read(MAX_UPLOAD + 1)
             if len(data) > MAX_UPLOAD:
@@ -466,7 +575,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         if delivery:  # in the database: GitHub redelivers on timeouts, also across our restarts
             store.add_delivery(delivery)
         url = f"https://github.com/{slug}/pull/{pr['number']}"
-        run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True)
+        # The head is known now, so the PR shows `pending: queued` before the run gets a slot.
+        run_id = runner.start(url, f"{slug}#{pr['number']}{WEBHOOK_LABEL}", payload["sender"]["login"], demo=True,
+                              meta={"kind": "pr", "owner": owner, "repo": repo, "number": pr["number"],
+                                    "head_sha": pr["head"]["sha"]})
         return JSONResponse({"id": run_id, "url": f"{public_url}/runs/{run_id}"}, status_code=202)
 
     async def comment_command(event: str, payload: dict, delivery: str) -> dict:
@@ -547,6 +659,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             raise HTTPException(503, f"self-test fixtures missing on this server: {', '.join(missing)}")
         user = authmod.current_user(request)
         check_quota(user, len(SELFTEST))
+        check_queue(user, len(SELFTEST))
         probes = [{"run_id": runner.start(str(FIXTURES / f), f"self-test: {label}", user, demo=True), "label": label,
                    "expect": expect} for f, label, expect in SELFTEST]
         test_id = time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
@@ -607,6 +720,10 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
     @app.get("/api/runs/{run_id}")
     async def get_run(run_id: str, request: Request):
         run = get_readable(run_id, request)
+        if run["status"] == "queued":
+            ahead = store.queue_ahead(run)
+            run["queue_ahead"] = ahead
+            run["queue_eta_s"] = round(math.ceil((ahead + 1) / runner.n_slots) * store.median_run_seconds())
         return {**run, "events": store.events(run_id)}
 
     @app.get("/api/runs/{run_id}/events")

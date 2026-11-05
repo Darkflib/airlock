@@ -12,7 +12,10 @@ EnvironmentFile=/home/airlock/.config/airlock/web.env
 # Labels this service's VMs, so startup clears only its own leftovers (airlock/sandbox.py reap_leftovers)
 Environment=AIRLOCK_VM_OWNER=web
 # One worker on purpose: GitHub writes per commit are serialized by an in-process lock (airlock/web/app.py commit_lock)
-ExecStart=/home/airlock/airlock/.venv/bin/uvicorn airlock.web.app:app_factory --factory --host 127.0.0.1 --port 8000 --proxy-headers --no-server-header
+ExecStart=/home/airlock/airlock/.venv/bin/uvicorn airlock.web.app:app_factory --factory --host 127.0.0.1 --port 8000 --proxy-headers --no-server-header --timeout-graceful-shutdown 5
+# On stop: open requests (live streams) get 5 s, then runs in progress get AIRLOCK_DRAIN_S (75 s)
+# to finish; anything left is retried on the next start (airlock/web/app.py Runner.drain, recover)
+TimeoutStopSec=100
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

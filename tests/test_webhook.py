@@ -53,7 +53,10 @@ def test_signed_pr_opened_starts_a_held_run_without_sign_in(make):
         run = c.app.state.runner.store.get_run(run_id)
     assert run["target"].endswith("(webhook)") and run["submitted_by"] == "Darkflib" and run["demo"]
     assert run["meta"]["head_sha"] == META["head_sha"]
-    assert [x[2] for x in gh.calls if x[0] == "status"] == ["pending", "pending"]  # held; nobody decided
+    statuses = [x for x in gh.calls if x[0] == "status"]
+    assert [x[2] for x in statuses] == ["pending"] * 3  # queued, testing, verdict: held; nobody decided
+    assert statuses[0][3].startswith("Queued (0 ahead)") and statuses[0][1] == "abc1234def"
+    assert "### Airlock: queued" in next(x[2] for x in gh.calls if x[0] == "comment")
 
 
 def test_bad_or_missing_signature_is_refused(make):

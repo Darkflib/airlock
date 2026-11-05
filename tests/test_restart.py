@@ -123,3 +123,24 @@ def test_old_deliveries_are_pruned(tmp_path):
     s.db.execute("UPDATE deliveries SET seen = ?", (time.time() - 8 * 86400,))
     s.add_delivery("b")
     assert not s.seen_delivery("a") and s.seen_delivery("b")
+
+
+def test_a_pr_run_cut_off_by_a_restart_is_retried_and_the_pr_stays_held(boot):
+    make, path = boot
+    s = Store(path)
+    s.create_run("cut", "Darkflib/airlock-demo#3 (webhook)", spec="https://github.com/Darkflib/airlock-demo/pull/3",
+                 meta={**META, "comment_url": "https://github.com/o/r/pull/3#issuecomment-9"})
+    s.update_run("cut", status="running")
+    gh = FakeGitHub()
+    with make(gh) as c:
+        reconciled(c)
+        store = c.app.state.runner.store
+        again = store.get_run("cut")["meta"]["retried_as"]
+        wait_done_store(c, again)
+        retry = store.get_run(again)
+    assert retry["status"] == "done" and retry["meta"]["retry_of"] == "cut"
+    states = [x[2] for x in gh.calls if x[0] == "status"]
+    # the retry is the newer run of the commit, so the dead run never posts `error` over it
+    assert "error" not in states and states[0] == "pending"
+    assert {x[3] for x in gh.calls if x[0] == "comment"} == {"https://github.com/o/r/pull/3#issuecomment-9"}
+    assert store.get_run("cut")["status"] == "error"

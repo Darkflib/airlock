@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS runs (
   created REAL NOT NULL,
   finished REAL,
   decided REAL,
-  demo INTEGER                     -- 1: guests may read it even when an owner submitted it
+  demo INTEGER,                    -- 1: guests may read it even when an owner submitted it
+  spec TEXT,                       -- what was analysed (PR URL, package spec, upload path): a restart resumes from it
+  started REAL                     -- when it got a slot (created to started is time in the queue)
 );
 CREATE TABLE IF NOT EXISTS events (
   run_id TEXT NOT NULL,
@@ -70,11 +72,17 @@ class Store:
                 self.db.execute(f"ALTER TABLE runs ADD COLUMN {col} TEXT")
         if "demo" not in cols:
             self.db.execute("ALTER TABLE runs ADD COLUMN demo INTEGER")
+        for col, kind in (("spec", "TEXT"), ("started", "REAL")):
+            if col not in cols:
+                self.db.execute(f"ALTER TABLE runs ADD COLUMN {col} {kind}")
         self.db.commit()
 
-    def create_run(self, run_id: str, target: str, submitted_by: str | None = None, demo: bool = False) -> None:
-        self.db.execute("INSERT INTO runs (id, target, status, created, submitted_by, demo) VALUES (?, ?, 'queued', ?, ?, ?)",
-                        (run_id, target, time.time(), submitted_by, int(demo)))
+    def create_run(self, run_id: str, target: str, submitted_by: str | None = None, demo: bool = False,
+                   spec: str | None = None, meta: dict | None = None) -> None:
+        self.db.execute("INSERT INTO runs (id, target, status, created, submitted_by, demo, spec, meta)"
+                        " VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)",
+                        (run_id, target, time.time(), submitted_by, int(demo), spec,
+                         json.dumps(meta) if meta is not None else None))
         self.db.commit()
 
     def backfill_demo(self, guest_repos: frozenset[str]) -> None:
@@ -180,6 +188,48 @@ class Store:
             return names.count(user.lower())
         return sum(n not in exclude for n in names)
 
+    def unfinished_runs(self) -> tuple[list[dict], list[dict]]:
+        """Runs a previous process left behind, oldest first: (queued, running). Queued runs never
+        started, so they can be resumed as they are; running ones lost their VM part-way."""
+        rows = [_run(r, spec=True) for r in self.db.execute(
+            "SELECT *, 0 AS contained FROM runs WHERE status IN ('queued', 'running') ORDER BY created, id")]
+        return [r for r in rows if r["status"] == "queued"], [r for r in rows if r["status"] == "running"]
+
+    def fail_run(self, run_id: str, error: str) -> None:
+        self.db.execute("UPDATE runs SET status = 'error', error = ?, finished = ? WHERE id = ?",
+                        (error, time.time(), run_id))
+        self.db.commit()
+
+    def newer_run_of_spec(self, run: dict) -> str | None:
+        """A later run of the same target (e.g. the same PR URL): resuming this one would only repeat it."""
+        row = self.db.execute("SELECT id FROM runs WHERE spec = ? AND id != ? AND (created > ? OR (created = ? AND id > ?))"
+                              " ORDER BY created DESC LIMIT 1",
+                              (run["spec"], run["id"], run["created"], run["created"], run["id"])).fetchone()
+        return row[0] if row else None
+
+    def queue_ahead(self, run: dict) -> int:
+        """Queued runs that will get a slot before this one (slots are handed out first come, first served)."""
+        return self.db.execute("SELECT COUNT(*) FROM runs WHERE status = 'queued' AND id != ?"
+                               " AND (created < ? OR (created = ? AND id < ?))",
+                               (run["id"], run["created"], run["created"], run["id"])).fetchone()[0]
+
+    def count_unfinished(self, user: str | None = None) -> int:
+        """Runs queued or running, for one submitter (case-insensitive) or for everyone."""
+        if user is None:
+            return self.db.execute("SELECT COUNT(*) FROM runs WHERE status IN ('queued', 'running')").fetchone()[0]
+        return self.db.execute("SELECT COUNT(*) FROM runs WHERE status IN ('queued', 'running')"
+                               " AND LOWER(COALESCE(submitted_by, '')) = ?", (user.lower(),)).fetchone()[0]
+
+    def count_queued(self) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM runs WHERE status = 'queued'").fetchone()[0]
+
+    def median_run_seconds(self, last: int = 20, default: float = 30.0) -> float:
+        """Slot time (started to finished) of recent finished runs, for a queue estimate."""
+        xs = sorted(r[0] for r in self.db.execute(
+            "SELECT finished - started FROM runs WHERE started IS NOT NULL AND finished IS NOT NULL"
+            " AND status = 'done' ORDER BY finished DESC LIMIT ?", (last,)))
+        return xs[len(xs) // 2] if xs else default
+
     def fail_stale_runs(self) -> list[str]:
         """Runs left queued or running by a previous process can never finish: mark them failed.
         Returns their ids, so the caller can tell GitHub about the PRs they were holding."""
@@ -253,8 +303,11 @@ class Store:
         return [_event(r) for r in rows]
 
 
-def _run(row: sqlite3.Row) -> dict:
+def _run(row: sqlite3.Row, spec: bool = False) -> dict:
+    """`spec` stays on the server (an upload's path on disk) unless asked for."""
     d = dict(row)
+    if not spec:
+        d.pop("spec", None)
     d["evidence"] = json.loads(d["evidence"]) if d["evidence"] else []
     d["meta"] = json.loads(d["meta"]) if d.get("meta") else {}
     return d

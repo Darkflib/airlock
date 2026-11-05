@@ -525,6 +525,7 @@ const Airlock = (() => {
       }
     }
 
+    let queuePoll;
     function renderHead(r) {
       runRow = r;
       document.title = `Airlock · ${r.target}`;
@@ -532,6 +533,15 @@ const Airlock = (() => {
       const st = $('status');
       st.className = `pill ${r.status}`;
       st.textContent = r.status;
+      if (r.status === 'queued' && r.queue_ahead !== undefined) {
+        const mins = Math.max(1, Math.round(r.queue_eta_s / 60));
+        st.textContent = `queued · ${r.queue_ahead ? r.queue_ahead + ' ahead' : 'next'} · about ${mins} min`;
+        clearTimeout(queuePoll);  // the stream says nothing until the run starts, so ask again
+        queuePoll = setTimeout(async () => {
+          const resp = await fetch(`/api/runs/${id}`);
+          if (resp.ok) renderHead(await resp.json());
+        }, 5000);
+      }
       $('meta').textContent = `run ${r.id}${r.model ? ' · ' + r.model : ''}${r.submitted_by ? ' · by @' + r.submitted_by : ''}`;
       $('live').hidden = !(r.status === 'running' || r.status === 'queued');
       renderPR(r.meta || {});

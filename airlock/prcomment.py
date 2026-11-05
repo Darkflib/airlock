@@ -17,9 +17,19 @@ def how_to_decide(run_url: str, held: bool = True) -> list[str]:
             f"[run page]({run_url}).", ""]
 
 
-def build_progress(run: dict, run_url: str, failed: str | None = None, held: bool = True) -> str:
-    """The comment while the run is in progress, or after it failed."""
+def build_progress(run: dict, run_url: str, failed: str | None = None, held: bool = True,
+                   queued: int | None = None) -> str:
+    """The comment while the run waits for a slot (`queued`: runs ahead of it) or is in progress,
+    or after it failed."""
     head = run["meta"].get("head_sha", "")[:7]
+    if queued is not None:
+        return "\n".join([
+            "### Airlock: queued", "",
+            f"Airlock will test this PR's head (`{head}`) as soon as a slot is free"
+            + (f" ({queued} run{'s' if queued != 1 else ''} ahead)." if queued else "; it should start shortly.")
+            + " This comment updates when testing starts; "
+            + ("the `airlock` check stays pending meanwhile." if held else "\n\n" + NOT_HELD), "",
+            f"[Run page]({run_url})"])
     if failed:
         return "\n".join([
             "### Airlock: run failed", "",

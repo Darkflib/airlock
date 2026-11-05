@@ -73,7 +73,7 @@ def test_decision_before_verdict_is_refused(tmp_path, monkeypatch):
     async def slow(target, *, events, **_):
         await asyncio.sleep(5)
 
-    with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow)) as c:
+    with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow, drain_s=0)) as c:
         run_id = c.post("/api/runs", data={"spec": "left-pad"}).json()["id"]
         assert c.post(f"/api/runs/{run_id}/decision", json={"decision": "approved"}).status_code == 409
 
@@ -127,7 +127,7 @@ def test_selftest_in_progress_is_reused(tmp_path, monkeypatch, fixtures):
     async def slow(target, *, events, **_):
         await asyncio.sleep(5)
 
-    with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow)) as c:
+    with TestClient(create_app(store=Store(tmp_path / "s.db"), analyse=slow, drain_s=0)) as c:
         first = c.post("/api/selftests").json()
         again = c.post("/api/selftests").json()
         assert again == {**first, "existing": True}
