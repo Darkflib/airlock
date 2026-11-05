@@ -381,9 +381,8 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         return FileResponse(STATIC / "index.html")
 
     @app.get("/runs/{run_id}")
-    async def run_page(run_id: str):
-        if not store.get_run(run_id):
-            raise HTTPException(404)
+    async def run_page(run_id: str, request: Request):
+        get_readable(run_id, request)  # the same 404 as the API, so the page doesn't confirm a run exists
         return FileResponse(STATIC / "run.html")
 
     @app.post("/api/runs")
@@ -722,13 +721,13 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         """Post a decision again after GitHub failed past the automatic retries (an outage)."""
         run = get_readable(run_id, request)
         user = authmod.current_user(request)
+        if not is_owner(user) and not mine(run, user):  # who may, before anything about the run's state
+            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can post it")
         m = run["meta"] or {}
         if m.get("kind") != "pr" or not github or not run["decision"]:
             raise HTTPException(409, "nothing to post: not a decided pull request run")
         if m.get("posted", {}).get("comment_url"):
             raise HTTPException(409, "already posted")
-        if not is_owner(user) and not mine(run, user):
-            raise HTTPException(403, "only the person who submitted this run, or an Airlock owner, can post it")
         if newer := store.newer_run_of_commit(run):
             raise HTTPException(409, f"run {newer} reviewed the same commit later; its status stands")
         await require_write(run, user)
