@@ -696,3 +696,9 @@ Tags: #metric #fix
 **Result:** both scripts pass `sh -n`. The host and settings resolve to the same values as before for our `.env`. The URL check accepts `https://airlock.darkflib.dev` and refuses `http://`, a port or a path. Checked against GitHub: the live App has Issues *write* and subscribes to more events than Airlock handles; the guide lists the minimum (Issues read; Pull request, Issue comment, Pull request review), and the technical report's permission table now includes Issues. Not yet run through a real deploy.
 **So:** someone else can stand Airlock up without editing our scripts, and can't hand us their instance by leaving a setting out. The next `deploy.sh` is the real test of the changed scripts.
 Tags: #docs #security
+
+### 06:14 — Changed deploy scripts checked on the real host
+**Tried:** Mike ran `scripts/deploy.sh` with the reworked scripts (`25cdb33`). Afterwards I compared what landed on the host with before.
+**Result:** three services `active`, healthz 200, restart 06:12:26 UTC. `web.env` holds the same nine keys at mode 600, with `AIRLOCK_PUBLIC_URL` and `AIRLOCK_ALLOWED_USERS` unchanged (read from `.env` now, not hard-coded). The App secrets resolved through the fallback 1Password item. Caddy gets `AIRLOCK_DOMAIN=airlock.darkflib.dev` from the new drop-in, and `https://airlock.darkflib.dev/healthz` is 200 with a valid certificate.
+**So:** the self-hosting changes are a no-op for our instance. The guide is still untested by someone starting from scratch.
+Tags: #docs #metric
