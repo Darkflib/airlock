@@ -1,6 +1,7 @@
 #cloud-config
 # Airlock host: Vultr VX1, Ubuntu 24.04.
 # Rebuildable from scratch; anything done by hand on the box should land here.
+# Tools are pinned to exact versions; scripts/check-pins.sh compares a live host with these pins.
 
 hostname: airlock
 timezone: UTC
@@ -46,18 +47,18 @@ runcmd:
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw --force enable
-  - su - airlock -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
-  - su - airlock -c '~/.local/bin/uv tool install -q mitmproxy'   # the egress sinkhole
-  # microsandbox (installs to ~/.microsandbox). msb refuses a storage root that is
-  # group-writable, and Ubuntu's default umask 002 makes it so.
-  - su - airlock -c 'curl -fsSL https://install.microsandbox.dev | sh'
-  - su - airlock -c 'chmod -R go-w ~/.microsandbox && chmod 700 ~/.microsandbox'
+  - su - airlock -c 'curl -LsSf https://astral.sh/uv/0.13.7/install.sh | sh'
+  - su - airlock -c '~/.local/bin/uv tool install -q mitmproxy==12.3.1'   # the egress sinkhole
+  # microsandbox: the runtime is the SDK's bundled msb, pinned by uv.lock and installed by
+  # scripts/install-web.sh (which also links it as the msb CLI and runs `msb doctor`). Here
+  # only its storage root: msb refuses one that is group-writable, as Ubuntu's umask 002 makes it.
+  - su - airlock -c 'mkdir -p ~/.microsandbox && chmod 700 ~/.microsandbox'
   # ~/.local/bin is only on PATH for login shells; link so non-interactive ssh finds them
   - ln -sf /home/airlock/.local/bin/msb /home/airlock/.local/bin/uv /usr/local/bin/
-  - su - airlock -c '~/.local/bin/msb doctor' > /var/log/airlock-msb-doctor 2>&1
   # Caddy (official repo). Config, secrets and the app service come from scripts/deploy.sh.
   - 'curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg'
   - 'curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt -o /etc/apt/sources.list.d/caddy-stable.list'
   - apt-get update -qq
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy=2.11.7
+  - apt-mark hold caddy   # upgrade deliberately: change the pin above and in scripts/check-pins.sh
   - 'test -c /dev/kvm && echo "kvm: present" > /var/log/airlock-kvm || echo "kvm: MISSING" > /var/log/airlock-kvm'

@@ -27,8 +27,12 @@ DOMAIN="${PUBLIC_URL#https://}"
 printf '%s' "$DOMAIN" | grep -Eqx '[A-Za-z0-9.-]+' && [ "$PUBLIC_URL" = "https://$DOMAIN" ] \
   || { echo "AIRLOCK_PUBLIC_URL must be https://<domain> (Caddy serves it on 443)" >&2; exit 1; }
 
-uv sync -q
-[ -x ~/.local/bin/mitmdump ] || uv tool install -q mitmproxy
+uv sync -q --locked
+# The msb CLI is the SDK's own bundled binary, so it is the uv.lock version the runtime uses
+ln -sf ~/airlock/.venv/bin/msb ~/.local/bin/msb
+ln -sf msb ~/.local/bin/microsandbox
+~/.local/bin/msb doctor >/dev/null 2>&1 || { ~/.local/bin/msb doctor >&2; echo "msb doctor failed: this host can't run VMs" >&2; exit 1; }
+[ -x ~/.local/bin/mitmdump ] || uv tool install -q mitmproxy==12.3.1
 
 umask 077
 CONF=~/.config/airlock
