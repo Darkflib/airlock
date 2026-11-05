@@ -21,10 +21,11 @@
       <div class="spacer"></div>
       <div class="user" id="user"></div>
     </header>
+    <main>
 
     <div class="run-head">
       <h1 id="target">…</h1>
-      <span class="pill" id="status"></span>
+      <span class="pill" id="status" role="status"></span>
       <span class="meta" id="meta"></span>
       <button type="button" class="ghost" id="share" hidden>Share read-only link</button>
     </div>
@@ -45,7 +46,7 @@
         <div class="panel">
           <h2>Verdict</h2>
           <div class="body">
-            <div class="verdict-big pending" id="verdict">Waiting for agent…</div>
+            <div class="verdict-big pending" id="verdict" aria-live="polite">Waiting for agent…</div>
             <div class="verdict-meta" id="verdict-meta"></div>
             <ul class="evidence" id="evidence"></ul>
           </div>
@@ -72,6 +73,7 @@
         </div>
       </div>
     </div>
+    </main>
   </div>
   <script src="/static/app.js"></script>
   <script>Airlock.run();</script>

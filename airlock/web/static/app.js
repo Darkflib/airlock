@@ -44,12 +44,13 @@ const Airlock = (() => {
     if (!me.login) return;
     const btn = el('button', 'avatar-btn');
     btn.type = 'button';
-    btn.setAttribute('aria-haspopup', 'menu');
     btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', 'user-menu');
+    btn.setAttribute('aria-label', `Account menu for @${me.login}`);
     btn.title = `Signed in as @${me.login}`;
     btn.append(avatar(me.login, 28), el('span', 'caret', '▾'));
     const menu = el('div', 'menu');
-    menu.setAttribute('role', 'menu');
+    menu.id = 'user-menu';
     menu.hidden = true;
     const who = el('div', 'menu-who');
     who.append(el('span', 'muted', 'Signed in as'), el('b', 'mono', `@${me.login}`));
@@ -60,7 +61,12 @@ const Airlock = (() => {
     const open = (yes) => { menu.hidden = !yes; btn.setAttribute('aria-expanded', String(yes)); };
     btn.addEventListener('click', (e) => { e.stopPropagation(); open(menu.hidden); });
     document.addEventListener('click', (e) => { if (!menu.contains(e.target)) open(false); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') open(false); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || menu.hidden) return;
+      open(false);
+      btn.focus();  // keyboard users keep their place
+    });
+    box.addEventListener('focusout', (e) => { if (!box.contains(e.relatedTarget)) open(false); });
     account.addEventListener('click', () => { open(false); accountDialog(me); });
     box.replaceChildren(btn, menu);
   }
@@ -72,12 +78,13 @@ const Airlock = (() => {
     if (dlg) { dlg.showModal(); return; }
     dlg = el('dialog', 'modal');
     dlg.id = 'account';
+    dlg.setAttribute('aria-label', 'Account');
     const head = el('div', 'modal-head');
     const id = el('div');
     id.append(el('div', 'modal-title mono', `@${me.login}`),
       el('div', 'muted small', me.owner ? 'Owner: you can see and decide every run.' : 'Guest: you see your own runs and the demo runs.'));
     const close = el('button', 'ghost icon', '✕');
-    close.type = 'button'; close.title = 'Close';
+    close.type = 'button'; close.title = 'Close'; close.setAttribute('aria-label', 'Close'); close.autofocus = true;
     close.addEventListener('click', () => dlg.close());
     head.append(avatar(me.login, 56), id, close);
     const gh = el('a', 'small', 'View GitHub profile ↗');
@@ -103,6 +110,9 @@ const Airlock = (() => {
       const go = el('button', 'reject', 'Delete my account');
       go.type = 'button'; go.disabled = true;
       const err = el('p', 'err');
+      err.setAttribute('role', 'alert');
+      input.id = 'delete-confirm';
+      label.htmlFor = input.id;
       input.addEventListener('input', () => { go.disabled = input.value.trim().toLowerCase() !== me.login.toLowerCase(); });
       go.addEventListener('click', async () => {
         go.disabled = true; go.textContent = 'Deleting…'; err.textContent = '';
@@ -312,6 +322,8 @@ const Airlock = (() => {
       if (!row) return;
       if (row.classList.contains('exec')) { $('show-exec').checked = true; document.body.classList.remove('hide-exec'); }
       reveal(row);
+      row.tabIndex = -1;
+      row.focus({ preventScroll: true });
       row.scrollIntoView({ behavior: 'smooth', block: 'center' });
       row.classList.add('flash');
       setTimeout(() => row.classList.remove('flash'), 1600);
@@ -605,8 +617,10 @@ const Airlock = (() => {
       if (snap && !snap.complete) g.append(el('p', 'warn',
         `The reviewer saw part of this PR: ${(snap.notes || []).join('; ')}. Install and tests ran on the full head.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
+      note.setAttribute('aria-label', 'Decision note (optional)');
       const row = el('div', 'row');
       const refused = el('p', 'warn'); refused.hidden = true;
+      refused.setAttribute('role', 'alert');
       const mk = (label, cls, decision) => {
         const b = el('button', cls, label);
         b.addEventListener('click', async () => {

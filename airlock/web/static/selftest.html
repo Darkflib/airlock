@@ -21,6 +21,7 @@
       <div class="spacer"></div>
       <div class="user" id="user"></div>
     </header>
+    <main>
 
     <div class="run-head">
       <h1>Containment self-test</h1>
@@ -30,7 +31,7 @@
 
     <div class="panel">
       <div class="body">
-        <div class="verdict-big pending" id="score">…</div>
+        <div class="verdict-big pending" id="score" aria-live="polite">…</div>
         <div class="verdict-meta">Each probe is a normal run: fresh microVM, canary credentials, sinkhole, agent review.
           Open a probe to see its live timeline.</div>
       </div>
@@ -39,6 +40,7 @@
         <tbody id="probes"></tbody>
       </table>
     </div>
+    </main>
   </div>
   <script src="/static/app.js"></script>
   <script>Airlock.selftest();</script>
