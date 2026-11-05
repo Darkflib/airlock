@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from . import guard
 from .events import EventLog
+from .prcomment import verdict_label
 from .sandbox import PKG_USER, Workspace
 
 OUTPUT_TAIL = 4000
@@ -170,7 +171,7 @@ class TriageAgent:
                                         for e in evidence]
                         res.verdict, res.evidence = verdict, evidence
                         res.seconds = round(time.monotonic() - t0, 1)
-                        self.events.emit("verdict", f"verdict: {res.verdict}", verdict=res.verdict,
+                        self.events.emit("verdict", f"verdict: {verdict_label(res.verdict).lower()}", verdict=res.verdict,
                                          evidence=res.evidence, turns=turn, forced=res.forced)
                         return res
                     start = len(self.events.events)
