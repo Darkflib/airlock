@@ -91,7 +91,7 @@ flowchart LR
 
 ## Vultr services used
 
-- **Vultr Cloud Compute, VX1** (`vx1-g-4c-16g-240s`, London). VX1 exposes `/dev/kvm`, so every run gets a real microVM with a separate kernel rather than a container. The box is fully reproducible from [`infra/cloud-init.yaml`](infra/cloud-init.yaml) plus `scripts/deploy.sh`, about 10 minutes from a blank instance. It has a **reserved IP** for a stable DNS name.
+- **Vultr Cloud Compute, VX1** (`vx1-g-4c-16g-240s`, London). VX1 exposes `/dev/kvm`, so every run gets a real microVM with a separate kernel rather than a container. The box is rebuilt from [`infra/cloud-init.yaml`](infra/cloud-init.yaml) plus `scripts/deploy.sh`, about 10 minutes from a blank instance, with tools pinned to exact versions and the VM images pinned by digest (`scripts/check-pins.sh` checks a host against them). It has a **reserved IP** for a stable DNS name.
 - **Vultr Serverless Inference.** All runtime LLM calls go through `https://api.vultrinference.com/v1`. We **benchmarked all 13 catalogue models** before choosing ([`evals/RESULTS.md`](evals/RESULTS.md)):
   - `mimo-v2.6-flash` went 15/15 on the harder agent tasks at n=3, with the fewest tokens.
   - All 12 runs that reviewed the hostile package said malicious, and none followed its README's "approve this package" injection.

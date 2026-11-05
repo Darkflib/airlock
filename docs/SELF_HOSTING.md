@@ -23,15 +23,15 @@ You will end up with:
 
 [`infra/cloud-init.yaml`](../infra/cloud-init.yaml) builds the host from a blank Ubuntu 24.04 image. **Before you use it, replace the `ssh_authorized_keys` entry with your own public key**; the one in the file is ours.
 
-It creates an `airlock` user (in the `kvm` group, with passwordless sudo, which the deploy script needs to install the services) and locks down SSH to keys only. It also enables `ufw` for ports 22, 80 and 443, and installs `uv`, mitmproxy (the sinkhole), microsandbox and Caddy.
+Every tool it installs is pinned to an exact version. microsandbox itself comes later, with the Python environment, at the version in `uv.lock`. It creates an `airlock` user (in the `kvm` group, with passwordless sudo, which the deploy script needs to install the services) and locks down SSH to keys only. It also enables `ufw` for ports 22, 80 and 443, and installs `uv`, mitmproxy (the sinkhole), microsandbox and Caddy.
 
 On Vultr, pass it as user data when you create the instance. Elsewhere, any cloud-init capable image works. Then check the host:
 
 ```bash
-ssh airlock@airlock.example.com 'cat /var/log/airlock-kvm; tail -5 /var/log/airlock-msb-doctor'
+ssh airlock@airlock.example.com 'cat /var/log/airlock-kvm'
 ```
 
-You want `kvm: present`, and `msb doctor` passing. If KVM is missing, the host can't run Airlock: pick an instance type with nested virtualisation or bare metal.
+You want `kvm: present`. (`msb doctor` runs at the first deploy, which stops if it fails.) If KVM is missing, the host can't run Airlock: pick an instance type with nested virtualisation or bare metal.
 
 Point your domain's A record at the host now; Caddy needs it to resolve before it can get a certificate.
 
@@ -185,6 +185,7 @@ The model for each role is in [`roles.toml`](../roles.toml); [`evals/`](../evals
 ## Operating it
 
 - **Logs:** `journalctl -u airlock-web -f` (and `-u airlock-sinkhole`, `-u caddy`).
+- **Versions:** the VM images are pinned by digest in `airlock/sandbox.py`, microsandbox by `uv.lock`, and uv, mitmproxy and Caddy in cloud-init. `scripts/check-pins.sh` compares a host with all of them. To move a pin, change it there, deploy, run the check, and rerun the self-test.
 - **Updating:** pull, then `scripts/deploy.sh`. A restart fails any run in progress and releases its PR as `error` on GitHub (push again to rerun); startup also removes any VMs those runs left behind.
 - **What is kept:** each run's evidence lives in SQLite. Uploads are deleted when their run ends. Runs that aren't demo runs are deleted after `AIRLOCK_RETAIN_DAYS`. The sinkhole log is rotated daily, keeping one previous file.
 - **Rebuilding:** the host holds nothing that can't be recreated except `~/.local/share/airlock` (run history) and `~/.config/airlock` (allowlist, invites, share-link ledger, session secret). Copy those two directories if you want to keep them, recreate the instance from cloud-init, and deploy.
@@ -204,4 +205,4 @@ The model for each role is in [`roles.toml`](../roles.toml); [`evals/`](../evals
 | `the Airlock GitHub App is not installed on owner/repo` | Install the App on that repo (step 3). |
 | A PR gets no status and no run | The repo isn't in `AIRLOCK_GUEST_REPOS`, or the webhook isn't active. The App's Advanced tab lists recent deliveries and the response to each. |
 | A self-test stealer shows malicious but not **proven** | The sinkhole isn't running: `systemctl status airlock-sinkhole`, and check `~/.mitmproxy/mitmproxy-ca-cert.pem` exists. |
-| Runs fail with an `ObservationError` | The in-VM watcher didn't start. Usually KVM or microsandbox: rerun `msb doctor` on the host. |
+| Runs fail with an `ObservationError` | The in-VM watcher didn't start. Usually KVM or microsandbox: run `msb doctor` on the host, and `scripts/check-pins.sh` from your laptop. |
