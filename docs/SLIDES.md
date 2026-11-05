@@ -31,12 +31,14 @@ The captured POST from PR #3, with the run's canary token highlighted.
 - It was a shell script: detection doesn't depend on the language.
 *Visual:* screenshot of the expanded PROVEN row.
 
-## 5. The hard one: PR #4
+## 5. Where the agent earns its place: PR #9
 
-Reads like a routine dependency bump; the theft is split across "install analytics" and a "config discovery" helper, and the host is built from fragments.
-- Merge base detonated in a second VM: **10 new behaviours, 5 of them containment**.
-- Exfil to `telemetry.tinystamp.invalid` proven by payload.
-*Visual:* run page with "only what this PR adds" on.
+A config library with no install script; its tests pass. Install and tests show **nothing**: a sandbox alone would let it through.
+- The agent reads the code: it only sends data when `NODE_ENV=production`.
+- It asks Airlock to **exercise** it that way. Airlock runs it from a clean copy with its own harness, so what's caught counts as proof.
+- POST to `cfg-metrics.tinyconf.invalid` with this run's token: **PROVEN**, rejected automatically.
+"The agent found it. Airlock proved it."
+*Visual:* Detonation "✓ nothing suspicious" above Agent investigation "4 contained", with the exercise row and the PROVEN POST.
 
 ## 6. The gate
 
