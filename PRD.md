@@ -180,7 +180,8 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Video script drafted from build-log `#demo` moments: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) (shots, 425-word narration, pre-recording checklist, sources)
 - [x] Slide outline drafted (10 slides, including the $1.45 inference spend): [docs/SLIDES.md](docs/SLIDES.md)
 - [x] Deck built from the outline (10 slides, Airlock palette; claude.ai Slides artifact, exports to PDF/PPTX)
-- [ ] Swap the two screenshot placeholders (slides 4 and 5) for frames from the Sat recording; recheck 33/33 and the spend on slide 9
+- [ ] Swap the two screenshot placeholders (slides 5 and 6) for frames from the Sat recording; recheck 33/33 and the spend on slide 10
+- [ ] Add slide 3 ("The same PR without Airlock", 5 Nov) to the deck artifact; the outline has it, the published deck doesn't yet
 - [x] Cover image: `assets/airlock-cover.png` (1920×1080), rendered from `assets/airlock-cover.html`
 
 **Sat 7 Nov: freeze and record**

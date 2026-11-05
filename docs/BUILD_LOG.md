@@ -877,3 +877,9 @@ Tags: #win #demo
 **Result:** 3/3 runs: CI passes (`npm ci` 1.0 s, `npm test` 0.2 s), and one POST delivers both the npm token and the AWS secret to the attacker, in 3.2 s. Worked first time. Airlock on the same PR: MALICIOUS, proven, 3/3, median 23.2 s. [results](../evals/results/without-airlock-20261105T215220Z/summary.md)
 **So:** the README has a before/after table; it's the answer to "why not just run it in CI?" and a candidate 10-second video beat: the green check next to the attacker's log.
 Tags: #metric #demo
+
+### 22:05 — The without-Airlock run goes in the hook
+**Tried:** put the 21:55 comparison in the video and deck.
+**Result:** the hook keeps PR #3's green check and replaces "passing tests don't show what the install script did" with the plain-CI result on a new slide 3: green check, and both keys at the attacker's server (captioned as our stand-in, recorded 5 Nov). Narration is 3 words shorter, about 400 words. The outline is now eleven slides; the published deck still needs slide 3.
+**So:** the video shows the risk before Airlock appears, instead of describing it.
+Tags: #demo #decision

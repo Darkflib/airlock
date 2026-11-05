@@ -1,11 +1,12 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 405 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what a sandbox alone misses and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what a sandbox alone misses and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
 - [ ] Run the regression once on the frozen commit; the 33/33 figure on the "under the hood" slide must match it.
 - [ ] Fresh run of PR #3 to film live.
+- [ ] Slide 3 ("The same PR without Airlock") exported as a full-screen frame for the hook. It shows a recorded run (`evals/results/without-airlock-20261105T215220Z`), so its caption says "recorded 5 Nov" and "attacker's server: our stand-in".
 - [ ] PR #9 is started on camera by a push. Prepare a one-line README change on the PR #9 branch in GitHub's web editor (don't commit it yet). Check the App's webhook is active: **Advanced → Recent Deliveries** shows a 200. Do one practice push the day before, and check the `(webhook)` run appears within a few seconds.
 - [ ] Don't push to PR #1: a push starts a run and moves its status.
 - [ ] PR #1 is held at a pending `airlock` status; check it still is, and that its merge button is greyed out.
@@ -26,7 +27,11 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** GitHub, `Darkflib/airlock-demo` PR #3 "feat: coloured startup log". Scroll to the green `npm test` check, then the Files tab with one line in `package.json` and a vendored `colorful-logs-2.0.1.tgz`.
 
-> "This pull request adds a coloured logger. The tests pass. Would you merge it? Passing tests show that the code works. They do not show what the install script did with your passwords."
+> "This pull request adds a coloured logger. The tests pass. Would you merge it?"
+
+**[SCREEN]** Slide 3, full screen: on the left "Plain CI job: npm ci ✓ npm test ✓"; on the right "Attacker's server received:" with the POST body, the npm token and AWS secret highlighted. Hold two seconds on the right side.
+
+> "We ran it like a normal CI job, with fake keys. The check is green. And both keys went straight to the attacker."
 
 ### 0:15–1:15 Detonation, PR #3 (live)
 
@@ -105,6 +110,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 | Claim on camera | Where it's measured |
 |---|---|
+| PR #3 as a plain CI job: tests pass, both keys reach the attacker | `without-airlock-20261105T215220Z` (3/3), BUILD_LOG 5 Nov 21:55 |
 | Boot under a second (0.69 s) | BUILD_LOG 3 Nov 17:39 |
 | Shell stealer, proven exfil, `cat`/`curl`/raw-IP | BUILD_LOG 3 Nov 22:37; self-test `20261104-084347-33a1a2` |
 | PR #9: silent in install and tests; proven when Airlock exercised it; rejected automatically | BUILD_LOG 5 Nov 14:30 and 14:35; PR #9's first webhook run, 5 Nov 14:30 (recheck on the live run) |

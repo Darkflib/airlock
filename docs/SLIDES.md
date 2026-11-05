@@ -1,6 +1,6 @@
 # Slide outline
 
-Draft, 4 Nov. Ten slides for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
+Draft, 4 Nov. Eleven slides (slide 3 added 5 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
 
 ## 1. Title
 
@@ -17,13 +17,21 @@ A green test run doesn't tell you what the install script did.
 - Static review catches the obvious payload, not the one that reads like a routine bump.
 *Visual:* PR #3 on GitHub with the green `npm test` check.
 
-## 3. What Airlock does
+## 3. The same PR without Airlock
+
+PR #3 run as a plain CI job: a fresh machine with the same fake credential files, `npm ci`, `npm test`, nothing watching.
+- `npm ci` ✓ `npm test` ✓: the check is green.
+- One POST delivered the npm token and the AWS secret to the attacker. 3 runs out of 3, 3.2 s each.
+- Through Airlock, the same PR: MALICIOUS, the request captured with nothing sent, merge held, rejected automatically.
+*Visual:* left, the two green steps; right, "Attacker's server received:" with the POST body, token and secret highlighted. Caption: "Recorded 5 Nov (`evals/without_airlock.py`). The stealer's real address doesn't exist, so our stand-in played the attacker's server."
+
+## 4. What Airlock does
 
 A push to a PR starts it by itself (or paste an npm or PyPI package, or upload a tarball) → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
 Scanners such as Socket read a package's code for risky patterns. Airlock runs the change and keeps what it actually sent, tied to this run's token, compared with the code before the change, and enforced as a merge check.
 *Visual:* four-step strip: Start → Run → Explain → Decide.
 
-## 4. The money shot: proven exfiltration
+## 5. The money shot: proven exfiltration
 
 The captured POST from PR #3, with the run's canary token highlighted.
 - Every destination outside the registries is answered by Airlock on the host, never forwarded.
@@ -31,7 +39,7 @@ The captured POST from PR #3, with the run's canary token highlighted.
 - It was a shell script: detection doesn't depend on the language.
 *Visual:* screenshot of the expanded PROVEN row.
 
-## 5. Where the agent earns its place: PR #9
+## 6. Where the agent earns its place: PR #9
 
 A config library with no install script; its tests pass. Install and tests show **nothing**: a sandbox alone would let it through.
 - The agent reads the code: it only sends data when `NODE_ENV=production`.
@@ -40,14 +48,14 @@ A config library with no install script; its tests pass. Install and tests show 
 "The agent found it. Airlock proved it."
 *Visual:* Detonation "✓ nothing suspicious" above Agent investigation "4 contained", with the exercise row and the PROVEN POST.
 
-## 6. The gate
+## 7. The gate
 
 - A push starts a run (App webhook); the GitHub App holds the PR at a pending `airlock` status; branch protection requires it.
 - Proven theft (a captured payload with this run's token) is rejected automatically: red check and evidence comment, no click. Everything else waits for a human Approve or Reject, from someone with write access to the repo on GitHub: on the run page, or with an `/airlock approve` comment on the PR.
 - The AI explains; it never merges.
 *Visual:* greyed-out merge button beside the bot's evidence comment.
 
-## 7. Architecture
+## 8. Architecture
 
 Three containment layers, evidence the guest can't forge:
 1. **Default-deny egress** (microsandbox policy): registries only.
@@ -56,13 +64,13 @@ Three containment layers, evidence the guest can't forge:
 Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive".
 *Visual:* `docs/architecture.png`.
 
-## 8. Built on Vultr
+## 9. Built on Vultr
 
 - **VX1 with KVM:** a separate guest kernel per run (guest 6.12, host 6.8), boot in 0.69 s. "Isn't this just Docker?" No.
 - **Serverless Inference:** triage agent `mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models.
 - **Rebuildable:** the host comes back from `infra/cloud-init.yaml` in about 10 minutes.
 
-## 9. Numbers
+## 10. Numbers
 
 | | |
 |---|---|
@@ -77,7 +85,7 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Whole build to 5 Nov, inference + compute | **$8.26** |
 "11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.
 
-## 10. Limits and try it
+## 11. Limits and try it
 
 - Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
 - npm and PyPI only; browser-level behaviour (Pattern B) descoped.
