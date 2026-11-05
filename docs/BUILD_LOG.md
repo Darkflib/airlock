@@ -748,5 +748,5 @@ Tags: #decision #demo
 ### 11:25 — Live check of the UI tidy: two run-page fixes
 **Tried:** looked at the deployed UI signed in as Mike. The runs list pages "1–10 of 55" (the old 50-row cap had been hiding five), and rows click through. On the PR #3 run, Detonation stays open with "6 contained", while Setup and the 29-event Agent stage are folded.
 **Result:** two faults. (1) The decision and GitHub-post events after the verdict fell through `stageOf` to a second "Setup" section at the end of the timeline. That labelling predates folding, but an open stray Setup stands out. (2) The agent often cites `[E13, E14]`, and only single `[E9]` refs were linked.
-**So:** post-verdict events now go in a "Decision" stage that is always open, and each id in a grouped ref is its own link.
+**So:** post-verdict events now go in a "Decision" stage that is always open, and each id in a grouped ref is its own link. Deployed (`a2bbf9b`). On the live PR #3 run the stages read Setup (folded), Detonation, Agent (folded), Verdict, Decision, and all 15 cited ids are links.
 Tags: #fix
