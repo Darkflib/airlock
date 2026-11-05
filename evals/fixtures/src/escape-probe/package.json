@@ -1,0 +1,9 @@
+{
+  "name": "escape-probe",
+  "version": "1.0.0",
+  "description": "Airlock test fixture: tries every way out of the sandbox and records which ones answered",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node probe.js"
+  }
+}

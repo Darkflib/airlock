@@ -139,7 +139,15 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
         elif ev == "file_read":
             out.append(("file_read", f"{script} read {path}", {"path": path, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "net_payload_canary":
-            out.append(("canary_exfil", f"{script} tried to send canary credentials to {host}", {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
+            bare = host.split(":")[0]
+            where = " in a request URL" if rec.get("where") == "url" else ""
+            if any(bare == h or bare.endswith("." + h) for h in allowed_hosts):
+                # Allowed hosts aren't sinkholed: this one really got there (only that host can read it).
+                out.append(("canary_exfil", f"{script} sent canary credentials to allowlisted {host}{where}: it reached that host",
+                            {"host": host, "argv": argv, "pid": pid, "source_kind": "node", "allowlisted": True}))
+            else:
+                out.append(("canary_exfil", f"{script} tried to send canary credentials to {host}{where}",
+                            {"host": host, "argv": argv, "pid": pid, "source_kind": "node"}))
         elif ev == "net_request":
             bare = host.split(":")[0]
             if any(bare == h or bare.endswith("." + h) for h in allowed_hosts):
@@ -152,6 +160,7 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
 
 
 CANARY_SUFFIXES = (".npmrc", "/.aws/credentials", "/.pypirc")
+CANARY_MARK = "airlockcanary"  # every canary token starts with it (airlock/sandbox.py)
 NPM_MARKERS = ("npm-cli.js", "/bin/npm ", "npm install", "npm pack", "npm init")
 
 
@@ -249,6 +258,11 @@ class WatchTranslator:
                     out.append(("file_read", f"{who} read {path}", {**base, "path": path}))
             elif ev == "dns":
                 name = rec.get("name", "")
+                if CANARY_MARK in name.lower():  # data smuggled in the name itself; resolvers may lowercase it
+                    where = ("forwarded to the registry's DNS, so it left the VM" if _allowed(name, self.allowed_hosts)
+                             else "answered by Airlock inside the VM, never left it")
+                    out.append(("canary_exfil", f"{who} put the canary token in a DNS lookup of {name[:120]}: {where}",
+                                {**base, "host": name, "via": "dns", "payload": name}))
                 if _allowed(name, self.allowed_hosts):
                     continue
                 for k in (pid, rec.get("ppid")):

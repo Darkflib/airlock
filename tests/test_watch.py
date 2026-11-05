@@ -139,3 +139,14 @@ def test_guest_observer_crash_is_logged_as_watch_error(tmp_path, monkeypatch):
     w.guarded(dns_loop)()
     recs = [json.loads(line) for line in (tmp_path / "w.jsonl").read_text().splitlines()]
     assert recs[-1]["ev"] == "watch_error" and recs[-1]["what"] == "dns_loop"
+
+
+def test_canary_token_in_a_dns_name_is_exfil_whatever_its_case():
+    t = WatchTranslator(ALLOW)
+    out = t.feed(lines(
+        {"ev": "dns", "name": "airlockcanary0f835f01136bd3b8.d.invalid", "sinkholed": "198.18.7.9", "pid": 3, "exe": "/usr/bin/node", "uid": 1000},
+        {"ev": "dns", "name": "AIRLOCKCANARY0F835F01136BD3B8.registry.npmjs.org", "pid": 4, "exe": "/usr/bin/node", "uid": 1000},
+    ))
+    assert kinds(out) == ["canary_exfil", "egress_blocked", "canary_exfil"]
+    assert "never left it" in out[0][1] and "proven" not in out[0][2]  # guest-side: never proof
+    assert "left the VM" in out[2][1]

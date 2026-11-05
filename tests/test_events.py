@@ -48,3 +48,15 @@ def test_eventlog_ids_and_containment_flag():
     ev = log.emit("canary_read", "read ~/.npmrc")
     assert ev.id == 2 and ev.containment and not log.events[0].containment
     assert [e.kind for e in log.containment()] == ["canary_read"]
+
+
+def test_canary_in_a_url_is_exfil_even_to_an_allowed_host():
+    trace = "\n".join([
+        line(argv=POST, ev="net_request", host="registry.npmjs.org"),
+        line(argv=POST, ev="net_payload_canary", host="registry.npmjs.org", where="url"),
+        line(argv=POST, ev="net_payload_canary", host="x.invalid", where="url"),
+    ])
+    out = events_from_trace(trace, ALLOW)
+    assert [k for k, _, _ in out] == ["egress_allowed", "canary_exfil", "canary_exfil"]
+    assert out[1][2]["allowlisted"] and "it reached that host" in out[1][1]
+    assert "allowlisted" not in out[2][2] and out[2][1].endswith("in a request URL")

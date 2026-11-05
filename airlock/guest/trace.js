@@ -51,25 +51,32 @@ function hostOf(target) {
   return '?';
 }
 
+// A canary token anywhere in a request (URL, path or body) is an exfil attempt, even to an allowed host.
+const CANARY = 'AIRLOCKCANARY';
+const carries = (v) => { try { return String(v).toUpperCase().includes(CANARY); } catch (_) { return false; } };
+const urlOf = (target) => (typeof target === 'string' || target instanceof URL ? String(target)
+  : target && typeof target === 'object' ? `${target.hostname || target.host || ''}${target.path || ''}` : '');
+
 for (const modName of ['http', 'https']) {
   const mod = require(modName);
   for (const fn of ['request', 'get']) {
     const orig = mod[fn];
     mod[fn] = function (...args) {
-      log({ ev: 'net_request', mod: modName, host: hostOf(args[0]) });
+      const host = hostOf(args[0]);
+      log({ ev: 'net_request', mod: modName, host });
+      if (carries(urlOf(args[0]))) log({ ev: 'net_payload_canary', host, where: 'url' });
       return orig.apply(this, args);
     };
   }
 }
 
-// Request bodies: flag any that carry a canary token (exfil attempt).
-const CANARY = 'AIRLOCKCANARY';
+// Request bodies.
 const ClientRequest = require('http').ClientRequest;
 for (const fn of ['write', 'end']) {
   const orig = ClientRequest.prototype[fn];
   ClientRequest.prototype[fn] = function (chunk, ...rest) {
     try {
-      if (chunk && typeof chunk !== 'function' && String(chunk).includes(CANARY)) {
+      if (chunk && typeof chunk !== 'function' && carries(chunk)) {
         log({ ev: 'net_payload_canary', host: this.host || this.getHeader('host') || '?' });
       }
     } catch (_) {}
@@ -82,9 +89,8 @@ if (typeof globalThis.fetch === 'function') {
   globalThis.fetch = function (input, init, ...rest) {
     const host = hostOf(typeof input === 'string' ? input : input && input.url);
     log({ ev: 'net_request', mod: 'fetch', host });
-    try {
-      if (init && init.body && String(init.body).includes(CANARY)) log({ ev: 'net_payload_canary', host });
-    } catch (_) {}
+    if (carries(typeof input === 'string' ? input : input && input.url)) log({ ev: 'net_payload_canary', host, where: 'url' });
+    if (init && init.body && carries(init.body)) log({ ev: 'net_payload_canary', host });
     return orig.call(this, input, init, ...rest);
   };
 }

@@ -178,6 +178,20 @@ For how it works in depth, the design trade-offs, its weaknesses and what it wou
 
 Airlock blocks every download that isn't from a package registry, because an allowed download host is also a route out for stolen data. So a package that fetches binaries while it installs can't finish, and Airlock reports it as inconclusive instead of guessing. To decide on one, check that the blocked URLs are the vendor's own (GitHub releases for the package's repo, Google's Chrome builds) and that nothing read the credentials and sent them anywhere. Packages that get their binaries from the npm registry instead (`sharp`, `esbuild`) aren't affected. Allowing known binary hosts per team is possible future work, not built. Python sdists that need a compiler now build (the image has gcc since 5 Nov). Sdists that need other toolchains or system libraries (Rust, database client libraries) would fail the same way, but we haven't tested any.
 
+**Escape lab** ([`evals/escape_lab.py`](evals/escape_lab.py), [results](evals/results/escape-lab-20261105T220624Z/summary.md), 5 Nov, 3 runs). A test package tries 38 ways out of a real Airlock VM, each carrying the run's fake credentials. A listener outside the sandbox, on the host's public IPv4 and IPv6, heard **nothing** in any run.
+
+| Tried | Result |
+| --- | --- |
+| HTTP(S) to any name, any port | sinkholed and captured (80, 443), or refused |
+| Token in DNS names: system resolver, the gateway, 8.8.8.8 (UDP), 1.1.1.1 (TCP) | never reached a real resolver (`example.com` sent the same way doesn't resolve either) |
+| Raw IPv4 and IPv6, including the host's own public addresses | `403 network_policy_denied` from microsandbox, or refused |
+| Cloud metadata: 169.254.169.254 (AWS and Vultr paths), 169.254.170.2, 100.100.100.200, metadata.google.internal | denied, or sinkholed |
+| The host's services: SSH, the sinkhole proxy, Caddy admin, the Airlock web app, Docker API | refused |
+| ICMP | no `ping`, and the package user can't open ping sockets |
+| Token in a URL on the npm registry (allowed) | **reaches the registry**: only its operator can read it, and Airlock flags it |
+
+The lab found two recording gaps, both fixed: a token in a request URL, and a token in a DNS name that the resolver had lowercased.
+
 **Limits we don't claim to solve**
 - **Sandbox-aware or delayed payloads.** Malware that detects it's being watched and stays quiet is a known limit.
 - **No eBPF.** The guest kernel has no kprobes or BTF, so the watcher polls `/proc` rather than hooking syscalls.
@@ -185,7 +199,8 @@ Airlock blocks every download that isn't from a package registry, because an all
 - **Pinned TLS** prevents payload capture; we still see the hostname.
 - **Encoded exfil.** Encoded or split canaries are still blocked or captured, but only a verbatim token counts as PROVEN.
 - **Receipts prove integrity, not honesty.** The signing key is generated on the host, like the session secret, so whoever controls the host could sign a false record. A receipt shows the record hasn't changed since Airlock sealed it. Runs from before 5 Nov have none.
-- **DNS over TCP** to the gateway fails closed (SERVFAIL) but isn't recorded as an event.
+- **DNS sent straight to an outside resolver** (8.8.8.8, 1.1.1.1, UDP or TCP) is refused by microsandbox before Airlock sees it: contained, but not on the timeline. DNS over TCP to the gateway fails closed (SERVFAIL), also unrecorded.
+- **Allowed hosts are reachable.** Data put in a request to a registry gets there. Airlock flags a canary token in such a request, but only the registry operator could read it, not the package's author.
 - **Coverage.** The connection poller can miss very short-lived activity. The sinkhole keeps 8,000 characters of a request body, and the evidence shown to the agent 2,000.
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
 - **Abandoned VMs.** A VM doesn't outlive the server process that started it (checked with kill -9 mid-run). On restart the web service destroys the leftover sandboxes it labelled as its own and marks the run failed, keeping its partial evidence, then retries it once as a new run; runs still waiting in the queue resume with the same id. A stop (a deploy, say) first gives runs in progress up to 75 s to finish. CLI and regression VMs on the same host are left alone. A PR whose run can't be retried is released on GitHub as `error` (not left `pending` and unmergeable), and a decision recorded just before the restart is posted.
