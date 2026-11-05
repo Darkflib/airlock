@@ -63,6 +63,7 @@ async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> 
                    "tokens": r.agent.prompt_tokens + r.agent.completion_tokens,
                    # enough to look into an unexpected result without the whole timeline
                    "exercised": sum(e["kind"] == "exercise" for e in r.events),
+                   "agent_s": r.agent.seconds,  # agent loop time; with turns, shows inference slowing under load
                    "gaps": [g for e in r.events if e["kind"] == "coverage_incomplete" for g in e["data"].get("gaps", [])],
                    "found": [e["summary"][:160] for e in det][:8], "evidence": r.evidence}
             row.update(diff_check(r.events, expected))

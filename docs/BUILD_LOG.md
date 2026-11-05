@@ -57,6 +57,7 @@ Tags: #fail
 **So:** a reserved IP is tied to its region, so a US redeploy needs a new reserved IP and a DNS change.
 Tags: #decision
 
+
 ### 18:03 — Serverless Inference catalogue and first tool call
 **Tried:** `GET /v1/models`, then a chat completion with one `exec` tool on `glm-5.3`.
 **Result:** the catalogue says every text model supports `tools` and image input, except `nemotron-3.5-content-safety` (no tools, which is fine for the guard role). Context windows run from 131k to 1M. `glm-5.3` returned a well-formed `exec` tool call with `finish_reason: tool_calls`. Catalogue saved to `evals/models.json`.
@@ -828,3 +829,15 @@ Tags: #fix #metric
 **Result:** bcrypt and puppeteer inconclusive (binary downloads from GitHub, nodejs.org and Google blocked, install exits 1); Prisma clean, with blocked engine downloads and, when exercised, a `~/.npmrc` read that sent nothing; psutil fixed by the full Python image. Each entry says what the reviewer sees and how to decide. Checking the data while writing it showed that Prisma's `~/.npmrc` read came from the agent's exercise call in one of two runs, not its postinstall, so the README and the 17:05 entry were corrected. The README's "payload bodies are truncated at 2,000 characters" now matches the report (sinkhole 8,000, agent 2,000).
 **So:** a judge or self-hoster who hits an inconclusive bcrypt run finds the explanation instead of a surprise. Allowing known binary hosts, or setting skip-download variables, are next steps that aren't built.
 Tags: #decision
+
+### 18:12 — Reassessed the judge critique against new evidence
+**Tried:** checked the saved 33-run regression, 48-run real-package results, exercise implementation, revised submission/video and follow-up entries against the nine original criticisms.
+**Result:** runtime-only theft now demonstrates incremental agent value; benign real packages broaden evaluation, but unseen malicious detection remains unmeasured. Real-package results were 42 quiet and 6 inconclusive, with 1 invalid tool call; follow-up fixes are targeted rechecks rather than a replacement full-suite result. Claims, cost and demo structure are substantially improved; some stale wording remains.
+**So:** withdraw the blanket AI-value and missing-cost criticisms; retain narrower concerns about independent malicious evaluation, installation compatibility, review burden and proof attribution. No live tests or benchmark changes made in this review.
+Tags: #decision #demo
+
+### 18:45 — Throughput: the limit is the host's CPU, not inference
+**Tried:** could more runs at once raise throughput on real packages, and is a separate "detonation" and "investigation" slot pool worth building? Ran the 24 real packages × 2 at 8 and 12 at once (`real-packages-20261105T182122Z`, `…T182915Z`; the harness now records agent seconds), then `spikes/inference_concurrency.py`: plain agent-sized calls (~10k-token prompt) to Serverless Inference at 1–16 at once, no VMs.
+**Result:** inference is flat: about 2 s at the median at every level, 29 → 340 calls a minute. The host isn't. Steady-state throughput (n × 3600 ÷ mean run time, worst straggler dropped): 4 at once ≈ 300/h, **8 at once ≈ 455/h** (load 6.7, no extra inconclusive), 12 at once ≈ 450/h (load 14.6, install and tests median 14 → 30 s, agent p90 13.6 s per turn, and 2 extra inconclusive: Prisma's install failed and esbuild ended with no verdict). The batch wall clock at 8 (264/h) was dominated by one puppeteer run whose agent took 357 s for 6 turns: one call hung toward the 180 s inference timeout.
+**So:** two pools wouldn't help: the agent phase also uses CPU (exercise reinstalls the package, the agent runs npm), and the CPU is already saturated at 8. Better levers: default slots of 2 × cores (8 here; it gives +50% on real packages, and the 5 Nov PR load test showed 8 still correct, only slower per run) and a shorter inference timeout so one hung call can't hold a slot for minutes. Scaling past that means more cores (a bigger VX1, or a second host).
+Tags: #metric #decision
