@@ -60,6 +60,7 @@ def verdict_label(verdict: str | None) -> str:
 
 
 def short_cmd(cmd: str) -> str:
+    cmd = cmd.split("&&")[-1].strip()  # the step that ran the package, not its setup (npm init, venv)
     if "pip install" in cmd:
         return "pip install " + cmd.split()[-1].rsplit("/", 1)[-1]
     return cmd[:80]
