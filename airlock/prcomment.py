@@ -90,6 +90,7 @@ def link_refs(text: str, run_url: str) -> str:
     """"[E57, E58]" in the reviewer's points → links to those events on the run page."""
     def group(m: re.Match) -> str:
         return "(" + re.sub(r"\bE(\d+)\b", lambda e: f"[E{e[1]}]({run_url}#E{e[1]})", m[1]) + ")"
+    text = re.sub(r"(\bE\d+)\]\s*\[(E\d+)", r"\1, \2", text)  # "[E33][E34]" reads as one group
     return REFS.sub(group, text)
 
 

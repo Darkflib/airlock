@@ -268,10 +268,11 @@ def test_comment_leads_with_the_reviewers_sentence_and_links_its_events():
     events = [{"id": 9, "kind": "verdict", "summary": "verdict: malicious", "containment": False,
                "data": {"one_line": "tinyconf sends your npm token to an outside server in production."}}]
     run = {"verdict": "malicious", "decision": None, "meta": META, "model": "m",
-           "evidence": ["load() posts ~/.npmrc when NODE_ENV=production [E57, E58]"]}
+           "evidence": ["load() posts ~/.npmrc when NODE_ENV=production [E57, E58]", "reads it [E3][E4]"]}
     body = build_comment(run, events, "https://airlock.test/runs/1")
     first = body.split("\n\n")
     assert first[0].startswith("### 🚫 Airlock: **Malicious**") and first[1].startswith("tinyconf sends your npm token")
     assert ("NODE_ENV=production ([E57](https://airlock.test/runs/1#E57), [E58](https://airlock.test/runs/1#E58))"
             in body)
+    assert "reads it ([E3](https://airlock.test/runs/1#E3), [E4](https://airlock.test/runs/1#E4))" in body
     assert "<details><summary>What this covers</summary>" in body
