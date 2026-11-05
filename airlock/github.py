@@ -20,6 +20,9 @@ from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait
 API = "https://api.github.com"
 PR_URL = re.compile(r"^https://github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)/?(?:[?#].*)?$")
 HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+FILE_PAGES = 30          # 30 x 100 = the 3,000 files GitHub lists for a PR at most
+FILE_LIST_ATTEMPTS = 3   # re-reads of the file list when the head moves while it's read
+DIFF_LIMIT = 200_000     # characters of diff written into the VM for the agent
 
 
 def transient(e: BaseException, idempotent: bool = True) -> bool:
@@ -54,10 +57,26 @@ class PullRequest:
     head_ref: str
     head_sha: str
     files: list[dict]
+    changed_files: int = 0      # GitHub's own count for the head; files may hold fewer
+    head_moved: bool = False    # the head kept changing while the file list was read
+
+    @property
+    def files_complete(self) -> bool:
+        return not self.head_moved and len(self.files) >= self.changed_files
 
     @property
     def slug(self) -> str:
         return f"{self.owner}/{self.repo}#{self.number}"
+
+
+@dataclass
+class Diff:
+    """A PR diff pinned to two commits. `text` may be cut (`truncated`) or empty (`unavailable`:
+    GitHub refuses diffs past its own size limits)."""
+    text: str
+    chars: int = 0
+    truncated: bool = False
+    unavailable: str | None = None
 
 
 class GitHubApp:
@@ -108,16 +127,39 @@ class GitHubApp:
         return httpx.AsyncClient(base_url=API, timeout=30, follow_redirects=True, transport=self.transport,
                                  headers={**HEADERS, "Authorization": f"Bearer {token}"})
 
-    async def pull_request(self, owner: str, repo: str, number: int) -> PullRequest:
+    async def pull_request(self, owner: str, repo: str, number: int, files: bool = True) -> PullRequest:
+        """The PR and its changed files, consistent with one head commit. The file list is read
+        by PR number, so the head is read again afterwards; if it moved, the list is read again
+        (a few times at most, then `head_moved` marks the list as not matching the head)."""
         async with await self._client(owner, repo) as c:
             pr = (await c.get(f"/repos/{owner}/{repo}/pulls/{number}")).raise_for_status().json()
-            files = (await c.get(f"/repos/{owner}/{repo}/pulls/{number}/files", params={"per_page": 100})).raise_for_status().json()
+            listed: list[dict] = []
+            moved = False
+            for _ in range(FILE_LIST_ATTEMPTS if files else 0):
+                listed = await self._files(c, owner, repo, number)
+                again = (await c.get(f"/repos/{owner}/{repo}/pulls/{number}")).raise_for_status().json()
+                moved = again["head"]["sha"] != pr["head"]["sha"]
+                pr = again
+                if not moved:
+                    break
         return PullRequest(
             owner=owner, repo=repo, number=number, title=pr["title"], author=pr["user"]["login"],
             html_url=pr["html_url"], base_ref=pr["base"]["ref"], base_sha=pr["base"]["sha"],
-            head_ref=pr["head"]["ref"], head_sha=pr["head"]["sha"],
+            head_ref=pr["head"]["ref"], head_sha=pr["head"]["sha"], changed_files=pr.get("changed_files", 0),
+            head_moved=moved,
             files=[{"filename": f["filename"], "status": f["status"], "additions": f["additions"],
-                    "deletions": f["deletions"]} for f in files])
+                    "deletions": f["deletions"]} for f in listed])
+
+    async def _files(self, c: httpx.AsyncClient, owner: str, repo: str, number: int) -> list[dict]:
+        """Every page of the PR's changed files; GitHub itself lists at most 3,000."""
+        out: list[dict] = []
+        for page in range(1, FILE_PAGES + 1):
+            got = (await c.get(f"/repos/{owner}/{repo}/pulls/{number}/files",
+                               params={"per_page": 100, "page": page})).raise_for_status().json()
+            out += got
+            if len(got) < 100:
+                break
+        return out
 
     async def tarball(self, owner: str, repo: str, sha: str) -> bytes:
         async with await self._client(owner, repo) as c:
@@ -132,11 +174,16 @@ class GitHubApp:
             r = (await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", params={"per_page": 1})).raise_for_status()
             return r.json()["merge_base_commit"]["sha"]
 
-    async def diff(self, owner: str, repo: str, number: int, limit: int = 200_000) -> str:
+    async def diff(self, owner: str, repo: str, base: str, head: str, limit: int = DIFF_LIMIT) -> Diff:
+        """The PR's diff between two commits (three-dot, as GitHub shows a PR), so it matches the
+        archive that was detonated even if the branch moves on. Past `limit` characters it's cut."""
         async with await self._client(owner, repo) as c:
-            r = await c.get(f"/repos/{owner}/{repo}/pulls/{number}", headers={"Accept": "application/vnd.github.diff"})
+            r = await c.get(f"/repos/{owner}/{repo}/compare/{base}...{head}", headers={"Accept": "application/vnd.github.diff"})
+            if r.status_code in (406, 422):  # "diff too large" and similar: the run goes on without it
+                return Diff("", unavailable=f"GitHub would not produce the diff (HTTP {r.status_code})")
             r.raise_for_status()
-            return r.text[:limit]
+            text = r.text
+        return Diff(text[:limit], chars=len(text), truncated=len(text) > limit)
 
     async def comment(self, owner: str, repo: str, number: int, body: str, edit: str | None = None) -> str:
         """Post a comment, or rewrite the one at `edit` (its html_url) in place; returns its html_url.

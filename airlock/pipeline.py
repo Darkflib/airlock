@@ -107,7 +107,7 @@ def observed_summary(events: EventLog) -> str:
 PR_GOAL = """Review GitHub pull request {slug}: "{title}" by @{author}. The repository at the PR
 head is in /work/repo and the PR diff is in /work/pr.diff. Files changed:
 {files}
-
+{snapshot}
 Airlock has already run `npm ci` and `npm test` in /work/repo as the unprivileged user `node`,
 with tracing. The run so far, as Airlock events (ids in brackets):
 
@@ -153,6 +153,30 @@ def apply_gaps(verdict: str, evidence: list[str], gaps: list[str], events: Event
                     verdict="inconclusive", evidence=evidence)
         return "inconclusive", evidence
     return verdict, evidence
+
+
+def snapshot_info(pr, diff) -> dict:
+    """What the reviewer's view of the PR leaves out. The archive is always the whole head;
+    only the file list and the diff can be partial."""
+    notes = []
+    if pr.head_moved:
+        notes.append(f"the branch kept moving while it was read, so the file list may not match {pr.head_sha[:7]}")
+    elif not pr.files_complete:
+        notes.append(f"the file list shows {len(pr.files)} of {pr.changed_files} changed files")
+    if diff.unavailable:
+        notes.append(f"no diff: {diff.unavailable}")
+    elif diff.truncated:
+        notes.append(f"the diff is cut at {len(diff.text):,} of {diff.chars:,} characters")
+    return {"files_listed": len(pr.files), "changed_files": pr.changed_files, "files_complete": pr.files_complete,
+            "head_moved": pr.head_moved, "diff_chars": diff.chars, "diff_truncated": diff.truncated,
+            "diff_unavailable": diff.unavailable, "complete": not notes, "notes": notes}
+
+
+def snapshot_for_agent(snapshot: dict) -> str:
+    if snapshot["complete"]:
+        return ""
+    return ("Incomplete view: " + "; ".join(snapshot["notes"]) + ". The whole repository at the head is in "
+            "/work/repo (no git history): look there with find and grep for what the list and diff leave out.\n")
 
 
 async def detonate_repo(ws: Workspace, tarball: bytes, diff: str | None = None):
@@ -212,12 +236,14 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
         raise RuntimeError("GitHub App not configured (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_B64)")
     t0 = time.monotonic()
     pr = await app.pull_request(owner, repo, number)
+    # Everything below is pinned to these two commits, so a push mid-run can't mix snapshots.
     tarball = await app.tarball(owner, repo, pr.head_sha)
-    diff = await app.diff(owner, repo, number)
+    diff = await app.diff(owner, repo, pr.base_sha, pr.head_sha)
+    snapshot = snapshot_info(pr, diff)
     files = "\n".join(f"  {f['status']:9} {f['filename']} (+{f['additions']} -{f['deletions']})" for f in pr.files)
     meta = {"kind": "pr", "owner": owner, "repo": repo, "number": number, "title": pr.title,
             "author": pr.author, "html_url": pr.html_url, "head_sha": pr.head_sha, "head_ref": pr.head_ref,
-            "base_ref": pr.base_ref, "files": pr.files}
+            "base_ref": pr.base_ref, "files": pr.files, "snapshot": snapshot}
     if on_pr:
         await on_pr(meta)
     try:
@@ -229,13 +255,18 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
         base_err = f"finding the merge base failed: {type(e).__name__}: {str(e)[:150]}"
     try:
         async with Workspace(events, image=IMAGES["npm"], label=f"{repo}-pr{number}") as ws:
-            events.emit("acquired", f"fetched {pr.slug} @ {pr.head_sha[:7]} ({len(pr.files)} files changed) via the "
-                        "GitHub App; copied into the VM", source="github", **{k: meta[k] for k in ("html_url", "head_sha")})
-            installed, tested = await detonate_repo(ws, tarball, diff)
+            events.emit("acquired", f"fetched {pr.slug} @ {pr.head_sha[:7]} ({pr.changed_files or len(pr.files)} files "
+                        "changed) via the GitHub App; copied into the VM", source="github",
+                        **{k: meta[k] for k in ("html_url", "head_sha")})
+            if snapshot["notes"]:
+                events.emit("snapshot_partial", "the reviewer sees part of this PR: " + "; ".join(snapshot["notes"])
+                            + ". Install and tests ran on the full head", **snapshot)
+            installed, tested = await detonate_repo(ws, tarball, diff.text or f"(no diff: {diff.unavailable})\n")
             base_log, why = await base_run if base_run else (None, base_err)
             changes = emit_diff(events, base_log, why, base_sha)
             agent = TriageAgent(inference_client(), model, ws, events, max_turns=max_turns)
             result = await agent.run(PR_GOAL.format(slug=pr.slug, title=pr.title, author=pr.author, files=files,
+                                                    snapshot=snapshot_for_agent(snapshot),
                                                     observed=observed_summary(events),
                                                     diff=behaviour.for_agent(changes)))
             gaps = await coverage_gaps(ws, installed, tested)

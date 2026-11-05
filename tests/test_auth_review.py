@@ -39,7 +39,7 @@ class GitHub(FakeGitHub):
             await self.release.wait()
         return "write"
 
-    async def pull_request(self, owner, repo, number):
+    async def pull_request(self, owner, repo, number, files=True):
         return SimpleNamespace(head_sha=META["head_sha"], author="Darkflib" if number == 99 else self.author)
 
 

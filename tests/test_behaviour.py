@@ -3,6 +3,7 @@ import asyncio
 from types import SimpleNamespace
 
 from airlock import behaviour, pipeline, sandbox
+from airlock.github import Diff, PullRequest
 from airlock.events import EventLog
 from airlock.prcomment import build_comment
 
@@ -74,14 +75,14 @@ def test_pr_comment_leads_with_new_behaviour():
 
 class FakeGitHub:
     async def pull_request(self, owner, repo, number):
-        return SimpleNamespace(title="t", author="a", html_url="u", head_sha="h" * 40, head_ref="f", base_ref="main",
-                               base_sha="b" * 40, files=[], slug=f"{owner}/{repo}#{number}")
+        return PullRequest(owner, repo, number, title="t", author="a", html_url="u", base_ref="main",
+                           base_sha="b" * 40, head_ref="f", head_sha="h" * 40, files=[])
 
     async def tarball(self, owner, repo, sha):
         return sha.encode()[:1]  # b"h" for the head, b"m" for the merge base
 
     async def diff(self, *a):
-        return ""
+        return Diff("")
 
     async def merge_base(self, owner, repo, base, head):
         return "m" * 40

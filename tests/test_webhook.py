@@ -101,7 +101,7 @@ class CommentGitHub(PermGitHub):
         super().__init__(perms or {"Darkflib": "admin", "dev-writer": "write", "reader": "read"})
         self.head, self.author = head, author
 
-    async def pull_request(self, owner, repo, number):
+    async def pull_request(self, owner, repo, number, files=True):
         return SimpleNamespace(head_sha=self.head, author=self.author)
 
     def replies(self):

@@ -456,6 +456,9 @@ const Airlock = (() => {
           : 'The agent found harmful behaviour. Reject to block it, or approve to override.'));
       if ((r.meta || {}).kind === 'pr') g.append(el('p', '',
         `Your decision is posted to ${r.meta.owner}/${r.meta.repo}#${r.meta.number} as the final commit status (it is pending until then) and a comment from the Airlock GitHub App. Proven theft is rejected automatically. Only people with write access to ${r.meta.owner}/${r.meta.repo} on GitHub can decide, here or by commenting /airlock approve or /airlock reject on the PR.`));
+      const snap = (r.meta || {}).snapshot;
+      if (snap && !snap.complete) g.append(el('p', 'warn',
+        `The reviewer saw part of this PR: ${(snap.notes || []).join('; ')}. Install and tests ran on the full head.`));
       const note = el('textarea'); note.placeholder = 'Note (optional)';
       const row = el('div', 'row');
       const refused = el('p', 'warn'); refused.hidden = true;

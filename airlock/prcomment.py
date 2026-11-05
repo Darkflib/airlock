@@ -50,6 +50,10 @@ def build_comment(run: dict, events: list[dict], run_url: str, held: bool = True
         "investigate.",
         "",
     ]
+    snap = run["meta"].get("snapshot") or {}
+    if snap and not snap.get("complete", True):
+        lines += [f"_The reviewer saw part of this PR: {'; '.join(snap.get('notes') or [])}. "
+                  "Install and tests ran on the full head._", ""]
     changes = next((e["data"] for e in events if e["kind"] == "behaviour_diff"), None)
     if changes and changes.get("available"):
         base = (changes.get("base_sha") or "")[:7]

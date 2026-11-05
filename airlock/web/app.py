@@ -437,7 +437,7 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
             return {"refused": text}
 
         try:
-            current = await github.pull_request(owner, repo, number)
+            current = await github.pull_request(owner, repo, number, files=False)  # head and author only
         except Exception as e:  # noqa: BLE001
             return await reply(f"Airlock couldn't read this pull request from GitHub ({type(e).__name__}); try again.")
         head = current.head_sha
