@@ -156,6 +156,8 @@ def test_share_link_opens_only_that_run_read_only(make_client):
         assert anon.get(f"/runs/{a}").status_code == 200
         assert anon.get(f"/api/runs/{a}").json()["id"] == a
         assert "event: done" in anon.get(f"/api/runs/{a}/events").text
+        assert anon.get(f"/api/runs/{a}/receipts").status_code != 401   # the verifier can read them
+        assert anon.get(f"/api/runs/{b}/receipts").status_code == 401
         assert anon.get("/api/me").json()["share"] is True
         assert anon.get(f"/api/runs/{b}").status_code == 401          # another run
         assert anon.get("/api/runs").status_code == 401               # the run list

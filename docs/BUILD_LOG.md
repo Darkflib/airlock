@@ -951,3 +951,9 @@ Tags: #demo
 **Result:** no signed PR run existed (the last PR runs predate receipts), so ran PR #3 fresh on the live site: `20261106-164620-b13d8d`, malicious, rejected automatically, verdict and decision receipts. Share link expires 5 Jan 2027. 428 tests pass.
 **So:** a judge who isn't signed in can open a rejected PR run and check its receipt in two clicks.
 Tags: #demo
+
+### 16:49 — Share links couldn't read receipts
+**Tried:** followed the deployed `/example?to=verify` link signed out.
+**Result:** the verifier page loaded but `/api/runs/<id>/receipts` answered 401 "sign in required": `share_allows` listed the run, its page and its events, never its receipts, so Verify on any shared run page has failed since receipts shipped (5 Nov 21:33).
+**So:** a share now also opens its runs' receipts (read-only, same runs); the share test checks it, and another run's receipts stay 401.
+Tags: #fail
