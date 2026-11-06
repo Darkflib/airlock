@@ -32,7 +32,7 @@ from tests.test_web import fake_analyse
 RUNS = "DPAB"
 VIEWERS = ("anon", "share_D", "share_S", "owner", "guest_a", "guest_b", "a_shareP")
 
-# Reading a run through the API (GET /api/runs/{id}, and its event stream).
+# Reading a run through the API (GET /api/runs/{id}, its event stream and its signed receipts).
 READ = {          # D    P    A    B
     "anon":     (401, 401, 401, 401),
     "share_D":  (200, 401, 401, 401),
@@ -90,6 +90,7 @@ def world(tmp_path, monkeypatch):
                                ("A", "judge-a", False), ("B", "judge-b", False)):
         store.create_run(run_id, f"run {run_id}", submitted_by=user, demo=demo)
         store.update_run(run_id, status="done", verdict="benign", finished=time.time())
+        store.add_receipt(run_id, "verdict", {"payload": "{}", "sha256": "0" * 64, "key_id": "k", "sig": ""})
     store.create_selftest("S", [{"run_id": "D", "label": "probe", "expect": "benign"}], "Darkflib")
     app = create_app(store=store, analyse=fake_analyse, auth=config)
 
@@ -129,6 +130,16 @@ def test_read(world, viewer, run, code):
     as_, _, _ = world
     assert as_(viewer).get(f"/api/runs/{run}").status_code == code
     assert as_(viewer).get(f"/api/runs/{run}/events").status_code == code
+    assert as_(viewer).get(f"/api/runs/{run}/receipts").status_code == code
+
+
+@pytest.mark.parametrize("viewer", VIEWERS)
+def test_public_pages(world, viewer):
+    as_, _, _ = world
+    for path in ("/login", "/verify", "/healthz"):
+        assert as_(viewer).get(path).status_code == 200, path
+    home = as_(viewer).get("/")
+    assert home.status_code == (302 if SIGNED_IN[viewer] == 401 else 200)
 
 
 @pytest.mark.parametrize("viewer,run,code", cells(PAGE))

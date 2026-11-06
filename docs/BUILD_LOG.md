@@ -957,3 +957,9 @@ Tags: #demo
 **Result:** the verifier page loaded but `/api/runs/<id>/receipts` answered 401 "sign in required": `share_allows` listed the run, its page and its events, never its receipts, so Verify on any shared run page has failed since receipts shipped (5 Nov 21:33).
 **So:** a share now also opens its runs' receipts (read-only, same runs); the share test checks it, and another run's receipts stay 401.
 Tags: #fail
+
+### 16:55 — Access audit after the receipts gap
+**Tried:** listed all 32 web routes against `tests/test_access_matrix.py`, added the missing rows (receipts per viewer and run, and the public pages), then probed the live site as signed out, as the example share holder and as the owner (session minted on the host, reads only; writes sent only as signed out or share holder).
+**Result:** every live cell as intended: public pages 200 for all; run list, shares and self-tests 401 unless signed in; the shared run's page, API and receipts 200 for its holder and nothing else (another demo run 302/401, a private upload 401); every write (decide, share, post, submit, self-test, delete account, unsigned webhook) 401 signed out or with a share. Guests checked in the matrix only (no live guest account). Matrix 183 cases, 428 tests pass. Live share links: the example PR #3 run and the left-pad run, both signed.
+**So:** the receipts row would have caught the earlier gap; a new read route now has a place to be stated.
+Tags: #metric
