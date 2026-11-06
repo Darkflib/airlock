@@ -963,3 +963,15 @@ Tags: #fail
 **Result:** every live cell as intended: public pages 200 for all; run list, shares and self-tests 401 unless signed in; the shared run's page, API and receipts 200 for its holder and nothing else (another demo run 302/401, a private upload 401); every write (decide, share, post, submit, self-test, delete account, unsigned webhook) 401 signed out or with a share. Guests checked in the matrix only (no live guest account). Matrix 183 cases, 428 tests pass. Live share links: the example PR #3 run and the left-pad run, both signed.
 **So:** the receipts row would have caught the earlier gap; a new read route now has a place to be stated.
 Tags: #metric
+
+### 22:01 — Shot list for recording day; script timings re-balanced
+**Tried:** turned `VIDEO_SCRIPT.md` and `SLIDES.md` into a per-shot list with timecodes, capture order and slide stills (`docs/SHOT_LIST.md`), counting narration words per block.
+**Result:** 401 words fits 3:00, but the blocks didn't: Verdict had ~10 s spare and Detonation ~7 s, while the Gate (54 words in 18 s), Under the hood (48 in 17 s) and Close (38 in 10 s) overran. Slide 3 isn't exported as an image yet.
+**So:** the shot list moves block boundaries (Gate starts 1:59, Close 2:44) instead of cutting words; the PR #1 approve is filmed last and once, with its greyed-merge still grabbed before it.
+Tags: #decision #demo
+
+### 22:40 — VO timing from one take with whisper
+**Tried:** `scripts/vo_timings.py`: whisper.cpp (`small.en`, one word per segment) on a single take, aligned to the 15 narration lines in `VIDEO_SCRIPT.md` with difflib, planned slots read from `SHOT_LIST.md`. Tested on a `say -r 140` read with 0.9 s gaps.
+**Result:** 13 s for a 2:42 take; 90–100% of each line's words matched. Whisper's word times run edge to edge and ~0.35 s late, so pauses vanished at first (speak = slot on every line); trimming with ffmpeg `silencedetect` (−35 dB, 0.3 s, 0.6 s tolerance) recovered every 1.2 s boundary.
+**So:** the draft VO is one take, not 15 files; the same run on the final VO gives caption timings.
+Tags: #decision
