@@ -945,3 +945,9 @@ Tags: #decision
 **Result:** two columns from 900 px up with the card sticky; on a phone the card comes first and the pitch follows, no horizontal scroll (checked at 1400 and 375 px on the local replay server). No changing numbers on the page, so the frozen-build rerun can't make it stale. 427 tests pass.
 **So:** judges who aren't signed in yet still learn what they're looking at.
 Tags: #demo
+
+### 16:47 — Example run and receipt on the sign-in page
+**Tried:** link a real run and its signed receipt from the sign-in page. Share tokens are bearer credentials and `scripts/audit-history.py` flags them, so the page links `/example` and `/example?to=verify`, which redirect to a share token kept on the host (`~/.config/airlock/example_share`); `/s/<token>?to=verify` opens the verifier on the shared run.
+**Result:** no signed PR run existed (the last PR runs predate receipts), so ran PR #3 fresh on the live site: `20261106-164620-b13d8d`, malicious, rejected automatically, verdict and decision receipts. Share link expires 5 Jan 2027. 428 tests pass.
+**So:** a judge who isn't signed in can open a rejected PR run and check its receipt in two clicks.
+Tags: #demo

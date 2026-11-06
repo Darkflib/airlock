@@ -41,7 +41,7 @@ STATE_TTL = 600
 SHARE_COOKIE = "airlock_share"
 SHARE_TTL = 60 * 24 * 3600
 PUBLIC_PATHS = ("/auth/", "/static/", "/login", "/healthz", "/s/", "/api/me", "/api/github/webhook",
-                "/verify", "/api/signing-key")
+                "/verify", "/api/signing-key", "/example")
 
 
 @dataclass
@@ -109,6 +109,11 @@ class AuthConfig:
     def share_revoked(self, share: dict) -> bool:
         # Links minted before ids existed can't be revoked one by one (rotate the secret for those).
         return bool(share.get("id")) and share["id"] in self._lines("revoked_shares")
+
+    def example_share(self) -> str | None:
+        """The share token the sign-in page's example links open (`example_share`, one line, set by hand)."""
+        lines = [s.strip() for s in self._lines("example_share") if s.strip()]
+        return lines[0] if lines else None
 
     def shares(self) -> list[dict]:
         """Live share links: minted, unexpired and not revoked."""
@@ -311,14 +316,25 @@ def install(app, cfg: AuthConfig, exchange: GithubLogin = github_login) -> None:
         return RedirectResponse("/auth/login?" + urlencode({"invite": token}), status_code=302)
 
     @router.get("/s/{token}")
-    async def shared(token: str):
+    async def shared(token: str, to: str = ""):
         share = verify_kind(cfg.session_secret, token, "share")
         if not share or cfg.share_revoked(share):
             return RedirectResponse("/login?error=share", status_code=302)
         target = f"/selftests/{share['selftest']}" if share.get("selftest") else f"/runs/{share['runs'][0]}"
+        if to == "verify" and share.get("runs"):  # open the run's receipts in the verifier instead
+            target = "/verify?" + urlencode({"run": share["runs"][0]})
         resp = RedirectResponse(target, status_code=302)
         cookie(resp, SHARE_COOKIE, token, int(share["exp"] - time.time()))
         return resp
+
+    # The sign-in page's public examples: a recorded run and its receipts, through a share link kept
+    # on the host (never in the repo, since the token is a bearer credential).
+    @router.get("/example")
+    async def example(to: str = ""):
+        token = cfg.example_share()
+        if not token:
+            return RedirectResponse("/login?error=share", status_code=302)
+        return RedirectResponse(f"/s/{token}" + ("?to=verify" if to == "verify" else ""), status_code=302)
 
     @router.get("/auth/callback")
     async def callback(request: Request, code: str = "", state: str = ""):

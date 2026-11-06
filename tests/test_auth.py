@@ -163,6 +163,21 @@ def test_share_link_opens_only_that_run_read_only(make_client):
         assert anon.post("/api/runs", data={"spec": "left-pad"}).status_code == 401
 
 
+def test_example_links_open_a_share_and_its_receipts(make_client, tmp_path):
+    with make_client() as anon:
+        assert anon.get("/example", follow_redirects=False).headers["location"] == "/login?error=share"
+    token = auth.share_token(SECRET, ["r1"])
+    (tmp_path / "example_share").write_text(token + "\n")
+    with make_client() as anon:
+        assert anon.get("/example", follow_redirects=False).headers["location"] == f"/s/{token}"
+        r = anon.get("/example", params={"to": "verify"}, follow_redirects=False)
+        assert r.headers["location"] == f"/s/{token}?to=verify"
+        r = anon.get(f"/s/{token}", params={"to": "verify"}, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "/verify?run=r1"
+        assert anon.cookies.get(auth.SHARE_COOKIE) == token
+        assert anon.get(f"/s/{token}", params={"to": "elsewhere"}, follow_redirects=False).headers["location"] == "/runs/r1"
+
+
 def test_bad_or_wrong_kind_tokens_are_refused(make_client):
     session = auth.sign(SECRET, {"login": "Darkflib", "exp": time.time() + 60})
     share = auth.share_token(SECRET, ["r1"])
