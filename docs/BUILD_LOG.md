@@ -916,3 +916,9 @@ Tags: #demo #decision
 **So:** "direct DNS never leaves" now rests on a name server we own, not on `example.com` failing; the README limit is reworded to "not on the timeline" only. The box costs about $5/month; tear it down after submission.
 Tags: #win #metric #demo
 
+### 01:40 — Doc review before the freeze
+**Tried:** a fresh-eyes consistency pass over README, SUBMISSION, SLIDES, VIDEO_SCRIPT and the PRD against the results files, then the fixes.
+**Result:** 33 findings. The worst were in the README: the security table's `file:line` references had all drifted (now function names, which don't drift); the H1 lacked the agreed title; "cannot merge until a human clicks Approve or Reject" contradicted automatic rejection; "within about 10 seconds" for PR #3 (the 33/33 median is 23.2 s); the demo repo bullet skipped PR #9. Slide 10 still quoted the 30/30 run's 12–31 s (33/33: 17–35 s). The long description said "real packages" for the 11 regression scenarios (two of them are) and "inconclusive where installs download binaries" (psutil was a compiler); now 1991/2000. Video: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), 406 words. Home page gains a PR #9 chip. History audit: canary tokens in `evals/results/` and `tests/` are now allowed (finished runs' fake tokens prove nothing); both repos clean.
+**So:** the docs agree with the 33/33 run and with each other. Not changed: the README banner still says "Sandbox untrusted code" (accurate, not the new title).
+Tags: #decision
+

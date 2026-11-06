@@ -1,6 +1,6 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what a sandbox alone misses and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what a sandbox alone misses and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 6 Nov: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), as the strongest entries do; the words came out of the 0:15 and 2:15 blocks. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
@@ -45,11 +45,11 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Detonation stage: `npm ci` as the unprivileged user. Events land: `cat` reads `.npmrc` and `.aws/credentials`, `curl` is sinkholed, raw-IP connect refused.
 
-> "Now the install runs, as a normal user. A watcher that the package cannot touch records the programs it runs, the password files it opens, and where it tries to connect."
+> "The install runs as a normal user. A watcher that the package cannot touch records the programs it runs, the password files it opens, and where it tries to connect."
 
 **[SCREEN]** The PROVEN exfil row. Expand it: the captured POST body with this run's token highlighted. Hold for three seconds. **This is the money shot.**
 
-> "And there it is. The script read both password files and sent them out. But every address outside the registry goes to Airlock's fake server. So we caught the request, with the stolen token inside. It is proof. And it works for any language."
+> "And there it is. The script read both password files and sent them out. But every address outside the registry goes to Airlock's fake server. So we caught the request, with the stolen token inside. It is proof."
 
 ### 1:15–1:35 Verdict
 
@@ -79,7 +79,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** The run page already shows REJECTED, "automatically: exfiltration proven by a captured payload". Nobody clicked. On GitHub, PR #9: red `airlock` status with the same reason, merge blocked, and the `airlocksandbox[bot]` evidence comment.
 
-> "During the test, the pull request cannot be merged. The repository requires the Airlock check. Here the theft is proven, so Airlock rejects it by itself and posts the evidence on the pull request."
+> "While Airlock tests it, the pull request cannot merge. Here the theft is proven, so Airlock rejects it by itself and posts the evidence."
 
 **[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Switch to GitHub, PR #1: comment `/airlock approve` (typed ahead, just press Comment). The `airlock` check turns green, the bot's evidence comment appears, and the merge button unlocks.
 
@@ -89,13 +89,13 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A review costs about two cents in AI."
+> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A real review costs under three cents in AI."
 
 ### 2:50–3:00 Close
 
-**[SCREEN]** Airlock logo, URL `airlock.darkflib.dev`, repo link.
+**[SCREEN]** Slide 11 ("Limits and try it"), its first two bullets, then the Airlock logo, URL `airlock.darkflib.dev`, repo link.
 
-> "Every untrusted change runs in its own disposable computer, and you see exactly what it tried to steal."
+> "What it can't do: malware that knows it is watched can stay quiet, and it covers npm and PyPI only. But every untrusted change runs in its own disposable computer, and you see what it tried to steal."
 
 ## Cutaways if a shot fails on the day
 
@@ -104,7 +104,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 - **GitHub status lags:** refresh once on camera, or cut the wait.
 - **`/airlock approve` doesn't turn the check green within ~5 s:** look for the bot's reply on the PR saying why; otherwise click **Approve** on the PR #1 run page and say "I approve it" instead.
 - **The agent doesn't call `exercise` on PR #9 (no PROVEN row in Agent investigation):** push again for a fresh run, or film the practice run from the day before.
-- **The webhook run doesn't appear within ~5 s:** check Recent Deliveries for the error, then paste the PR #9 URL into Airlock instead and drop the line "nobody has to paste anything"; the rest of the block still works.
+- **The webhook run doesn't appear within ~5 s:** check Recent Deliveries for the error, then paste the PR #9 URL into Airlock instead and drop the line "Nobody pastes anything. A push starts Airlock by itself."; the rest of the block still works.
 
 ## Sources
 
@@ -113,11 +113,11 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | PR #3 as a plain CI job: tests pass, both keys reach the attacker | `without-airlock-20261105T215220Z` (3/3), BUILD_LOG 5 Nov 21:55 |
 | Boot under a second (0.69 s) | BUILD_LOG 3 Nov 17:39 |
 | Shell stealer, proven exfil, `cat`/`curl`/raw-IP | BUILD_LOG 3 Nov 22:37; self-test `20261104-084347-33a1a2` |
-| PR #9: silent in install and tests; proven when Airlock exercised it; rejected automatically | BUILD_LOG 5 Nov 14:30 and 14:35; PR #9's first webhook run, 5 Nov 14:30 (recheck on the live run) |
+| PR #9: silent in install and tests; proven when Airlock exercised it; rejected automatically | BUILD_LOG 5 Nov 14:30 and 14:35; PR #9's first webhook run, 5 Nov 14:35 (recheck on the live run) |
 | A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 24 real packages × 2: no false alarms, 6 inconclusive; about 2.5 cents of inference per review | `real-packages-20261105T164727Z`, BUILD_LOG 5 Nov 17:05 |
 | 33/33, proven 18/18 | `product-20261105T142257Z` (rerun on the frozen commit) |
-| About $0.003 of inference per review; about 600 PR runs an hour on one host | median tokens in `product-20261104T030613Z` × mimo-v2.6-flash price; load test BUILD_LOG 5 Nov 13:15 |
+| About $0.003 of inference per review; about 700 PR runs an hour on one host | median tokens in `product-20261104T030613Z` × mimo-v2.6-flash price; load test BUILD_LOG 5 Nov 13:15 and 19:35 |

@@ -21,7 +21,7 @@ A green test run doesn't tell you what the install script did.
 
 PR #3 run as a plain CI job: a fresh machine with the same fake credential files, `npm ci`, `npm test`, nothing watching.
 - `npm ci` ✓ `npm test` ✓: the check is green.
-- One POST delivered the npm token and the AWS secret to the attacker. 3 runs out of 3, 3.2 s each.
+- One POST delivered the npm token and the AWS secret to the attacker. 3 runs out of 3, about 3.2 s each.
 - Through Airlock, the same PR: MALICIOUS, the request captured with nothing sent, merge held, rejected automatically.
 *Visual:* left, the two green steps; right, "Attacker's server received:" with the POST body, token and secret highlighted. Caption: "Recorded 5 Nov (`evals/without_airlock.py`). The stealer's real address doesn't exist, so our stand-in played the attacker's server."
 
@@ -78,8 +78,8 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Malicious runs with exfil proven by payload | **18/18** |
 | Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
 | Containment events on benign runs | **0** |
-| 24 real npm/PyPI packages × 2 | **0 false alarms**, 42 clean, 6 inconclusive (binary downloads blocked) |
-| Median run, end to end | **12–31 s** fixtures, **46 s** real packages |
+| 24 real npm/PyPI packages × 2 | **0 false alarms**, 42 clean, 6 inconclusive (binary downloads blocked, or no compiler) |
+| Median run, end to end | **17–35 s** fixtures, **46 s** real packages |
 | Inference per review (median) | **≈ $0.003** fixtures, **≈ $0.025** real packages |
 | One VX1 host ($113/month), 8 at once | **≈ 700 PR runs/hour**, ≈ 455 real-package reviews/hour |
 | Whole build to 5 Nov, inference + compute | **$8.26** |
@@ -88,11 +88,11 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 ## 11. Limits and try it
 
 - Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
-- npm and PyPI only; browser-level behaviour (Pattern B) descoped.
+- npm and PyPI only; installs that download binaries come back inconclusive, never approved; browser-level behaviour (Pattern B) descoped.
 - **Try it:** airlock.darkflib.dev → Run self-test (five known packages, scored live). Repo: github.com/Darkflib/airlock (MIT).
 
 ## Notes for building the deck
 
 - Screenshots come from the Sat recording session, so they match the video.
 - Don't put share-link or invite URLs on a slide; they're bearer tokens and the deck is public.
-- `Darkflib/airlock-demo` is private; if it stays private, don't link PRs from the slides (judges get a 404). Screenshots are fine.
+- `Darkflib/airlock-demo` goes public before submission (decided 5 Nov); until then PR links 404, so use screenshots.

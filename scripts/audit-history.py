@@ -6,7 +6,7 @@ Vendored package archives (.tgz, .tar.gz) are unpacked and scanned too.
     python3 -I scripts/audit-history.py [repo-path ...]      # default: this repository
     git clone --mirror https://github.com/OWNER/REPO.git /tmp/r && python3 -I scripts/audit-history.py /tmp/r
 
-Exits 1 if anything needs a look. Known fakes are allowed: the fixed canary strings in tests and evals,
+Exits 1 if anything needs a look. Known fakes are allowed: the fixed canary strings, run canaries in tests/ and evals/results/,
 and the deliberately unroutable collector hosts (*.invalid, 203.0.113.0/24) in the demo fixtures.
 """
 import io
@@ -33,6 +33,9 @@ PATTERNS = {
 }
 # Hand-written fakes, not values from a run: fixed patterns that a real token never has.
 ALLOWED = re.compile(r"AIRLOCKCANARY(0{16}|1{16}|0123456789ABCDEF|DEADBEEF0{8})|AKIAAIRLOCKCANARY001")
+# Canary tokens from finished lab runs (evals/results) and hand-written ones in tests: a canary token is a
+# fake credential, and PROVEN counts only the running run's own token, so an old one proves nothing.
+CANARY_OK_PATHS = ("evals/results/", "tests/")
 
 
 def blobs(repo):
@@ -67,6 +70,8 @@ def audit(repo):
             continue  # package hashes only
         for where, text in texts(repo, oid, path):
             for name, pattern in PATTERNS.items():
+                if name == "real canary token" and path.startswith(CANARY_OK_PATHS):
+                    continue
                 for m in re.finditer(pattern, text):
                     if not ALLOWED.search(m.group(0)):
                         found.setdefault((name, m.group(0)[:12] + "…"), set()).add(where)

@@ -6,7 +6,7 @@ Nov 3, 2026 · @Mike Preston · this file is the source of truth
 
 Airlock runs an untrusted dependency change (a GitHub pull request, a new npm or PyPI package, or an uploaded package file) inside a disposable microVM with fake credentials and no internet access beyond the package registries. It reports what the change actually *did*: credentials read, programs run, hosts contacted, and the exact data it tried to send out. An AI reviewer gives a verdict, and the PR cannot merge until a human approves or rejects: it is held at a pending status that branch protection requires.
 
-**Status (Wed 4 Nov):** every P0 requirement works end to end on the live site, and the Thursday hardening items are done and verified live, a day early.
+**Status (Fri 6 Nov):** every P0 requirement works end to end on the live site, and the Thursday hardening items are done and verified live. Since then: signed receipts, the same PR without Airlock, the escape lab, the outside catcher and the hijack-the-reviewer test (all below). Left: the doc review (6 Nov), freeze, recording and submission.
 
 - **Live site:** https://airlock.darkflib.dev, with GitHub sign-in and an allowlist.
 - **Regression:** 33/33 correct on the real pipeline (11 scenarios × 3: npm, PyPI, a runtime-only stealer caught through the agent's exercise, and three demo PRs). Every malicious target had its exfil proven by payload, and every benign target had zero containment events.
@@ -169,7 +169,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Pinned runtime inputs (5 Nov): VM images by digest (`node` was `node:latest`), uv 0.13.7 / mitmproxy 12.3.1 / Caddy 2.11.7 (held) in cloud-init, microsandbox from `uv.lock` (the SDK's bundled `msb` is the runtime; the CLI now links to it instead of the always-latest installer), `uv sync --locked`, `msb doctor` fails a deploy. `scripts/check-pins.sh` clean on the host; PR #3 (node) and the Python stealer (python:3.12-slim) MALICIOUS with PROVEN exfil on the pinned digests. Rebuilt on a fresh VX1 from the pinned cloud-init (5 Nov 06:45): pins clean, all five self-test fixtures and PR #3 correct, instance destroyed
 - [x] Access matrix (5 Nov): `tests/test_access_matrix.py`, 7 viewers × 4 runs × every run, self-test and share route (175 cells). Found and fixed: the run page confirmed runs the API hides (200 vs 404), and "post again" answered before checking who asked
 - [x] One access module and explicit production settings (5 Nov): `airlock/web/access.py` (`Viewer`) holds the read/change/submit rules every route asks; the production config requires `AIRLOCK_PUBLIC_URL` and owners (no fallback to ours), `AIRLOCK_GUEST_REPOS` defaults to none, and startup logs the effective access settings. Deployed 06:52; PR #3 webhook run MALICIOUS, rejected
-- [x] PRD final pass (4 Nov): status line, "18/18" in model routing and the demo script, success metrics (now 30/30, proven 15/15, medians 12–31 s), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
+- [x] PRD final pass (4 Nov): status line, "18/18" in model routing and the demo script, success metrics (then 30/30, proven 15/15, medians 12–31 s; superseded by 33/33 on 5 Nov), risk-table "on Thursday" items, the answered obfuscated-PR question, demo script without PR #4 / behaviour diff / PyPI
 
 **Fri 6 Nov: story**
 
@@ -181,8 +181,8 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 - [x] Signed receipts (5 Nov): an Ed25519 receipt over the timeline, verdict and subject when the verdict is in, and one for the decision chained to it (automatic rejections too). Run page Verify/Download, public `/verify` page checked in the browser with a "change the verdict" tamper demo, `airlock verify` CLI, receipt hash in the PR comment. Key generated once on the host. 418 tests. Deployed 5 Nov 21:33; first live run (`20261105-213334-de0311`) verified in the browser and with the CLI; key pinned in [docs/SIGNING_KEY.md](docs/SIGNING_KEY.md)
 - [x] Demo PR #9 (5 Nov): `tinyconf` vendored into `airlock-demo`, a runtime-only stealer (exfil only from `load()` with `NODE_ENV=production`). Its first webhook run: install and tests silent, the agent exercised it, PROVEN, rejected automatically. The video's 1:35 scene now uses it instead of PR #4
 - [x] Demo script reworked (4 Nov): PR #3 (readable stealer) → PR #4 (hidden stealer caught at runtime, with "new in this PR" vs the merge base) → the gate, with PR #1's greyed-out merge button (left pending for this shot); PyPI as one line under "under the hood"
-- [x] Video script drafted from build-log `#demo` moments: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) (shots, 425-word narration, pre-recording checklist, sources)
-- [x] Slide outline drafted (10 slides, including the $1.45 inference spend): [docs/SLIDES.md](docs/SLIDES.md)
+- [x] Video script drafted from build-log `#demo` moments: [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) (shots, about 400-word narration, pre-recording checklist, sources)
+- [x] Slide outline drafted (now eleven slides; whole-build spend $8.26): [docs/SLIDES.md](docs/SLIDES.md)
 - [x] Deck built from the outline (10 slides, Airlock palette; claude.ai Slides artifact, exports to PDF/PPTX)
 - [ ] Swap the two screenshot placeholders (slides 5 and 6) for frames from the Sat recording; recheck 33/33 and the spend on slide 10
 - [ ] Add slide 3 ("The same PR without Airlock", 5 Nov) to the deck artifact; the outline has it, the published deck doesn't yet
@@ -198,7 +198,7 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 
 - [ ] Pre-publish audit: scan git history for secrets and share-link tokens; `.env` holds only `op://` references. First pass 5 Nov: both repos clean (`scripts/audit-history.py`); rerun on the final commits before flipping visibility
 - [ ] Make `Darkflib/airlock` public (MIT)
-- [ ] `Darkflib/airlock-demo` goes public (decided 5 Nov), so PR links in bot comments and slides work for judges. Before: tidy runs and bot comments; close test PRs #5-#7. README warning that PRs #3/#4 carry deliberate (unroutable) stealers: done 5 Nov via PR #8
+- [ ] `Darkflib/airlock-demo` goes public (decided 5 Nov), so PR links in bot comments and slides work for judges. Before: tidy runs and bot comments; close test PRs #5-#7. README warning that PRs #3/#4/#9 carry deliberate (unroutable) stealers: done (checked 6 Nov)
 - [ ] `scripts/check-submission.py` passes (long description at 1997/2000 on 5 Nov: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
 
 **If anything slips,** cut slide polish and the cover image first. Never the video or the pre-publish audit.
@@ -223,7 +223,7 @@ The video uses the real demo repo `Darkflib/airlock-demo` and three PRs. Everyth
    - npm and PyPI; 13 Serverless Inference models benchmarked; regression 33/33 (11 scenarios × 3); on 24 real packages no false alarms; about $0.025 of inference per real review.
 7. **2:50 Close (10 s).** "Every untrusted change gets its own disposable computer, and you see what it tried to steal."
 
-**Before recording:** a fresh run of PR #3; PR #9's run is started on camera by the push, so prepare the README edit and do practice pushes the day before (check the agent uses `exercise`). PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #4 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
+**Before recording:** a fresh run of PR #3; PR #9's run is started on camera by the push, so prepare the README edit and do practice pushes the day before (check the agent uses `exercise`). PR #1 is already held at pending for the gate shot: don't push to it. PR #3 and PR #9 already carry bot comments from earlier decisions, so film the newest comment or tidy the older ones first.
 
 **On other AI reviewers.** Codex also flagged PR #3 by reading the plainly written script. The honest line: *static review can catch an obvious payload; Airlock proves what ran, what it took and where it tried to send it, and gates the merge.* PR #4 (`tinystamp`) is the fair side-by-side: no tell-tale script, the credential read and exfil are split across innocuous-looking "install analytics" and a "config discovery" helper, and the collector host is built from fragments — the diff reads like a routine dependency bump, but detonation still proves the exfil. (For a blind static-review test, strip the fixture's honest NOTICE comments first.)
 
@@ -259,8 +259,8 @@ The malicious fixture is only ever installed inside sandboxes. Its targets are u
 - [x] Hostile targets get a malicious verdict with proven exfil: 18/18 in the regression (npm, shell, Python, runtime-only via exercise, PR #3, PR #4).
 - [x] Benign targets get a benign verdict with zero containment events: 15/15.
 - [x] No false alarms on real packages (5 Nov): 24 popular npm/PyPI packages × 2, none malicious or suspicious; 6 inconclusive from installs that download binaries or need a compiler (`real-packages-20261105T164727Z`)
-- [x] A full run finishes well inside goal 1's 5 minutes: medians 12–31 s end to end, VM boot about 0.7 s. The tighter 20 s target holds for tarballs, npm specs, sdists and the stealer PRs (12–18 s), but not for PR #1 (24 s: two VMs plus `npm test`) or real PyPI `six` (31 s).
-- [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses are answered on the host (verified 4 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.
+- [x] A full run finishes well inside goal 1's 5 minutes: medians 17–35 s end to end in the 33/33 run (`product-20261105T142257Z`, 4 at once), VM boot about 0.7 s. The tighter 20 s target holds for tarballs, npm specs and sdists (17–19 s), but not for the PRs (23–29 s: two VMs plus `npm test`), the runtime-only stealer (29 s: the agent's exercise) or real PyPI `six` (35 s).
+- [x] No canary value reaches an unapproved destination: the sinkhole never connects upstream, and DNS bypasses never leave the sandbox: the gateway resolver is answered on the host (4 Nov), and lookups sent straight to outside resolvers never reach a name server we control (outside catcher, 6 Nov). Canary text does go to Vultr inference in tool output, and into the PR comment after a human decision, by design.
 
 **Submission checklist**
 
