@@ -9,6 +9,25 @@
 </head>
 <body>
   <main class="wrap login">
+    <section class="pitch" aria-labelledby="pitch-title">
+      <p class="eyebrow">Supply-chain security for pull requests and packages</p>
+      <h2 id="pitch-title">Run untrusted code somewhere it can't hurt you, and catch what it tries to steal.</h2>
+      <p class="lede">Airlock tests a new pull request, npm package or PyPI package in a throwaway virtual machine full of fake passwords. Whatever the code tries to send out is captured as evidence, an AI agent explains it, and nothing merges until a person approves.</p>
+
+      <h3>The problem</h3>
+      <p>In CI, install scripts and test hooks run with real tokens and full internet access. A postinstall that reads <code>~/.npmrc</code> and posts it somewhere still leaves the tests green, and reviewers rarely read a lockfile change. Passing tests don't tell you what the install did.</p>
+
+      <h3>How Airlock works</h3>
+      <ol class="steps">
+        <li><b>Detonate.</b> Each run gets a fresh microVM with its own kernel on a Vultr server. The install and tests run as an unprivileged user beside fake credentials, each carrying a token unique to the run, while a root watcher records programs, file reads, DNS lookups and connections.</li>
+        <li><b>Capture.</b> Only the package registries are reachable. Every other address is answered by a fake server on the host, so stolen credentials are caught in the request itself: the theft is <em>proven</em> by the payload, not guessed from a connection. For a pull request, the code before the change runs too, and only new behaviour is flagged.</li>
+        <li><b>Investigate.</b> An AI agent on Vultr Serverless Inference reads the code and the evidence. If something only misbehaves when called, it asks Airlock to run it from a clean copy, so that theft counts as proof as well. Every claim it makes cites a recorded event.</li>
+        <li><b>Gate.</b> A required GitHub check holds the pull request at pending. Proven theft is rejected automatically; anything else waits for a person, and only a person can approve.</li>
+      </ol>
+
+      <p class="pitch-links">See it on real pull requests in the <a href="https://github.com/Darkflib/airlock-demo/pulls">public demo repo</a>, or <a href="/verify">verify a signed receipt</a>.</p>
+    </section>
+
     <div class="login-card panel">
       <img src="/static/apple-touch-icon.png" alt="" width="96" height="96">
       <h1 class="brand">AIRLOCK</h1>

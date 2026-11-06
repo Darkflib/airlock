@@ -939,3 +939,9 @@ Tags: #decision #demo
 **Result:** "a sandbox alone would let it through" is now "install and tests alone didn't expose it" (slide 6, video 1:35 line, PRD demo script, competition notes). README and technical report limits gain: exercise proves behaviour under the agent's chosen inputs, not intent (and no live test yet has an adversarial agent build a misleading call); allowed registries can receive data, flagged not blocked; adoption is untested. The submission's long description names the registry exception (1989/2000 chars).
 **So:** no claim now says nothing leaves or that exercise proves intent. Still stale until the rerun: 46 s, 455/h without its batch figure (318/h), 16/48 forced (latest 18/48), 6 inconclusive, 33/33.
 Tags: #decision
+
+### 13:07 — Sign-in page sells the project
+**Tried:** the sign-in page was a lone card in empty space, the first thing a judge sees. Added a pitch column beside it: what Airlock is, the problem (install scripts run in CI with real tokens; green tests say nothing about the install) and how it works in four steps (detonate, capture, investigate, gate), with links to the public demo repo's PRs and /verify.
+**Result:** two columns from 900 px up with the card sticky; on a phone the card comes first and the pitch follows, no horizontal scroll (checked at 1400 and 375 px on the local replay server). No changing numbers on the page, so the frozen-build rerun can't make it stale. 427 tests pass.
+**So:** judges who aren't signed in yet still learn what they're looking at.
+Tags: #demo
