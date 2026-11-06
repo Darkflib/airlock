@@ -41,7 +41,7 @@ The captured POST from PR #3, with the run's canary token highlighted.
 
 ## 6. Where the agent earns its place: PR #9
 
-A config library with no install script; its tests pass. Install and tests show **nothing**: a sandbox alone would let it through.
+A config library with no install script; its tests pass. Install and tests alone **didn't expose it**.
 - The agent reads the code: it only sends data when `NODE_ENV=production`.
 - It asks Airlock to **exercise** it that way. Airlock runs it from a clean copy with its own harness, so what's caught counts as proof.
 - POST to `cfg-metrics.tinyconf.invalid` with this run's token: **PROVEN**, rejected automatically.

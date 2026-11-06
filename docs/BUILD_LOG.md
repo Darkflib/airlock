@@ -928,3 +928,14 @@ Tags: #decision
 **So:** PR links in bot comments, slides and the submission now work for judges. `Darkflib/airlock` itself is still private until submission.
 Tags: #decision
 
+### 02:09 — Refreshed judge critique after the containment labs
+**Tried:** read the latest real-package benchmark, outside-catcher, hijack and CI-baseline results, receipts documentation and revised submission against the previous critique.
+**Result:** separate-host controls strengthen tested containment; forced-benign reviewer runs demonstrate deterministic proof overriding a wrong verdict. Latest real-package batch: 44 quiet, 3 inconclusive, 1 error; no false malware verdicts. Allowed-registry transfers remain possible and are flagged rather than blocked. No independent malicious corpus or final-build full regression appears in the saved results.
+**So:** earlier AI-value, cost and demo-repetition criticisms no longer stand in their original form. Remaining priorities are malicious generalisation, exercise attribution, compatibility/reliability and precise framing of benchmark and egress claims. Source review only, no live verification or application changes.
+Tags: #decision #demo
+
+### 02:25 — Wording from the refreshed critique
+**Tried:** acted on the wording half of the critique above; numbers wait for the frozen-build rerun.
+**Result:** "a sandbox alone would let it through" is now "install and tests alone didn't expose it" (slide 6, video 1:35 line, PRD demo script, competition notes). README and technical report limits gain: exercise proves behaviour under the agent's chosen inputs, not intent (and no live test yet has an adversarial agent build a misleading call); allowed registries can receive data, flagged not blocked; adoption is untested. The submission's long description names the registry exception (1989/2000 chars).
+**So:** no claim now says nothing leaves or that exercise proves intent. Still stale until the rerun: 46 s, 455/h without its batch figure (318/h), 16/48 forced (latest 18/48), 6 inconclusive, 33/33.
+Tags: #decision

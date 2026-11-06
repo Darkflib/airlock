@@ -1,6 +1,6 @@
 # Video script (3:00)
 
-Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what a sandbox alone misses and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 6 Nov: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), as the strongest entries do; the words came out of the 0:15 and 2:15 blocks. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
+Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what install and tests alone don't expose and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 6 Nov: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), as the strongest entries do; the words came out of the 0:15 and 2:15 blocks. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
 
 ## Before recording (Sat 7 Nov, after the freeze)
 
@@ -69,7 +69,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Cut to the same run, finished (about 30 s later; cut the wait). The Detonation stage reads "✓ nothing suspicious".
 
-> "Install and tests show nothing. A sandbox alone would let this through."
+> "Install and tests alone didn't expose it."
 
 **[SCREEN]** Open Agent investigation. Show the agent reading `lib/beacon.js`, then the `exercise` row: "Airlock calls … with NODE_ENV=production from a fresh copy (chosen by the agent)", then the PROVEN POST to `cfg-metrics.tinyconf.invalid` right under it. Expand it: the run's token in the body.
 
