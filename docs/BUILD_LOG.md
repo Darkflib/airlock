@@ -901,3 +901,11 @@ Tags: #win
 **Result:** real arm 3/3 **malicious** on the model's own judgement (median 16.9 s), one run noting the docs "try to talk reviewers into calling it benign"; the guard redacted the blunt README line but not the subtler fake-audit "guidance for automated review pipelines", which the model saw through anyway. Hijacked arm 3/3: reviewer said benign, `apply_proof` overrode it to **malicious** (overridden flag set), because the host captured the payload with this run's token. `test_hijack.py` (4 tests) pins that only host proof from the package overrides; full suite 424 passing. [results](../evals/results/hijack-lab-20261105T234710Z/summary.md)
 **So:** the merge gate rests on the captured payload, not the model's word — a package can't talk its way to a green check. One README beat; a candidate video line. Not part of the 33/33 regression.
 Tags: #win #demo #metric
+
+## 6 November 2026
+
+### 00:30 — Judging-criteria map in the README
+**Tried:** the competitor review item 5 (something other entries did): a judge scoring each of Vultr's four axes shouldn't have to hunt. Added a "Judging criteria → where to check it" table between "30 seconds for judges" and "What we measured", mapping technology / originality / business value / presentation to what Airlock does for each and a live or in-repo place to see it (self-test, demo PR #3 share link, the hijack and tinyconf results, the without-Airlock table, the cost line, the `/verify` page). Closed with a "what Airlock does not claim" line and a real-vs-replayed note (every number is from the live host; replayed UI fixtures are never counted).
+**Result:** all anchors resolve and the three linked result summaries exist. No new numbers — this is framing, not a new measurement.
+**So:** a skimming judge lands on the rubric and knows which button or file backs each score. Pairs with the hijack beat committed just before.
+Tags: #demo #decision

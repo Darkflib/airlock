@@ -20,6 +20,19 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **Proof.** 33/33 correct (11 scenarios × 3) on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
 - **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser screenshots) was descoped, since the demo repo has no UI; npm and PyPI only. See [the security model](#security-model-and-limits).
 
+## Judging criteria → where to check it
+
+Vultr scores on four axes. Each row says what Airlock does for it and where you can see it for yourself, live or in the repo.
+
+| Criterion | What Airlock does for it | Check it |
+| --- | --- | --- |
+| **Technology** | A real microVM per run (its own kernel via `/dev/kvm` on a Vultr VX1), default-deny egress with a host-side sinkhole, a root watcher and DNS guard the package user can't touch, and every LLM call on Vultr Serverless Inference. | The [security model table](#security-model-and-limits) maps each control to `file:line`; **Run self-test** on the home page detonates five known packages live. |
+| **Originality** | Proof, not pattern-matching: theft is captured on the host carrying *this run's* token, so a verdict can't be bluffed. The agent turns a runtime-only finding into proof by asking Airlock to **exercise** the code, and that proof overrides even a reviewer the package talks round. | The demo PR #3 run (share link in the submission); the runtime-only `tinyconf` beat ([33/33 results](evals/results/product-20261105T142257Z/summary.md)); the [hijack-the-reviewer lab](evals/results/hijack-lab-20261105T234710Z/summary.md). |
+| **Business value** | Answers "why not just run it in CI?": on the same PR a plain CI job ships both keys to the attacker on a green check. It's cheap (~$0.003–0.025 a review, ~700 PR runs/hour on a $113/month host) and quiet in practice — no false alarms on 24 real packages. | The [without-Airlock table](#what-you-see); the cost line under [What we measured](#what-we-measured-all-on-vultr); the [24 real packages](evals/results/real-packages-20261105T164727Z/summary.md) run. |
+| **Presentation** | One PR comment that rewrites itself as the run progresses, a verdict whose every point cites the event it rests on, and a signed receipt a judge can verify in their own browser. | Any run page (**Verify** and the cited event ids); the public [`/verify`](https://airlock.darkflib.dev/verify) page with its tamper button; the self-test judges trigger themselves. |
+
+Every number in this README comes from the live VX1 host and Vultr Serverless Inference (replayed UI fixtures, used only for front-end work, are never counted). What Airlock does **not** claim: to detect unseen real-world malware, or malware that spots the sandbox and stays silent. It proves what a change *did* when it ran, and gates the merge on that.
+
 ## What we measured, all on Vultr
 
 Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
