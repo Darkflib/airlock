@@ -922,3 +922,9 @@ Tags: #win #metric #demo
 **So:** the docs agree with the 33/33 run and with each other. Not changed: the README banner still says "Sandbox untrusted code" (accurate, not the new title).
 Tags: #decision
 
+### 02:05 — Demo repo public
+**Tried:** closed the test PRs #5–#7 and made `Darkflib/airlock-demo` public, after the 01:40 history audit of a mirror clone came back clean.
+**Result:** PR #9 opens signed out (HTTP 200); open PRs are #1, #3, #4 and #9; the README warning covers all three stealers.
+**So:** PR links in bot comments, slides and the submission now work for judges. `Darkflib/airlock` itself is still private until submission.
+Tags: #decision
+

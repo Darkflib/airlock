@@ -95,4 +95,4 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 
 - Screenshots come from the Sat recording session, so they match the video.
 - Don't put share-link or invite URLs on a slide; they're bearer tokens and the deck is public.
-- `Darkflib/airlock-demo` goes public before submission (decided 5 Nov); until then PR links 404, so use screenshots.
+- `Darkflib/airlock-demo` is public (6 Nov), so slides can link its PRs.
