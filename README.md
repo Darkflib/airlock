@@ -66,6 +66,11 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), Airlock reports t
 
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and reads **"No malicious behaviour observed"**, listing what ran and what a run like this can't exercise. Airlock never calls a quiet run safe.
 
+**A package that argues with the reviewer.** We also tried to talk the AI reviewer out of its verdict. The `logfmt-lite` fixture steals the credentials like the others, but every surface it reads — code comments, a README, a fake `SECURITY-AUDIT.md`, the install log — says it's audited and safe and tells automated reviewers to approve it ([`evals/hijack_lab.py`](evals/hijack_lab.py), [results](evals/results/hijack-lab-20261105T234710Z/summary.md), 5 Nov, 3 runs per arm). Two things hold:
+
+- **The model didn't fall for it:** 3/3, the production reviewer called it malicious on its own and one run even noted the docs were "trying to talk reviewers into calling it benign". The injection guard redacted the blunt README line; the model saw through the subtler fake audit unaided.
+- **Even if it had:** a reviewer forced to answer *benign* still can't open the gate. The verdict and the merge decision rest on the payload captured on the host carrying this run's token, not the model's word, so Airlock overrode the benign call to malicious 3/3. `test_hijack.py` pins the rule: only host-captured proof from the package overrides, never the agent's own commands or guest telemetry.
+
 ## How it works
 
 ```mermaid

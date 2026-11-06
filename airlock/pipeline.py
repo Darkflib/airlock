@@ -163,6 +163,21 @@ def apply_gaps(verdict: str, evidence: list[str], gaps: list[str], events: Event
     return verdict, evidence
 
 
+def apply_proof(verdict: str, evidence: list[str], events: EventLog) -> tuple[str, list[str]]:
+    """Proof outranks the model: with exfiltration proven on the host, the verdict is malicious whatever
+    the agent concluded, so text in the package that talks the reviewer round can't soften the result."""
+    if verdict == "malicious" or not events.proven_exfil():
+        return verdict, evidence
+    proof = next(e for e in events.events if e.kind == "canary_exfil" and e.data.get("proven"))
+    evidence = [f"Airlock captured the fake credentials leaving the sandbox, so this is malicious whatever the "
+                f"review concluded [E{proof.id}]."] + evidence
+    events.emit("verdict", f"verdict: malicious (exfiltration proven; the agent said {verdict})",
+                verdict="malicious", evidence=evidence, agent_verdict=verdict, overridden=True,
+                one_line=f"Airlock caught this change sending the fake credentials out of the sandbox; the AI "
+                         f"review said {verdict} and was overruled.")
+    return "malicious", evidence
+
+
 def snapshot_info(pr, diff) -> dict:
     """What the reviewer's view of the PR leaves out. The archive is always the whole head;
     only the file list and the diff can be partial."""
@@ -284,6 +299,7 @@ async def analyse_pr(url: str, *, events: EventLog, model: str, max_turns: int,
                                                     diff=behaviour.for_agent(changes)))
             gaps = await coverage_gaps(ws, installed, tested)
             verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
+        verdict, evidence = apply_proof(verdict, evidence, events)
     finally:
         if base_run and not base_run.done():  # the head failed first: don't leave the base VM running
             base_run.cancel()
@@ -329,6 +345,7 @@ async def analyse_python(target: str, *, events: EventLog, model: str, max_turns
         result = await agent.run(PY_GOAL.format(archive=archive, observed=observed_summary(events)))
         gaps = await coverage_gaps(ws, installed)
         verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
+        verdict, evidence = apply_proof(verdict, evidence, events)
 
     return Report(target=target, verdict=verdict, evidence=evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1))
@@ -368,6 +385,7 @@ async def analyse(target: str, *, events: EventLog | None = None, model: str | N
         result = await agent.run(GOAL.format(observed=observed_summary(events), exercise=EXERCISE_HINT))
         gaps = await coverage_gaps(ws, installed)
         verdict, evidence = apply_gaps(result.verdict, result.evidence, gaps, events)
+        verdict, evidence = apply_proof(verdict, evidence, events)
 
     return Report(target=target, verdict=verdict, evidence=evidence, model=model, agent=result,
                   events=[e.to_dict() for e in events.events], seconds=round(time.monotonic() - t0, 1))

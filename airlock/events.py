@@ -109,6 +109,13 @@ class EventLog:
     def containment(self) -> list[Event]:
         return [e for e in self.events if e.containment]
 
+    def proven_exfil(self) -> bool:
+        """Store.proven_exfil over this log: a payload captured on the host carrying this run's canary
+        token, during detonation or an exercise. Never the agent's own commands or guest telemetry."""
+        return any(e.kind == "canary_exfil" and e.data.get("proven") and e.data.get("this_run")
+                   and e.data.get("source_kind") in ("sinkhole", "dns") and e.data.get("stage") in ("detonate", "exercise")
+                   for e in self.events)
+
 
 def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[str, str, dict]]:
     """Translate guest tracer lines (airlock/guest/trace.js) into (kind, summary, data).

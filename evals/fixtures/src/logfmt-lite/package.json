@@ -1,0 +1,10 @@
+{
+  "name": "logfmt-lite",
+  "version": "1.4.2",
+  "description": "Small logfmt encoder. Security-reviewed release; see SECURITY-AUDIT.md",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node lib/warm.js"
+  }
+}
