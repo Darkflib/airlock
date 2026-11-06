@@ -1,0 +1,59 @@
+#cloud-config
+# Outside catcher: a second, separate Vultr box (vc2-1c-1gb) the escape lab aims at.
+# scripts/catcher.sh up renders this (it fills in CATCHER_PY_B64) and creates the box.
+
+hostname: catcher
+timezone: UTC
+
+users:
+  - name: catcher
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO1E7qtIMp0dD8CtJCXLeIkICUEL/06G3Sb7UhdbOXKn darkflib-ecc-2026
+
+ssh_pwauth: false
+disable_root: true
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-catcher.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+  # Port 53 is ours: stop systemd-resolved's stub listener holding it.
+  - path: /etc/systemd/resolved.conf.d/no-stub.conf
+    content: |
+      [Resolve]
+      DNSStubListener=no
+  - path: /opt/catcher/catcher.py
+    encoding: b64
+    content: CATCHER_PY_B64
+  - path: /etc/systemd/system/catcher.service
+    content: |
+      [Unit]
+      Description=Outside catcher for the Airlock escape lab
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Environment=CATCHER_ZONE=CATCHER_ZONE_VALUE
+      ExecStart=/usr/bin/python3 /opt/catcher/catcher.py
+      Restart=always
+      RestartSec=2
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+  - systemctl restart systemd-resolved
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw allow 22/tcp
+  - for p in 53 80 443 4444 8080 47801; do ufw allow $p/tcp; done
+  - ufw allow 53/udp
+  - ufw --force enable
+  - systemctl daemon-reload
+  - systemctl enable --now catcher

@@ -198,6 +198,8 @@ Airlock blocks every download that isn't from a package registry, because an all
 
 **Escape lab** ([`evals/escape_lab.py`](evals/escape_lab.py), [results](evals/results/escape-lab-20261105T220624Z/summary.md), 5 Nov, 3 runs). A test package tries 38 ways out of a real Airlock VM, each carrying the run's fake credentials. A listener outside the sandbox, on the host's public IPv4 and IPv6, heard **nothing** in any run.
 
+**Outside catcher** ([`evals/outside_count.py`](evals/outside_count.py), [results](evals/results/outside-catcher-20261106T004627Z/summary.md), 6 Nov, 3 runs). A second Vultr box, not the Airlock host, with a DNS zone delegated to it, so a token in a lookup that reaches *any* real resolver lands in its log. The probe adds 16 tries at it: its real name over HTTP(S), its IPv4 and IPv6 directly, DNS via the system resolver, the gateway, 8.8.8.8, 1.1.1.1 and the catcher itself. A control sent from the host itself reached it five ways; from the VMs, **0 of 48 tries arrived**.
+
 | Tried | Result |
 | --- | --- |
 | HTTP(S) to any name, any port | sinkholed and captured (80, 443), or refused |
@@ -217,7 +219,7 @@ The lab found two recording gaps, both fixed: a token in a request URL, and a to
 - **Pinned TLS** prevents payload capture; we still see the hostname.
 - **Encoded exfil.** Encoded or split canaries are still blocked or captured, but only a verbatim token counts as PROVEN.
 - **Receipts prove integrity, not honesty.** The signing key is generated on the host, like the session secret, so whoever controls the host could sign a false record. A receipt shows the record hasn't changed since Airlock sealed it. Runs from before 5 Nov have none.
-- **DNS sent straight to an outside resolver** (8.8.8.8, 1.1.1.1, UDP or TCP) is refused by microsandbox before Airlock sees it: contained, but not on the timeline. DNS over TCP to the gateway fails closed (SERVFAIL), also unrecorded.
+- **DNS sent straight to an outside resolver** (8.8.8.8, 1.1.1.1, or the attacker's own name server, UDP or TCP) is answered NXDOMAIN inside the sandbox before Airlock sees it: the outside catcher shows it never gets out, but it's not on the timeline. DNS over TCP to the gateway fails closed (SERVFAIL), also unrecorded.
 - **Allowed hosts are reachable.** Data put in a request to a registry gets there. Airlock flags a canary token in such a request, but only the registry operator could read it, not the package's author.
 - **Coverage.** The connection poller can miss very short-lived activity. The sinkhole keeps 8,000 characters of a request body, and the evidence shown to the agent 2,000.
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.

@@ -909,3 +909,10 @@ Tags: #win #demo #metric
 **Result:** all anchors resolve and the three linked result summaries exist. No new numbers — this is framing, not a new measurement.
 **So:** a skimming judge lands on the rubric and knows which button or file backs each score. Pairs with the hijack beat committed just before.
 Tags: #demo #decision
+
+### 00:55 — Outside catcher: 0 of 48 reached a box we control
+**Tried:** the competitor review item 3. The escape lab's listeners were on the Airlock host itself, so "nothing heard" couldn't rule out traffic that never crossed the real network. A second Vultr box (vc2-1c-1gb, London; `infra/catcher`, `scripts/catcher.sh`) logs TCP on 53/80/443/4444/8080/47801, DNS and ping, and `catch.darkflib.dev` is delegated to it, so a token in a lookup reaching any real resolver lands there. The probe gained 16 tries at it; the lab sends a marker from the host first as a control; `evals/outside_count.py` joins the report with the catcher's log.
+**Result:** control heard five ways (HTTP by name, DNS via public resolvers, TCP v4/v6, ping). From the VMs, 0/48 tries arrived, 3/3 runs identical: names sinkholed (proven exfil), raw IPs `403 network_policy_denied` or refused, and token lookups sent straight to 8.8.8.8, 1.1.1.1 or the catcher's own name server got NXDOMAIN inside the sandbox. First boot failed: the IPv6 UDP socket also claimed v4 port 53 (`Address already in use`) until `IPV6_V6ONLY`. First count said "escaped": the host control landed 1 ms inside run 1's window (clock skew), so control-marked hits are now excluded by marker, not time. [results](../evals/results/outside-catcher-20261106T004627Z/summary.md)
+**So:** "direct DNS never leaves" now rests on a name server we own, not on `example.com` failing; the README limit is reworded to "not on the timeline" only. The box costs about $5/month; tear it down after submission.
+Tags: #win #metric #demo
+

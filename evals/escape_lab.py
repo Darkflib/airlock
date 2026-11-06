@@ -4,7 +4,12 @@ the probe saw from inside (did each attempt get an answer?) and what Airlock rec
 this measures containment and recording, not the verdict.
 
   set -a; . ~/.config/airlock/web.env; set +a
-  .venv/bin/python evals/escape_lab.py [--runs 1]
+  .venv/bin/python evals/escape_lab.py [--runs 1] [--catcher catch.darkflib.dev]
+
+With --catcher, the probe also aims at the outside catcher (a separate box with a DNS zone delegated to
+it: infra/catcher, scripts/catcher.sh), and the lab first reaches it from the host itself, a control
+that shows the catcher hears what gets there. evals/outside_count.py then joins the report with the
+catcher's log.
 
 Prints a JSON report on stdout.
 """
@@ -12,8 +17,11 @@ Prints a JSON report on stdout.
 import argparse
 import asyncio
 import json
+import secrets
 import socket
+import subprocess
 import time
+import urllib.request
 from pathlib import Path
 
 from airlock.events import EventLog
@@ -46,11 +54,49 @@ async def listen(heard: list) -> list:
     return [await asyncio.start_server(on, "0.0.0.0", PORT), await asyncio.start_server(on, "::", PORT)]
 
 
-async def once() -> dict:
+def catcher_addrs(zone: str) -> dict:
+    """The catcher's addresses, through the public delegation (as an attacker's name would resolve)."""
+    found = {fam: sa[0] for fam, _, _, _, sa in socket.getaddrinfo(f"addr.{zone}", 80, proto=socket.IPPROTO_TCP)}
+    return {"zone": zone, "v4": found.get(socket.AF_INET), "v6": found.get(socket.AF_INET6)}
+
+
+def control(c: dict) -> dict:
+    """From the host, not a VM: the same kinds of contact the probe tries, carrying a marker. Each should
+    show in the catcher's log; if they don't, the catcher's silence about the VM means nothing."""
+    mark = "CONTROL" + secrets.token_hex(6).upper()
+    done = {"marker": mark}
+    try:
+        urllib.request.urlopen(urllib.request.Request(f"http://h80.{c['zone']}/control?t={mark}", data=mark.encode()), timeout=5)
+        done["http_name"] = "ok"
+    except OSError as e:
+        done["http_name"] = str(e)
+    try:
+        socket.getaddrinfo(f"{mark}.res.{c['zone']}", 80)
+        done["dns_resolver"] = "ok"
+    except OSError as e:
+        done["dns_resolver"] = str(e)
+    with socket.create_connection((c["v4"], 4444), timeout=5) as s:
+        s.sendall(mark.encode())
+    done["tcp_v4"] = "ok"
+    if c["v6"]:
+        try:
+            with socket.create_connection((c["v6"], 47801), timeout=5) as s:
+                s.sendall(mark.encode())
+            done["tcp_v6"] = "ok"
+        except OSError as e:
+            done["tcp_v6"] = str(e)
+    ping = subprocess.run(["ping", "-c", "1", "-W", "2", "-p", mark.encode()[:16].hex(), c["v4"]], capture_output=True)
+    done["icmp"] = "ok" if ping.returncode == 0 else ping.stderr.decode()[-80:]
+    return done
+
+
+async def once(catcher: dict | None) -> dict:
     events, heard = EventLog(), []
     servers = await listen(heard)
     target = {"v4": public_ip(socket.AF_INET, "8.8.8.8"), "v6": public_ip(socket.AF_INET6, "2001:4860:4860::8888"), "port": PORT}
-    t0 = time.monotonic()
+    if catcher:
+        target["catcher"] = catcher
+    t0, started = time.monotonic(), time.time()
     async with Workspace(events, image=IMAGES["npm"], label="escape-probe") as ws:
         await ws.write("/opt/escape-target.json", json.dumps(target).encode())
         await ws.exec("chmod 644 /opt/escape-target.json", source="unpack")
@@ -65,17 +111,23 @@ async def once() -> dict:
         s.close()
     recorded = [e.to_dict() for e in events.events
                 if e.kind in ("egress_blocked", "egress_allowed", "canary_exfil", "dns_blocked", "canary_read")]
-    return {"seconds": round(time.monotonic() - t0, 1), "install_exit": installed.exit_code,
-            "token_matches_canary": probe["token"] == canary, "gateway": probe["gateway"], "outside": target,
+    return {"seconds": round(time.monotonic() - t0, 1), "window": [started, time.time()], "install_exit": installed.exit_code,
+            "token_matches_canary": probe["token"] == canary, "probe_token": probe["token"],  # fake, made for this run
+            "gateway": probe["gateway"], "outside": target,
             "outside_heard": heard,
             "probe": probe["results"], "recorded": recorded}
 
 
-async def main(runs: int) -> list[dict]:
-    return [await once() for _ in range(runs)]
+async def main(runs: int, zone: str | None) -> dict:
+    catcher = catcher_addrs(zone) if zone else None
+    report = {"catcher": catcher, "control": control(catcher) if catcher else None}
+    report["runs"] = [await once(catcher) for _ in range(runs)]
+    return report
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=1)
-    print(json.dumps(asyncio.run(main(ap.parse_args().runs)), indent=2, default=str))
+    ap.add_argument("--catcher", help="the catcher's DNS zone, e.g. catch.darkflib.dev")
+    a = ap.parse_args()
+    print(json.dumps(asyncio.run(main(a.runs, a.catcher)), indent=2, default=str))

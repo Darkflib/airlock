@@ -1,0 +1,44 @@
+{
+  "catcher": {
+    "zone": "catch.darkflib.dev",
+    "v4": "95.179.197.125",
+    "v6": "2001:19f0:7400:219f:5400:7ff:fe03:9747"
+  },
+  "control_seen": [
+    "dns:udp",
+    "icmp:",
+    "tcp:4444",
+    "tcp:47801",
+    "tcp:80"
+  ],
+  "control_sent": {
+    "marker": "CONTROL2804AC9483C2",
+    "http_name": "ok",
+    "dns_resolver": "ok",
+    "tcp_v4": "ok",
+    "tcp_v6": "ok",
+    "icmp": "ok"
+  },
+  "hits_total": 18,
+  "runs": [
+    {
+      "run": 1,
+      "catcher_probes": 16,
+      "hits_with_token": [],
+      "hits_from_host": []
+    },
+    {
+      "run": 2,
+      "catcher_probes": 16,
+      "hits_with_token": [],
+      "hits_from_host": []
+    },
+    {
+      "run": 3,
+      "catcher_probes": 16,
+      "hits_with_token": [],
+      "hits_from_host": []
+    }
+  ],
+  "escaped": false
+}

