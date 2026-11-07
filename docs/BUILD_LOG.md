@@ -975,3 +975,17 @@ Tags: #decision #demo
 **Result:** 13 s for a 2:42 take; 90–100% of each line's words matched. Whisper's word times run edge to edge and ~0.35 s late, so pauses vanished at first (speak = slot on every line); trimming with ffmpeg `silencedetect` (−35 dB, 0.3 s, 0.6 s tolerance) recovered every 1.2 s boundary.
 **So:** the draft VO is one take, not 15 files; the same run on the final VO gives caption timings.
 Tags: #decision
+
+## 7 November 2026
+
+### 12:35 — Why the gate isn't a GitHub Actions step
+**Tried:** looked at adding an example Actions step as a second integration path.
+**Result:** rejected. The PR under review can edit the workflow; `pull_request_target` plus checking out the PR's code is a pwn request; any earlier `npm ci` runs the install on the runner; any workflow can post a check named `airlock`.
+**So:** added it as a rejected option in TECHNICAL_REPORT's "Why a GitHub App" and a short paragraph under the README's without-Airlock table. Docs only.
+Tags: #decision
+
+### 12:50 — Hijack lab into the video and slides
+**Tried:** checked the submission, script and slides against the 7 Nov competitor refresh.
+**Result:** the title has the subtitle, nothing claims to be the only one, signed receipts aren't the lead, and the "not a detection rate" caveat is already in the README, slides and long description. The one gap: the hijack lab's forced-benign arm was only in the README, and "the AI can't flip the verdict" is now a common claim.
+**So:** one VO line in the gate scene ("Even an AI fooled into saying 'safe' can't stop that."), a row on the numbers slide, and a sources-table row. Trimmed "Under the hood" by four words; narration is now 407 words. The long description is at 1989/2000, so it stays as it is.
+Tags: #demo #decision

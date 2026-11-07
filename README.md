@@ -77,6 +77,8 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), the PROVEN row ap
 | What the reviewer sees | a green check | MALICIOUS, merge held, rejected automatically, signed receipt |
 | Time | 3.2 s | 23.2 s median (two VMs and the AI review) |
 
+**Why the gate isn't a CI step either.** A PR can edit the workflow that's meant to check it, and any workflow can post a check with the same name. Airlock's check comes from its GitHub App, outside the repo, and branch protection accepts `airlock` only from that App ([why a GitHub App](docs/TECHNICAL_REPORT.md#why-a-github-app)).
+
 The benign PR (#1, left-pad 1.2.0 → 1.3.0) produces **zero** containment events and reads **"No malicious behaviour observed"**, listing what ran and what a run like this can't exercise. Airlock never calls a quiet run safe.
 
 **A package that argues with the reviewer.** We also tried to talk the AI reviewer out of its verdict. The `logfmt-lite` fixture steals the credentials like the others, but every surface it reads — code comments, a README, a fake `SECURITY-AUDIT.md`, the install log — says it's audited and safe and tells automated reviewers to approve it ([`evals/hijack_lab.py`](evals/hijack_lab.py), [results](evals/results/hijack-lab-20261105T234710Z/summary.md), 5 Nov, 3 runs per arm). Two things hold:

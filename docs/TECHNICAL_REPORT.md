@@ -269,15 +269,16 @@ A verdict nobody enforces is a suggestion. Airlock enforces it through GitHub's 
 
 ### Why a GitHub App
 
-We considered three ways to act on a repository:
+We considered four ways to act on a repository:
 
 | Option | Problem |
 | --- | --- |
 | A personal access token | Acts as a person, across every repo that person can reach. A leak is a leak of that person. Statuses look like they came from a human. |
 | The signed-in user's OAuth token | Same breadth, plus Airlock would need write scopes at sign-in, and would act as whoever happened to click. |
+| A CI step (GitHub Actions) | The PR under review can change it. On a PR from a branch in the same repo, GitHub runs the workflow as the PR's head has it, so the PR can delete the step or make it pass. `pull_request_target` runs the base's workflow instead, but checking out and installing the PR's code there runs it with the repo's secrets (the "pwn request" pattern). Any `npm ci` before the step has already run the untrusted install on the runner. And every workflow posts checks as the same GitHub Actions app, so any workflow can post a green `airlock`. |
 | **A GitHub App** (chosen) | Installed per repo by the repo's owner, with only the permissions it declares. Acts as its own identity, `airlocksandbox[bot]`. Tokens are short-lived and can be narrowed to one repo. Branch protection can name the App as the only accepted source of a check. |
 
-The last point decides it: with a PAT, anyone who can write a commit status could also write a green `airlock` status. With an App, branch protection can require `airlock` **from that App's id**, so nobody else's status counts.
+The last point decides it: with a PAT, anyone who can write a commit status could also write a green `airlock` status. With an App, branch protection can require `airlock` **from that App's id**, so nobody else's status counts. It's also why the check isn't a CI step: a gate that the PR under review can edit isn't a gate.
 
 ### Permissions
 

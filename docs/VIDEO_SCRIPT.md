@@ -79,7 +79,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** The run page already shows REJECTED, "automatically: exfiltration proven by a captured payload". Nobody clicked. On GitHub, PR #9: red `airlock` status with the same reason, merge blocked, and the `airlocksandbox[bot]` evidence comment.
 
-> "While Airlock tests it, the pull request cannot merge. Here the theft is proven, so Airlock rejects it by itself and posts the evidence."
+> "While Airlock tests it, the pull request cannot merge. Here the theft is proven, so Airlock rejects it by itself and posts the evidence. Even an AI fooled into saying 'safe' can't stop that."
 
 **[SCREEN]** PR #1, the left-pad bump: run page shows 0 new behaviours, zero containment. Switch to GitHub, PR #1: comment `/airlock approve` (typed ahead, just press Comment). The `airlock` check turns green, the bot's evidence comment appears, and the merge button unlocks.
 
@@ -89,7 +89,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
-> "Three layers of protection: a blocked network, a fake internet that records what is sent to it, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A real review costs under three cents in AI."
+> "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A real review costs under three cents in AI."
 
 ### 2:50–3:00 Close
 
@@ -116,6 +116,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | PR #9: silent in install and tests; proven when Airlock exercised it; rejected automatically | BUILD_LOG 5 Nov 14:30 and 14:35; PR #9's first webhook run, 5 Nov 14:35 (recheck on the live run) |
 | A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
+| A fooled AI can't stop the rejection | `hijack-lab-20261105T234710Z`: reviewer forced to answer benign, still rejected 3/3 |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 24 real packages × 2: no false alarms, 6 inconclusive; about 2.5 cents of inference per review | `real-packages-20261105T164727Z`, BUILD_LOG 5 Nov 17:05 |

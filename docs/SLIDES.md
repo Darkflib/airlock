@@ -77,6 +77,7 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Regression (11 npm/PyPI scenarios × 3) | **33/33** correct |
 | Malicious runs with exfil proven by payload | **18/18** |
 | Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
+| Reviewer forced to answer "benign" (hijack lab) | **still rejected 3/3**: the captured proof decides, not the AI |
 | Containment events on benign runs | **0** |
 | 24 real npm/PyPI packages × 2 | **0 false alarms**, 42 clean, 6 inconclusive (binary downloads blocked, or no compiler) |
 | Median run, end to end | **17–35 s** fixtures, **46 s** real packages |
