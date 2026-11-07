@@ -37,7 +37,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 **[SCREEN]** airlock.darkflib.dev. Paste the PR URL, submit. The PR card shows `colorful-logs-2.0.1.tgz` marked *added*. The timeline streams in.
 
-> "Airlock runs every untrusted change in its own disposable computer. This is a small virtual machine on Vultr. It started in under one second."
+> "Airlock Sandbox runs every untrusted change in its own disposable computer. This is a small virtual machine on Vultr. It started in under one second."
 
 **[SCREEN]** Setup stage: VM started, canaries (fake passwords) planted, watcher ready.
 

@@ -18,6 +18,7 @@
   .brand { display:flex; align-items:center; gap:28px; }
   .brand img { width:150px; height:150px; }
   .brand h1 { font-size:132px; font-weight:700; letter-spacing:2px; line-height:1; }
+  .brand h1 span { display:block; margin-top:14px; font-family:'JetBrains Mono', monospace; font-size:44px; font-weight:500; letter-spacing:22px; color:var(--cyan); }
   .kicker { font-family:'JetBrains Mono', monospace; font-size:26px; color:var(--cyan); letter-spacing:5px; text-transform:uppercase; }
   .tag { font-size:52px; font-weight:600; line-height:1.18; }
   .tag em { font-style:normal; color:var(--hazard); }
@@ -44,7 +45,7 @@
 
   <div class="left">
     <p class="kicker">Catch stolen keys before you merge</p>
-    <div class="brand"><img src="airlock-logo.png" alt=""><h1>AIRLOCK</h1></div>
+    <div class="brand"><img src="airlock-logo.png" alt=""><h1>AIRLOCK<span>SANDBOX</span></h1></div>
     <p class="tag">Every untrusted code change runs in its own disposable computer.<br><em>See what it tried to steal.</em></p>
     <p class="sub">Pull requests and npm and PyPI packages run in a throwaway Vultr virtual machine. Stolen data is captured as proof. Nothing merges until a person approves.</p>
   </div>

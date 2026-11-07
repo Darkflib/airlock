@@ -26,7 +26,7 @@ The total of 401 words still fits in 3:00. The front half has slack and the back
 |---|---|---|---|---|---|---|
 | 1 | 0:00–0:06 | 6 s | LIVE | GitHub PR #3 "coloured startup log": scroll to green `npm test` check, then Files tab (`package.json` line + vendored `.tgz`) | "This pull request adds a coloured logger…" | **Slide 2**: PR #3 with green check |
 | 2 | 0:06–0:17 | 11 s | SLIDE | Slide 3 "same PR without Airlock". Hold 2 s on the right side (attacker's POST, token and secret highlighted) | "We ran it like a normal CI job…" | (slide 3 itself) |
-| 3 | 0:17–0:29 | 12 s | LIVE | airlock.darkflib.dev: paste PR #3 URL, submit; PR card shows `colorful-logs-2.0.1.tgz` *added*; timeline starts streaming | "Airlock runs every untrusted change…" | spare: PR card |
+| 3 | 0:17–0:29 | 12 s | LIVE | airlock.darkflib.dev: paste PR #3 URL, submit; PR card shows `colorful-logs-2.0.1.tgz` *added*; timeline starts streaming | "Airlock Sandbox runs every untrusted change…" | spare: PR card |
 | 4 | 0:29–0:40 | 11 s | LIVE | Setup stage: VM started (boot time visible), canaries planted, watcher ready | "First, we put fake passwords…" | **Slide 9** (optional): boot time |
 | 5 | 0:40–0:53 | 13 s | LIVE | Detonation: `npm ci` as unprivileged user; `cat .npmrc` / `.aws/credentials`, `curl` sinkholed, raw-IP refused | "The install runs as a normal user…" | spare |
 | 6 | 0:53–1:09 | 16 s | LIVE | **Money shot.** PROVEN exfil row expanded, run token highlighted in the POST body. Hold 3 s still | "And there it is…" | **Slide 5**: expanded PROVEN row, full res |

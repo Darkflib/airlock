@@ -989,3 +989,9 @@ Tags: #decision
 **Result:** the title has the subtitle, nothing claims to be the only one, signed receipts aren't the lead, and the "not a detection rate" caveat is already in the README, slides and long description. The one gap: the hijack lab's forced-benign arm was only in the README, and "the AI can't flip the verdict" is now a common claim.
 **So:** one VO line in the gate scene ("Even an AI fooled into saying 'safe' can't stop that."), a row on the numbers slide, and a sources-table row. Trimmed "Under the hood" by four words; narration is now 407 words. The long description is at 1989/2000, so it stays as it is.
 Tags: #demo #decision
+
+### 13:16 — Display name: Airlock Sandbox
+**Tried:** several other entries are also called Airlock. Killbox, Snare and similar were free, but the video shows `airlock` everywhere (domain, check, `/airlock approve`), and a full rename two hours before recording risks the gate shot.
+**Result:** "Airlock Sandbox" matches the bot users see (`airlocksandbox[bot]`) and no other entry uses it. With "Before You Merge" the lablab title was 51 characters, over the 50 limit.
+**So:** lablab title "Airlock Sandbox: Catch Stolen Keys Before Merge" (47, checker passes); README, PRD and slide 1 headings, the first narration line, and the cover wordmark (re-rendered). "Airlock" stays as the short name; domain, App, check and code are unchanged.
+Tags: #decision #demo

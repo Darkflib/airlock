@@ -1,6 +1,6 @@
 ![Airlock](assets/airlock-github-banner.png)
 
-# Airlock: Catch Stolen Keys Before You Merge
+# Airlock Sandbox: Catch Stolen Keys Before You Merge
 
 **Every untrusted dependency change gets its own disposable computer.**
 
