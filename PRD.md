@@ -197,9 +197,12 @@ The P0 cut line (end of Thursday 5 Nov) **was met on Tuesday 3 Nov**. The rest o
 **Sun 8 Nov: publish and submit (deadline 23:00 GMT)**
 
 - [ ] Pre-publish audit: scan git history for secrets and share-link tokens; `.env` holds only `op://` references. First pass 5 Nov: both repos clean (`scripts/audit-history.py`); rerun on the final commits before flipping visibility
+- [ ] Just before making the repo public: move the competitor review out of the repo and filter it from history (`git filter-repo --path the competitor review --invert-paths`), drop its three links in this file, make the pointed BUILD_LOG lines neutral, fix commit hashes the rewrite makes stale (filter-repo's commit map), force-push
 - [ ] Make `Darkflib/airlock` public (MIT)
 - [x] `Darkflib/airlock-demo` public (6 Nov), so PR links in bot comments and slides work for judges: test PRs #5-#7 closed first, leaving #1, #3, #4 and #9; README warning covers #3/#4/#9; mirror-clone history audit clean (6 Nov)
 - [ ] `scripts/check-submission.py` passes (long description at 1997/2000 on 5 Nov: additions must replace text); submit on lablab.ai; on-site demo in Salt Lake City
+
+**After judging:** take the live site down cheaply and safely, in the order in [docs/AFTER_JUDGING.md](docs/AFTER_JUDGING.md) (public pages, access, DNS, then the machines).
 
 **If anything slips,** cut slide polish and the cover image first. Never the video or the pre-publish audit.
 

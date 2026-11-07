@@ -1,6 +1,6 @@
 # Slide outline
 
-Draft, 4 Nov. Eleven slides (slide 3 added 5 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
+Draft, 4 Nov. Thirteen slides (slide 3 added 5 Nov; 12 and 13 on 7 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
 
 ## 1. Title
 
@@ -86,11 +86,23 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Whole build to 5 Nov, inference + compute | **$8.26** |
 "11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.
 
-## 11. Limits and try it
+## 11. Limits
 
 - Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
 - npm and PyPI only; installs that download binaries come back inconclusive, never approved; browser-level behaviour (Pattern B) descoped.
-- **Try it:** airlock.darkflib.dev → Run self-test (five known packages, scored live). Repo: github.com/Darkflib/airlock (MIT).
+
+## 12. What's next
+
+From `docs/TECHNICAL_REPORT.md` section 14. Three items, appearing one by one:
+- **Scale out:** a control plane separate from a pool of KVM workers on Vultr, so capacity is more instances; warm VM pools; Postgres and per-tenant isolation.
+- **See deeper:** a custom guest kernel with eBPF (kprobes, tracepoints, BTF) for syscall-level tracing instead of polling `/proc`; plus anti-evasion (realistic hosts, a fake clock).
+- **Prove it at scale:** a corpus of known-malicious packages and popular benign ones, for a real detection and false-positive rate.
+
+## 13. End card
+
+Airlock Sandbox logo on navy. No live-site URL: the demo host won't stay up long after judging, and the video will.
+github.com/Darkflib/airlock (MIT)
+Mike Preston · Team OwlSuperb · github.com/Darkflib · darkflib.com · mikepreston.org
 
 ## Notes for building the deck
 

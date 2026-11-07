@@ -33,7 +33,7 @@ SHOTS = ROOT / "docs" / "SHOT_LIST.md"
 DEFAULT_MODEL = Path.home() / "dev" / "whisper-dl" / "ggml-small.en.bin"
 
 # Narration lines in VIDEO_SCRIPT.md, in order, map to these shots in SHOT_LIST.md.
-LINE_TO_SHOT = [str(n) for n in range(1, 14)] + ["14", "15"]
+LINE_TO_SHOT = ["0"] + [str(n) for n in range(1, 14)] + ["14", "15", "16", "17"]
 
 NUMBERS = {
     "33": "thirty three", "24": "twenty four", "3": "three", "9": "nine",
@@ -62,7 +62,7 @@ def narration_lines() -> list[str]:
 
 
 def planned() -> dict[str, tuple[float, float]]:
-    """Shot -> (in, out) seconds from the SHOT_LIST table; 14a/14b merge into 14."""
+    """Shot -> (in, out) seconds from the SHOT_LIST table; lettered parts (14a/14b) merge."""
     def secs(t: str) -> float:
         m, s = t.split(":")
         return int(m) * 60 + float(s)
@@ -182,7 +182,7 @@ def main() -> None:
               f"{fmt(s):>6}–{fmt(e):<6} {speak} {slot or 0:5.1f} {delta}  {pct:3d}%   {line[:48]}")
     done = [t for t in end.values()]
     if done:
-        print(f"\nlast word at {fmt(max(done))} (target 3:00). "
+        print(f"\nlast word at {fmt(max(done))} (planned end {fmt(max(b for _, b in plan.values()))}, limit 5:00). "
               "slot = this line's start to the next line's start (includes the pause); "
               "Δ = slot − planned duration.")
     low = [LINE_TO_SHOT[i] for i in range(len(lines)) if matched[i] < 0.6 * total[i]]

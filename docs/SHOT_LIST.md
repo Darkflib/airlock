@@ -16,7 +16,7 @@ The script's block timings don't match its narration. At 135–140 words a minut
 | Under the hood | 48 | 17 s | ~21 s |
 | Close | 38 | 10 s | ~16 s |
 
-The total of 401 words still fits in 3:00. The front half has slack and the back half overruns, so the timecodes below move the block boundaries. If the read still runs long, use the script's own trims (0:15 and 2:33 blocks).
+**Retimed 7 Nov from the raw take one** (lablab's limit turned out to be 5:00, so nothing is squeezed to 3:00): each slot is that line's measured speaking time plus about a second. Lines 0, 16 and 17 are new or split, so their times are estimates. Redo these from the cleaned voice-over with `scripts/vo_timings.py` before cutting.
 
 ## Edit timeline
 
@@ -24,23 +24,25 @@ The total of 401 words still fits in 3:00. The front half has slack and the back
 
 | # | In–Out | Dur | Src | On screen | VO starts | Still for deck |
 |---|---|---|---|---|---|---|
-| 1 | 0:00–0:06 | 6 s | LIVE | GitHub PR #3 "coloured startup log": scroll to green `npm test` check, then Files tab (`package.json` line + vendored `.tgz`) | "This pull request adds a coloured logger…" | **Slide 2**: PR #3 with green check |
-| 2 | 0:06–0:17 | 11 s | SLIDE | Slide 3 "same PR without Airlock". Hold 2 s on the right side (attacker's POST, token and secret highlighted) | "We ran it like a normal CI job…" | (slide 3 itself) |
-| 3 | 0:17–0:29 | 12 s | LIVE | airlock.darkflib.dev: paste PR #3 URL, submit; PR card shows `colorful-logs-2.0.1.tgz` *added*; timeline starts streaming | "Airlock Sandbox runs every untrusted change…" | spare: PR card |
-| 4 | 0:29–0:40 | 11 s | LIVE | Setup stage: VM started (boot time visible), canaries planted, watcher ready | "First, we put fake passwords…" | **Slide 9** (optional): boot time |
-| 5 | 0:40–0:53 | 13 s | LIVE | Detonation: `npm ci` as unprivileged user; `cat .npmrc` / `.aws/credentials`, `curl` sinkholed, raw-IP refused | "The install runs as a normal user…" | spare |
-| 6 | 0:53–1:09 | 16 s | LIVE | **Money shot.** PROVEN exfil row expanded, run token highlighted in the POST body. Hold 3 s still | "And there it is…" | **Slide 5**: expanded PROVEN row, full res |
-| 7 | 1:09–1:20 | 11 s | LIVE | Verdict card MALICIOUS; click an `[E#]` link and the timeline jumps to the exfil event | "Next, an AI agent on Vultr Serverless Inference…" | spare: verdict card |
-| 8 | 1:20–1:28 | 8 s | LIVE | GitHub PR #9 "layered config via tinyconf", Files tab: `index.js` uses `tinyconf.load()` | "This one is harder…" | — |
-| 9 | 1:28–1:34 | 6 s | LIVE | Commit the prepared README line in the web editor, switch to the Airlock tab: `#9 (webhook)` run appears; GitHub `airlock` check pending | "Nobody pastes anything…" | — |
-| 10 | 1:34–1:37 | 3 s | LIVE | Same run finished (cut the ~30 s wait): Detonation "✓ nothing suspicious" | "Install and tests alone…" | — |
-| 11 | 1:37–1:59 | 22 s | LIVE | Agent investigation: reads `lib/beacon.js` → `exercise` row (NODE_ENV=production, chosen by the agent) → PROVEN POST to `cfg-metrics.tinyconf.invalid`, expanded with token. Hold 2 s | "The agent reads the code…" | **Slide 6**: Detonation ✓ above exercise + PROVEN in one frame (zoom out to fit) |
-| 12 | 1:59–2:09 | 10 s | LIVE | Run page REJECTED "automatically…"; GitHub PR #9: red `airlock` status, merge blocked, `airlocksandbox[bot]` evidence comment | "While Airlock tests it…" | **Slide 7** (alt): red status + bot comment |
-| 13 | 2:09–2:23 | 14 s | LIVE | PR #1 run page: 0 new behaviours, zero containment → GitHub PR #1: press Comment on `/airlock approve` → check green, bot comment, merge unlocks | "This one is quiet…" | **Slide 7**: greyed merge button, grabbed *before* pressing Comment |
-| 14a | 2:23–2:32 | 9 s | SLIDE | Slide 8 architecture (`docs/architecture.png`) | "Three layers of protection…" | — |
-| 14b | 2:32–2:44 | 12 s | SLIDE | Slide 10 numbers | "Thirty-three out of thirty-three…" | — |
-| 15a | 2:44–2:54 | 10 s | SLIDE | Slide 11, first two bullets (limits) | "What it can't do…" | — |
-| 15b | 2:54–3:00 | 6 s | SLIDE | End card: logo (`assets/airlock-logo.png`), airlock.darkflib.dev, repo link | "…what it tried to steal." | — |
+| 0 | 0:00–0:08 | 8 s | SLIDE | The cover (`assets/airlock-cover.png`) | "This is Mike from Team OwlSuperb…" | — |
+| 1 | 0:08–0:17 | 9 s | LIVE | GitHub PR #3 "coloured startup log": scroll to green `npm test` check, then Files tab (`package.json` line + vendored `.tgz`) | "This pull request adds a coloured logger…" | **Slide 2**: PR #3 with green check |
+| 2 | 0:17–0:31 | 14 s | SLIDE | Slide 3 "same PR without Airlock". Hold 2 s on the right side (attacker's POST, token and secret highlighted) | "We ran it like a normal CI job…" | (slide 3 itself) |
+| 3 | 0:31–0:43 | 12 s | LIVE | airlock.darkflib.dev: paste PR #3 URL, submit; PR card shows `colorful-logs-2.0.1.tgz` *added*; timeline starts streaming | "Airlock Sandbox runs every untrusted change…" | spare: PR card |
+| 4 | 0:43–0:55 | 12 s | LIVE | Setup stage: VM started (boot time visible), canaries planted, watcher ready | "First, we put fake passwords…" | **Slide 9** (optional): boot time |
+| 5 | 0:55–1:17 | 22 s | LIVE | Detonation: `npm ci` as unprivileged user; `cat .npmrc` / `.aws/credentials`, `curl` sinkholed, raw-IP refused | "The install runs as a normal user…" | spare |
+| 6 | 1:17–1:36 | 19 s | LIVE | **Money shot.** PROVEN exfil row expanded, run token highlighted in the POST body. Hold 3 s still | "And there it is…" | **Slide 5**: expanded PROVEN row, full res |
+| 7 | 1:36–1:48 | 12 s | LIVE | Verdict card MALICIOUS; click an `[E#]` link and the timeline jumps to the exfil event | "Next, an AI agent on Vultr Serverless Inference…" | spare: verdict card |
+| 8 | 1:48–2:00 | 12 s | LIVE | GitHub PR #9 "layered config via tinyconf", Files tab: `index.js` uses `tinyconf.load()` | "This one is harder…" | — |
+| 9 | 2:00–2:07 | 7 s | LIVE | Commit the prepared README line in the web editor, switch to the Airlock tab: `#9 (webhook)` run appears; GitHub `airlock` check pending | "Nobody pastes anything…" | — |
+| 10 | 2:07–2:12 | 5 s | LIVE | Same run finished (cut the ~30 s wait): Detonation "✓ nothing suspicious" | "Install and tests alone…" | — |
+| 11 | 2:12–2:33 | 21 s | LIVE | Agent investigation: reads `lib/beacon.js` → `exercise` row (NODE_ENV=production, chosen by the agent) → PROVEN POST to `cfg-metrics.tinyconf.invalid`, expanded with token. Hold 2 s | "The agent reads the code…" | **Slide 6**: Detonation ✓ above exercise + PROVEN in one frame (zoom out to fit) |
+| 12 | 2:33–2:48 | 15 s | LIVE | Run page REJECTED "automatically…"; GitHub PR #9: red `airlock` status, merge blocked, `airlocksandbox[bot]` evidence comment | "While Airlock tests it…" | **Slide 7** (alt): red status + bot comment |
+| 13 | 2:48–3:02 | 14 s | LIVE | PR #1 run page: 0 new behaviours, zero containment → GitHub PR #1: press Comment on `/airlock approve` → check green, bot comment, merge unlocks | "This one is quiet…" | **Slide 7**: greyed merge button, grabbed *before* pressing Comment |
+| 14a | 3:02–3:12 | 10 s | SLIDE | Slide 8 architecture (`docs/architecture.png`) | "Three layers of protection…" | — |
+| 14b | 3:12–3:24 | 12 s | SLIDE | Slide 10 numbers | "Thirty-three out of thirty-three…" | — |
+| 15 | 3:24–3:36 | 12 s | SLIDE | Slide 11, first two bullets (limits) | "What it can't do…" | — |
+| 16 | 3:36–4:01 | 25 s | SLIDE | Slide 12 "What's next": scale out, eBPF guest kernel, real-malware test, appearing one by one | "Where next?…" | — |
+| 17 | 4:01–4:13 | 12 s | SLIDE | Slide 13 end card: logo, repo, `github.com/Darkflib`, `darkflib.com`, `mikepreston.org`. Hold 4 s after the line | "But every untrusted change…" | — |
 
 ## Capture order (morning)
 

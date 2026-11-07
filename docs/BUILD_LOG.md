@@ -995,3 +995,15 @@ Tags: #demo #decision
 **Result:** "Airlock Sandbox" matches the bot users see (`airlocksandbox[bot]`) and no other entry uses it. With "Before You Merge" the lablab title was 51 characters, over the 50 limit.
 **So:** lablab title "Airlock Sandbox: Catch Stolen Keys Before Merge" (47, checker passes); README, PRD and slide 1 headings, the first narration line, and the cover wordmark (re-rendered). "Airlock" stays as the short name; domain, App, check and code are unchanged.
 Tags: #decision #demo
+
+### 17:20 — Video runs to about 4:15: what's next, end card
+**Tried:** timed the two raw VO takes with whisper. Both have retakes, so each line's every attempt was found separately. Take one is the cleaner base.
+**Result:** cut tight, take one is about 3:25 against the planned 3:00. lablab's real limit is 5:00 (found in the rules), so nothing needs squeezing.
+**So:** kept the natural pace and added three shots: the OwlSuperb opening line over the cover, a "What's next" slide (scale-out workers, eBPF guest kernel, a real-malware corpus, from TECHNICAL_REPORT §14) and an end card with Mike's GitHub and site. The close is split so the punchline lands on the end card. Shot list retimed from take one, to be redone from the cleaned VO; `vo_timings.py` maps the 18 lines.
+Tags: #demo #decision
+
+### 17:45 — End card without the live URL; after-judging checklist
+**Tried:** the demo host is too expensive to keep running for long after judging, but the video and the repo will stay up.
+**Result:** the end card now shows only the repo and Mike's links (github.com/Darkflib, darkflib.com, mikepreston.org). The live URL stays on slide 1, the cover and the README for judging.
+**So:** `docs/AFTER_JUDGING.md` lists the clean-up in a safe order: public pages, then access, then DNS, then the machines. DNS goes before the machines because a record left pointing at a released Vultr IP is a subdomain-takeover risk. The PRD links to it, and the pre-public history filter for the competitor review is now a Sunday item.
+Tags: #decision

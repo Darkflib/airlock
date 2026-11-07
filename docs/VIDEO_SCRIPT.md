@@ -1,4 +1,4 @@
-# Video script (3:00)
+# Video script (about 4:15; lablab's limit is 5:00)
 
 Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what install and tests alone don't expose and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 6 Nov: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), as the strongest entries do; the words came out of the 0:15 and 2:15 blocks. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
 
@@ -23,7 +23,11 @@ Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BU
 
 Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the voice-over.
 
-### 0:00–0:15 Hook
+### 0:00–0:31 Hook
+
+**[SCREEN]** The cover (`assets/airlock-cover.png`), full screen.
+
+> "This is Mike from Team OwlSuperb, and this is Airlock Sandbox."
 
 **[SCREEN]** GitHub, `Darkflib/airlock-demo` PR #3 "feat: coloured startup log". Scroll to the green `npm test` check, then the Files tab with one line in `package.json` and a vendored `colorful-logs-2.0.1.tgz`.
 
@@ -33,7 +37,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "We ran it like a normal CI job, with fake keys. The check is green. And both keys went straight to the attacker."
 
-### 0:15–1:15 Detonation, PR #3 (live)
+### 0:31–1:36 Detonation, PR #3 (live)
 
 **[SCREEN]** airlock.darkflib.dev. Paste the PR URL, submit. The PR card shows `colorful-logs-2.0.1.tgz` marked *added*. The timeline streams in.
 
@@ -51,13 +55,13 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "And there it is. The script read both password files and sent them out. But every address outside the registry goes to Airlock's fake server. So we caught the request, with the stolen token inside. It is proof."
 
-### 1:15–1:35 Verdict
+### 1:36–1:48 Verdict
 
 **[SCREEN]** Verdict card: MALICIOUS. Click an `[E#]` link; the timeline jumps to the exfil event.
 
 > "Next, an AI agent on Vultr Serverless Inference looks inside the same machine and writes a verdict. Every claim links to an event."
 
-### 1:35–2:15 The quiet one, PR #9: where the agent earns its place (started live by a push)
+### 1:48–2:33 The quiet one, PR #9: where the agent earns its place (started live by a push)
 
 **[SCREEN]** GitHub PR #9 "feat: layered config via tinyconf", Files tab: `index.js` now reads its port through `tinyconf.load()`. Nothing else stands out.
 
@@ -75,7 +79,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "The agent reads the code and finds a check: it only sends data in production. So it asks Airlock to run the code the way a live server would. Airlock runs it from a clean copy, and catches the stolen passwords. The agent found it. Airlock proved it."
 
-### 2:15–2:33 The gate
+### 2:33–3:02 The gate
 
 **[SCREEN]** The run page already shows REJECTED, "automatically: exfiltration proven by a captured payload". Nobody clicked. On GitHub, PR #9: red `airlock` status with the same reason, merge blocked, and the `airlocksandbox[bot]` evidence comment.
 
@@ -85,17 +89,29 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "This one is quiet: nothing new, nothing blocked. Airlock says what it saw, not that it's safe. So approval is a person's job, here in GitHub. Now it can merge."
 
-### 2:33–2:50 Under the hood
+### 3:02–3:24 Under the hood
 
 **[SCREEN]** Slide: architecture diagram (`docs/architecture.png`), then the numbers slide.
 
 > "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A real review costs under three cents in AI."
 
-### 2:50–3:00 Close
+### 3:24–3:36 Limits
 
-**[SCREEN]** Slide 11 ("Limits and try it"), its first two bullets, then the Airlock logo, URL `airlock.darkflib.dev`, repo link.
+**[SCREEN]** Slide 11 ("Limits"), its first two bullets.
 
-> "What it can't do: malware that knows it is watched can stay quiet, and it covers npm and PyPI only. But every untrusted change runs in its own disposable computer, and you see what it tried to steal."
+> "What it can't do: malware that knows it is watched can stay quiet, and it covers npm and PyPI only."
+
+### 3:36–4:01 What's next
+
+**[SCREEN]** Slide 12 ("What's next"), the three items appearing one by one. From `docs/TECHNICAL_REPORT.md` section 14.
+
+> "Where next? Split the control plane from a pool of Vultr workers, so more capacity is just more machines. Build a custom guest kernel with eBPF, so we trace every system call instead of polling. And test on a large set of real malware, so we can quote a true detection rate."
+
+### 4:01–4:13 Close
+
+**[SCREEN]** Slide 13, the end card: the Airlock Sandbox logo, the repo, and Mike's GitHub (`github.com/Darkflib`), `darkflib.com` and `mikepreston.org`. Hold about 4 s after the last word.
+
+> "But every untrusted change runs in its own disposable computer, and you see what it tried to steal."
 
 ## Cutaways if a shot fails on the day
 
