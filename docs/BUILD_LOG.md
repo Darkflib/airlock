@@ -1007,3 +1007,15 @@ Tags: #demo #decision
 **Result:** the end card now shows only the repo and Mike's links (github.com/Darkflib, darkflib.com, mikepreston.org). The live URL stays on slide 1, the cover and the README for judging.
 **So:** `docs/AFTER_JUDGING.md` lists the clean-up in a safe order: public pages, then access, then DNS, then the machines. DNS goes before the machines because a record left pointing at a released Vultr IP is a subdomain-takeover risk. The PRD links to it, and the pre-public history filter for the competitor review is now a Sunday item.
 Tags: #decision
+
+### 18:05 — lablab rules, collected from five pages
+**Tried:** read the event page, hackathon rules, "Delivering your hackathon solution" and both guides, and checked the submission against them.
+**Result:** we meet the hard rules: video under 5 min (MP4/MOV, 300 MB), PDF slides, public MIT repo with a README covering Vultr services, Challenge 1 tech, and a containment moment on camera. The Presentation rubric scores a video under 3 minutes 2/5, so the old 3:00 target would have cost points. Gap: Business Value (one of four criteria) wants a target user, a TAM figure and a revenue model, and our video and slides have none.
+**So:** form fields and the rules are now in `docs/SUBMISSION.md`. A business beat (who pays, cost per review, pricing shape) and a sourced TAM figure are proposed.
+Tags: #decision
+
+### 18:30 — Business beat: who pays, why now, market size
+**Tried:** lablab's Business Value criterion asks for a target user, a TAM figure and a revenue model. Looked for sourced figures and checked each against its original page.
+**Result:** Sonatype counted more than 454,600 new malicious packages in 2025, over 99% on npm. GitHub Octoverse 2025: Dependabot on 2.66M+ projects, 40M Dependabot PRs opened and 14M merged. Mordor Intelligence: supply-chain security platforms $5.53B (2025) → $10.10B (2030), 12.8% CAGR; other publishers range $2–6B for 2025, so the slide says so.
+**So:** a new slide 11 "Who pays, and why now" (later slides renumber to 12–14), a 22 s VO line after the numbers (video now about 4:35 of 5:00), a sources-table row per figure, TECHNICAL_REPORT §14.5 and the README judging table. Revenue model: per-repo subscription plus a self-hosted licence; no price quoted.
+Tags: #decision #demo

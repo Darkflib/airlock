@@ -1,6 +1,6 @@
 # Slide outline
 
-Draft, 4 Nov. Thirteen slides (slide 3 added 5 Nov; 12 and 13 on 7 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
+Draft, 4 Nov. Fourteen slides (slide 3 added 5 Nov; 11, 13 and 14 on 7 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
 
 ## 1. Title
 
@@ -86,19 +86,30 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 | Whole build to 5 Nov, inference + compute | **$8.26** |
 "11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.
 
-## 11. Limits
+## 11. Who pays, and why now
+
+- **Buyer:** platform and security teams in companies with many repos and automated dependency updates. Also open-source foundations and package registries.
+- **Why now:** more than **454,600 new malicious packages** in 2025, over 99% of them on npm (Sonatype).
+- **The workload:** Dependabot runs on **2.66 million+** GitHub projects; **40 million** Dependabot PRs were opened and **14 million** merged in 2025 (GitHub Octoverse). Each is a dependency change somebody approves.
+- **Market:** software supply-chain security platforms, about **$5.5B in 2025, $10.1B by 2030**, 12.8% a year (Mordor Intelligence). Other publishers put 2025 at $2–6B.
+- **Revenue:** a subscription per repository, plus a self-hosted licence for teams that must keep evidence in their own region. A review costs about **3 cents** of inference, and one $113/month host runs about 700 PR reviews an hour, so the margin is wide.
+- **Why it needs AI:** the agent finds code that only misbehaves when called, and turns it into proof (PR #9).
+
+*Footer:* Sources: Sonatype, State of the Software Supply Chain 2026 (open-source malware chapter); GitHub Octoverse 2025 (Sep 2024–Aug 2025); Mordor Intelligence, Software Supply Chain Security Platforms Market. All read 7 Nov 2026.
+
+## 12. Limits
 
 - Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
 - npm and PyPI only; installs that download binaries come back inconclusive, never approved; browser-level behaviour (Pattern B) descoped.
 
-## 12. What's next
+## 13. What's next
 
 From `docs/TECHNICAL_REPORT.md` section 14. Three items, appearing one by one:
 - **Scale out:** a control plane separate from a pool of KVM workers on Vultr, so capacity is more instances; warm VM pools; Postgres and per-tenant isolation.
 - **See deeper:** a custom guest kernel with eBPF (kprobes, tracepoints, BTF) for syscall-level tracing instead of polling `/proc`; plus anti-evasion (realistic hosts, a fake clock).
 - **Prove it at scale:** a corpus of known-malicious packages and popular benign ones, for a real detection and false-positive rate.
 
-## 13. End card
+## 14. End card
 
 Airlock Sandbox logo on navy. No live-site URL: the demo host won't stay up long after judging, and the video will.
 github.com/Darkflib/airlock (MIT)

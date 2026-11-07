@@ -1,4 +1,4 @@
-# Video script (about 4:15; lablab's limit is 5:00)
+# Video script (about 4:35; lablab's limit is 5:00)
 
 Draft, 4 Nov. Built from the PRD demo script and the `#demo` entries in `docs/BUILD_LOG.md`. Every shot is a real run on the live site; nothing is mocked. Narration is about 400 words in short, plain sentences for judges who speak English as a second language: about 3:00 at a slow 135 words a minute, with no slack. If a read-through runs long, trim the 0:15 and 2:33 blocks first. 5 Nov: the 1:35 block is now PR #9 (`tinyconf`) instead of PR #4. Each scene proves a different fact: PR #3, that theft is captured; PR #9, that the agent finds what install and tests alone don't expose and Airlock turns it into proof; PR #1, that approval stays human. PR #9 is started on camera by a push (the GitHub webhook) and rejected automatically because the theft is proven, so the gate shot has no Reject click; PR #1's approval is still a person's, made with an `/airlock approve` comment on GitHub. 6 Nov: the close names the limits on camera (sandbox-aware malware, npm and PyPI only), as the strongest entries do; the words came out of the 0:15 and 2:15 blocks. 5 Nov, late: the hook now shows PR #3 run as a plain CI job (slide 3) instead of saying what tests don't show, a few words shorter.
 
@@ -95,21 +95,27 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 > "Three layers of protection: a blocked network, a fake internet that records everything, and a watcher the package cannot touch. Thirty-three out of thirty-three correct in our tests. On twenty-four real packages: no false alarms. A real review costs under three cents in AI."
 
-### 3:24–3:36 Limits
+### 3:24–3:46 Who pays
 
-**[SCREEN]** Slide 11 ("Limits"), its first two bullets.
+**[SCREEN]** Slide 11 ("Who pays, and why now"): the malicious-package count first, then the market and the cost per review.
+
+> "Who pays? Platform and security teams. Last year Sonatype found over four hundred and fifty thousand new malicious packages, almost all on npm, in a supply-chain security market of about five and a half billion dollars. A review costs us three cents, so pricing per repository leaves a wide margin."
+
+### 3:46–3:58 Limits
+
+**[SCREEN]** Slide 12 ("Limits"), its first two bullets.
 
 > "What it can't do: malware that knows it is watched can stay quiet, and it covers npm and PyPI only."
 
-### 3:36–4:01 What's next
+### 3:58–4:23 What's next
 
-**[SCREEN]** Slide 12 ("What's next"), the three items appearing one by one. From `docs/TECHNICAL_REPORT.md` section 14.
+**[SCREEN]** Slide 13 ("What's next"), the three items appearing one by one. From `docs/TECHNICAL_REPORT.md` section 14.
 
 > "Where next? Split the control plane from a pool of Vultr workers, so more capacity is just more machines. Build a custom guest kernel with eBPF, so we trace every system call instead of polling. And test on a large set of real malware, so we can quote a true detection rate."
 
-### 4:01–4:13 Close
+### 4:23–4:35 Close
 
-**[SCREEN]** Slide 13, the end card: the Airlock Sandbox logo, the repo, and Mike's GitHub (`github.com/Darkflib`), `darkflib.com` and `mikepreston.org`. Hold about 4 s after the last word.
+**[SCREEN]** Slide 14, the end card: the Airlock Sandbox logo, the repo, and Mike's GitHub (`github.com/Darkflib`), `darkflib.com` and `mikepreston.org`. Hold about 4 s after the last word.
 
 > "But every untrusted change runs in its own disposable computer, and you see what it tried to steal."
 
@@ -133,6 +139,9 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | A fooled AI can't stop the rejection | `hijack-lab-20261105T234710Z`: reviewer forced to answer benign, still rejected 3/3 |
+| Over 454,600 new malicious packages in 2025, almost all on npm | Sonatype, State of the Software Supply Chain 2026, open-source malware chapter |
+| Supply-chain security market about $5.5B (2025) | Mordor Intelligence, Software Supply Chain Security Platforms Market ($5.53B 2025, $10.10B 2030, 12.8% CAGR); others range $2–6B |
+| 14 million Dependabot PRs merged in 2025 (slide only) | GitHub Octoverse 2025 |
 | Merge held at pending, branch protection | BUILD_LOG 4 Nov 02:10 |
 | 13 models benchmarked | BUILD_LOG 3 Nov 18:16, `evals/RESULTS.md` |
 | 24 real packages × 2: no false alarms, 6 inconclusive; about 2.5 cents of inference per review | `real-packages-20261105T164727Z`, BUILD_LOG 5 Nov 17:05 |

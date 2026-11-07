@@ -16,7 +16,7 @@ The script's block timings don't match its narration. At 135–140 words a minut
 | Under the hood | 48 | 17 s | ~21 s |
 | Close | 38 | 10 s | ~16 s |
 
-**Retimed 7 Nov from the raw take one** (lablab's limit turned out to be 5:00, so nothing is squeezed to 3:00): each slot is that line's measured speaking time plus about a second. Lines 0, 16 and 17 are new or split, so their times are estimates. Redo these from the cleaned voice-over with `scripts/vo_timings.py` before cutting.
+**Retimed 7 Nov from the raw take one** (lablab's limit turned out to be 5:00, so nothing is squeezed to 3:00): each slot is that line's measured speaking time plus about a second. Lines 0, 15, 17 and 18 are new or split, so their times are estimates. Redo these from the cleaned voice-over with `scripts/vo_timings.py` before cutting.
 
 ## Edit timeline
 
@@ -40,9 +40,10 @@ The script's block timings don't match its narration. At 135–140 words a minut
 | 13 | 2:48–3:02 | 14 s | LIVE | PR #1 run page: 0 new behaviours, zero containment → GitHub PR #1: press Comment on `/airlock approve` → check green, bot comment, merge unlocks | "This one is quiet…" | **Slide 7**: greyed merge button, grabbed *before* pressing Comment |
 | 14a | 3:02–3:12 | 10 s | SLIDE | Slide 8 architecture (`docs/architecture.png`) | "Three layers of protection…" | — |
 | 14b | 3:12–3:24 | 12 s | SLIDE | Slide 10 numbers | "Thirty-three out of thirty-three…" | — |
-| 15 | 3:24–3:36 | 12 s | SLIDE | Slide 11, first two bullets (limits) | "What it can't do…" | — |
-| 16 | 3:36–4:01 | 25 s | SLIDE | Slide 12 "What's next": scale out, eBPF guest kernel, real-malware test, appearing one by one | "Where next?…" | — |
-| 17 | 4:01–4:13 | 12 s | SLIDE | Slide 13 end card: logo, repo, `github.com/Darkflib`, `darkflib.com`, `mikepreston.org`. Hold 4 s after the line | "But every untrusted change…" | — |
+| 15 | 3:24–3:46 | 22 s | SLIDE | Slide 11 "Who pays, and why now": malicious-package count, then market and cost per review | "Who pays?…" | — |
+| 16 | 3:46–3:58 | 12 s | SLIDE | Slide 12, first two bullets (limits) | "What it can't do…" | — |
+| 17 | 3:58–4:23 | 25 s | SLIDE | Slide 13 "What's next": scale out, eBPF guest kernel, real-malware test, appearing one by one | "Where next?…" | — |
+| 18 | 4:23–4:35 | 12 s | SLIDE | Slide 14 end card: logo, repo, `github.com/Darkflib`, `darkflib.com`, `mikepreston.org`. Hold 4 s after the line | "But every untrusted change…" | — |
 
 ## Capture order (morning)
 
@@ -56,7 +57,7 @@ Record each take as its own clip with ~2 s of handles. The VO is done in three p
 5. **Take C, shots 8–12**: PR #9 push → webhook run → result → GitHub red status. Repeatable by pushing again. Check the `exercise` row appears before moving on; if it doesn't, push again.
 6. **Stills for slides 5, 6, 7 (red)** from takes B and C while the pages are still open: full-res screenshots beat frame grabs.
 7. **Still for slide 7 (greyed merge on PR #1)**, then **Take D, shot 13**: the PR #1 approve. **Do this last, and only once**: approving can't be redone on camera. Run the screen recorder before you open the page.
-8. **Optional:** the self-test page (Run self-test) for slide 11; the Vultr dashboard spend for a recheck.
+8. **Optional:** the self-test page (Run self-test) for slide 12; the Vultr dashboard spend for a recheck.
 9. **Rough cut** to the draft VO. Live shots will run longer or shorter than planned (the webhook run appearing, the `exercise` row landing): let the picture decide, and note where words now need to move or go.
 10. **Final VO**, read while watching the rough cut so each line lands on its shot (above all the PROVEN rows in shots 6 and 11, and the merge button unlocking in shot 13). Slow, with a pause after each number. If you change any wording, change `VIDEO_SCRIPT.md` too, so the captions and the sources table still match.
 11. **Captions** burned in from the final VO's wording, word for word.

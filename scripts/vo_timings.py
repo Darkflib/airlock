@@ -33,7 +33,7 @@ SHOTS = ROOT / "docs" / "SHOT_LIST.md"
 DEFAULT_MODEL = Path.home() / "dev" / "whisper-dl" / "ggml-small.en.bin"
 
 # Narration lines in VIDEO_SCRIPT.md, in order, map to these shots in SHOT_LIST.md.
-LINE_TO_SHOT = ["0"] + [str(n) for n in range(1, 14)] + ["14", "15", "16", "17"]
+LINE_TO_SHOT = ["0"] + [str(n) for n in range(1, 14)] + ["14", "15", "16", "17", "18"]
 
 NUMBERS = {
     "33": "thirty three", "24": "twenty four", "3": "three", "9": "nine",
