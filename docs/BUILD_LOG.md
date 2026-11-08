@@ -325,7 +325,7 @@ Tags: #fail #decision
 
 ### 23:48 — Deployed; live self-test 3/3; judge links minted
 **Result:**
-- Deployed `30dc32e`. The first live self-test (`20261103-234726-8e911e`) passed **3/3**: the Node stealer had 5 containment events and the shell stealer 6, both with exfil proven by payload; the benign package had 0.
+- Deployed `7915807`. The first live self-test (`20261103-234726-8e911e`) passed **3/3**: the Node stealer had 5 containment events and the shell stealer 6, both with exfil proven by payload; the benign package had 0.
 - Minted 60-day share links for PR #3 (rejected, bot comment posted), PR #1 (approved) and that self-test. Plus the `lablab` invite: 50 accounts, 30 days.
 - Checked signed out against the live site: each share link opens its page and API (200) but not the run list or submit (401). The invite redirects to GitHub OAuth.
 **So:** the submission can link straight to the money shot. The links are bearer tokens: store them in 1Password, never in this repo (it goes public).
@@ -362,7 +362,7 @@ Tags: #metric #win
 Tags: #fail #win #demo
 
 ### 01:48 — Deployed the DNS guard and fail-closed checks; regression still 18/18
-**Tried:** deployed `a214ffa` once 1Password approved, re-ran `spikes/dns_gateway_probe.py` and the product regression on the host.
+**Tried:** deployed `1d4bacb` once 1Password approved, re-ran `spikes/dns_gateway_probe.py` and the product regression on the host.
 **Result:** probe against the live code: registry resolves, `example.com` and the unique probe name get NXDOMAIN, both recorded as `dns_blocked`. Regression (`evals/results/product-20261104T014526Z`): **18/18**, exfil proven 9/9, 0 containment on benign targets, none downgraded to inconclusive, 0 forced, 0 invalid tool calls; median 10.7–17.0 s. A first attempt without `web.env` sourced failed the two PR targets with "GitHub App not configured": a harness setup slip, not a product fault.
 **So:** the stricter checks cost no accuracy and no false "inconclusive"s. README results table now points at this run.
 Tags: #metric #win
@@ -374,7 +374,7 @@ Tags: #metric #win
 Tags: #win #decision #demo
 
 ### 01:52 — Review recheck: fixes confirmed, remaining coverage and access gaps
-**Tried:** rechecked through `8c902b1`, ran local tests with loopback enabled, inspected the live homepage, and repeated safe fake-client/parser reproductions.
+**Tried:** rechecked through `40b8f5d`, ran local tests with loopback enabled, inspected the live homepage, and repeated safe fake-client/parser reproductions.
 **Result:** 68 tests passed; owner approval/sharing and wrong-token proof are fixed. Guests still read all owner runs; timed-out tests and observer loss during agent investigation can still end BENIGN; malformed guest DNS can crash its worker; rejected pending updates can preserve an earlier success.
 **So:** [current recheck](RECHECK-2026-11-04.md) supersedes the original open-issue list. Finish visibility, end-of-run observer health, status-failure handling and remaining claims; no application code or production state changed by this review.
 Tags: #decision #metric
@@ -451,7 +451,7 @@ Tags: #decision
 Tags: #metric #win #demo
 
 ### 09:05 — Homepage copy deployed; share links for the new runs
-**Tried:** deployed `600d832`, then minted read-only share links for self-test `20261104-084347-33a1a2` and PR #4 run `20261104-084529-f40401`.
+**Tried:** deployed `43d42e7`, then minted read-only share links for self-test `20261104-084347-33a1a2` and PR #4 run `20261104-084529-f40401`.
 **Result:** health 200; the served homepage describes the five-package self-test and has a PR #4 example (the browser had cached the old page until a reload). Signed out, both links redirect into their shared page, while `/api/runs` still returns 401. Links expire in 60 days (3 Jan 2027).
 **So:** the submission can link the 5/5 self-test and the PR #4 behaviour diff without sign-in. Links live in 1Password, not this repo.
 Tags: #demo
@@ -601,7 +601,7 @@ Tags: #bug #demo
 Tags: #win #demo
 
 ### 23:16 — Independent authentication and authority review
-**Tried:** rechecked the earlier reviews against `cd889d5`, traced OAuth/session/share and web/GitHub decision authority, and exercised temporary databases with fake GitHub clients; no live writes or package execution.
+**Tried:** rechecked the earlier reviews against `dd6b2c7`, traced OAuth/session/share and web/GitHub decision authority, and exercised temporary databases with fake GitHub clients; no live writes or package execution.
 **Result:** 138 existing tests pass in 5.66 s with loopback enabled. Six safe reproductions confirm decision/supersession races, an old review approving the current head, cross-PR run selection, legacy upload labels migrated to guest-visible demos, and share access failing for signed-in guests. Details and prior-fix disposition: [AUTH_REVIEW-2026-11-04.md](AUTH_REVIEW-2026-11-04.md); reproductions: `spikes/auth_review_20261104.py`.
 **So:** the main earlier fixes are present, but serialize gate transitions, bind commands to the intended PR/commit, and make legacy visibility default private before relying on private analysis and merge approval. Review artifacts only; no application fix or deployment performed.
 Tags: #security #decision
@@ -613,13 +613,13 @@ Tags: #security #decision
 Tags: #security #fix
 
 ### 23:33 — Comment approval rechecked after the review fixes (PR #7)
-**Tried:** opened PR #7 on the deployed `aebf7ef` build and commented `/airlock approve` after the result was published.
+**Tried:** opened PR #7 on the deployed `82f0112` build and commented `/airlock approve` after the result was published.
 **Result:** webhook run at 23:32:02, evidence comment by 23:32:06 (written in place), `/airlock approve` at 23:32:57, `success` "approved by @Darkflib (verdict: benign)" at 23:33:00 and the comment rewritten to "BENIGN, approved by @Darkflib". The new time and PR binding accepted it as intended.
 **So:** the gate shot's `/airlock approve` works on the hardened build.
 Tags: #win #demo
 
 ### 23:39 — Independent authority-fix recheck
-**Tried:** reviewed `aebf7ef` through `aba4d25`, ran the full suite and independently paused an old outbound approval while a newer review started; exercised share revocation through the actual event-stream generator with a deterministic clock.
+**Tried:** reviewed `82f0112` through `b7570e5`, ran the full suite and independently paused an old outbound approval while a newer review started; exercised share revocation through the actual event-stream generator with a deterministic clock.
 **Result:** 148 tests pass in 5.91 s; outbound status order `success, pending, pending` preserves the newer gate. A1–A4 are addressed within the documented single-worker/shared-SHA policy. One P2 remains: a signed-in guest's revoked share returns 404 on new requests but the existing stream keeps sending private events because the recheck accepts any valid session. Details: [AUTH_RECHECK-2026-11-04.md](AUTH_RECHECK-2026-11-04.md).
 **So:** close the four main findings; recheck run-level read permission, not just authentication, during SSE. Review artifacts only; no application change or production action.
 Tags: #security #decision
@@ -631,7 +631,7 @@ Tags: #security #decision
 Tags: #security #fix
 
 ### 23:52 — Independent closure of stream finding B1
-**Tried:** rechecked `19a0b96` through `c328dd5`, reran the full suite and the independent revoked-share/outbound-ordering reproduction.
+**Tried:** rechecked `0b3dd8b` through `75c685b`, reran the full suite and the independent revoked-share/outbound-ordering reproduction.
 **Result:** 150 tests pass in 5.90 s. Status order remains `success, pending, pending`; the historical B1 reproduction now ends with `StopAsyncIteration` before the revoked-share event is sent. Fresh run-level authorization replaces the valid-session shortcut, with a forced check before the final payload.
 **So:** B1 is closed for the reproduced case; revocation has a 15-second recheck interval. No remaining finding reproduced in this focused review. Review documentation only; no application changes or production actions.
 Tags: #security #win
@@ -657,7 +657,7 @@ Tags: #security #fix
 Tags: #metric #fix
 
 ### 00:16 — Budgets deployed; PR #3 webhook run on the new build
-**Tried:** deployed `a7e559a` with `scripts/deploy.sh` (no runs live; restart clean, healthz 200), then committed a README comment to PR #3's branch (`0c3e35d`) through the contents API so the webhook would start a run on the hardened build.
+**Tried:** deployed `e6bb3fa` with `scripts/deploy.sh` (no runs live; restart clean, healthz 200), then committed a README comment to PR #3's branch (`0c3e35d`) through the contents API so the webhook would start a run on the hardened build.
 **Result:** `(webhook)` run `20261105-001539-fa523d` started 4 s after the push and finished in 20.7 s: MALICIOUS, exfil to `telemetry.colorful-logs.invalid` PROVEN, 13 behaviours new vs the merge base (6 containment), 64 events (cap 5,000), no `limit_hit` or `coverage_incomplete`, VM destroyed. Rejected automatically: `airlock` status `failure` on the new head and the run's PR comment rewritten in place.
 **So:** the two-VM PR path behaves as before under the budgets. PR #3 now has one more commit and bot comment; PR #4 and PR #1 untouched for filming.
 Tags: #metric #demo
@@ -669,7 +669,7 @@ Tags: #metric #demo
 Tags: #security #fix
 
 ### 05:43 — Snapshot build deployed; PR #3 webhook run against real GitHub
-**Tried:** deployed `a7615e0` with `scripts/deploy.sh` (earlier attempts stopped at a 1Password authorization timeout before touching `web.env`; restart at 05:41:58 UTC, healthz 200), then committed a README comment to PR #3's branch (`ef4da3f`) through the contents API.
+**Tried:** deployed `c9e427a` with `scripts/deploy.sh` (earlier attempts stopped at a 1Password authorization timeout before touching `web.env`; restart at 05:41:58 UTC, healthz 200), then committed a README comment to PR #3's branch (`ef4da3f`) through the contents API.
 **Result:** `(webhook)` run `20261105-054230-4e262a` finished in 22.4 s: MALICIOUS, exfil PROVEN, 64 events (6 containment), no `snapshot_partial` or `limit_hit`. `meta.snapshot` complete: 5 of 5 files listed, head steady, diff 2,057 characters from `compare/base...head` (the same size as fetching that compare directly). Rejected automatically: `airlock` status `failure` on `ef4da3f`, PR comment rewritten in place with no partial-view line.
 **So:** the compare-based diff and the paginated file list work against real GitHub, and a complete snapshot leaves the agent's task and the comment as before. The partial paths (over 3,000 files, refused diff, moving head) are covered by unit tests only.
 Tags: #metric #demo
@@ -687,7 +687,7 @@ Tags: #security #fix #metric
 Tags: #security #fix
 
 ### 06:08 — Retention deployed and checked
-**Tried:** Mike deployed `9d410fb` (restart 06:05:05 UTC). Then I pushed `ae0f6ba` to PR #3 to check that a run still finds its captured request after the sinkhole log rotates.
+**Tried:** Mike deployed `1b96f41` (restart 06:05:05 UTC). Then I pushed `ae0f6ba` to PR #3 to check that a run still finds its captured request after the sinkhole log rotates.
 **Result:** the startup sweep logged `retention: {'uploads': 3, 'runs': 0, 'sinkhole_rotated': True}`: `uploads/` is empty, `sinkhole.jsonl.1` holds the old 172 KB log. The PR #3 webhook run `20261105-060534-9f48a4` wrote to a fresh `sinkhole.jsonl` (419 bytes), finished in 19.0 s, MALICIOUS with one sinkhole-PROVEN exfil, `failure` status posted and its comment written.
 **So:** retention is live and doesn't cost a proof. Each PR #3 run adds its own bot comment, so tidying the older ones stays on the pre-recording checklist.
 Tags: #metric #fix
@@ -699,14 +699,14 @@ Tags: #metric #fix
 Tags: #docs #security
 
 ### 06:14 — Changed deploy scripts checked on the real host
-**Tried:** Mike ran `scripts/deploy.sh` with the reworked scripts (`25cdb33`). Afterwards I compared what landed on the host with before.
+**Tried:** Mike ran `scripts/deploy.sh` with the reworked scripts (`5014e45`). Afterwards I compared what landed on the host with before.
 **Result:** three services `active`, healthz 200, restart 06:12:26 UTC. `web.env` holds the same nine keys at mode 600, with `AIRLOCK_PUBLIC_URL` and `AIRLOCK_ALLOWED_USERS` unchanged (read from `.env` now, not hard-coded). The App secrets resolved through the fallback 1Password item. Caddy gets `AIRLOCK_DOMAIN=airlock.darkflib.dev` from the new drop-in, and `https://airlock.darkflib.dev/healthz` is 200 with a valid certificate.
 **So:** the self-hosting changes are a no-op for our instance. The guide is still untested by someone starting from scratch.
 Tags: #docs #metric
 
 ### 06:30 — Runtime inputs pinned
 **Tried:** the "pinned runtime inputs" item from the 23:54 hardening list. The VM images were pulled by tag, and `node` meant `node:latest`, so a rebuilt host could detonate packages in a different Node and userland. cloud-init installed uv, mitmproxy and Caddy at whatever was current, and microsandbox through its installer, which always takes the latest release and has no version option. The runtime itself was already pinned, it turned out: the Python SDK runs its own bundled `msb`, locked by `uv.lock`, the same binary (same SHA-256) as the installer's copy. Now: `IMAGES` names both images by the digests the host already used (`node@sha256:6c6f…`, Node 26.13.0; `python:3.12-slim@sha256:1148…`), and each `vm_created` event records the exact reference. cloud-init pins uv 0.13.7, mitmproxy 12.3.1 and Caddy 2.11.7 (held) and no longer runs the microsandbox installer. `install-web.sh` links the `msb` CLI to the SDK's binary, runs `uv sync --locked`, and stops if `msb doctor` fails. New `scripts/check-pins.sh` reads the pins from cloud-init, `uv.lock` and `sandbox.py`, compares the host, and checks each image digest resolves (a made-up digest is refused by the registry).
-**Result:** 186 tests pass. After Mike deployed `a75656f`, `check-pins.sh` is clean. PR #3 webhook run `20261105-062625-554531` on the pinned node digest: MALICIOUS, sinkhole-PROVEN exfil, 21.9 s. The Python `setup.py` stealer via `scripts/remote.sh` on the pinned python digest: MALICIOUS, PROVEN.
+**Result:** 186 tests pass. After Mike deployed `b938df2`, `check-pins.sh` is clean. PR #3 webhook run `20261105-062625-554531` on the pinned node digest: MALICIOUS, sinkhole-PROVEN exfil, 21.9 s. The Python `setup.py` stealer via `scripts/remote.sh` on the pinned python digest: MALICIOUS, PROVEN.
 **So:** a rebuild gets the same guest images and tools as today, and drift is one command to see. Not done: a fresh instance from the changed cloud-init, so its new microsandbox path (no installer, CLI from the venv) is checked only on the existing host. mitmproxy's dependencies aren't locked. Pinned Caddy means its security releases (2.11.8 is out) arrive only when the pin moves.
 Tags: #security #fix #metric
 
@@ -743,19 +743,19 @@ Tags: #demo #metric
 ### 11:11 — UI tidy: paged runs, a real nav bar, account deletion, folding run stages
 **Tried:** four changes Mike asked for. (1) The runs table shows 10 rows at a time with Newer/Older, and whole rows click through. The page survives the 5 s refresh, and `/api/runs` now returns up to 500 rows instead of 50. (2) The header is a sticky nav bar. The logo and wordmark link home, "Runs" links to the table, and a GitHub avatar (`github.com/<login>.png`) opens a menu with Account… and Sign out. (3) The Account dialog has Sign out everywhere and, for guests, Delete account behind typing your login. `DELETE /api/me` deletes the guest's runs, events and self-tests, revokes their share links and ends every session. It refuses owners (403: their runs are the demo) and anyone with a run still in progress (409). The allowlist entry stays, so they can sign in again. (4) Run timeline stages are `<details>` sections, as in a CI job view. The stage in progress is open. A finished stage folds unless it has containment or a coverage/limit/error event, or the reader toggled it. Each heading shows badges (contained count, "✓ nothing suspicious", event count, duration). Evidence links open the folded stage before scrolling to the row.
 **Result:** 370 tests pass, 2 of them new (guest deletes their account, owner refused). Checked in the browser with `scripts/ui_replay.py` fixtures plus a minted session cookie. A benign run's timeline went from a long list to four headings with only the verdict open. The hostile run's Detonation stage stays open with "4 contained". Guest deletion landed on /login, and the run then answered 404 to the owner.
-**So:** decisions already posted to GitHub are left there, and deleting a run with a pending PR leaves the PR blocked, which fails safe. Deployed 11:16 UTC (`af5bef8`); the startup `access:` line is unchanged and `DELETE /api/me` answers 401 signed out.
+**So:** decisions already posted to GitHub are left there, and deleting a run with a pending PR leaves the PR blocked, which fails safe. Deployed 11:16 UTC (`0763f18`); the startup `access:` line is unchanged and `DELETE /api/me` answers 401 signed out.
 Tags: #decision #demo
 
 ### 11:25 — Live check of the UI tidy: two run-page fixes
 **Tried:** looked at the deployed UI signed in as Mike. The runs list pages "1–10 of 55" (the old 50-row cap had been hiding five), and rows click through. On the PR #3 run, Detonation stays open with "6 contained", while Setup and the 29-event Agent stage are folded.
 **Result:** two faults. (1) The decision and GitHub-post events after the verdict fell through `stageOf` to a second "Setup" section at the end of the timeline. That labelling predates folding, but an open stray Setup stands out. (2) The agent often cites `[E13, E14]`, and only single `[E9]` refs were linked.
-**So:** post-verdict events now go in a "Decision" stage that is always open, and each id in a grouped ref is its own link. Deployed (`a2bbf9b`). On the live PR #3 run the stages read Setup (folded), Detonation, Agent (folded), Verdict, Decision, and all 15 cited ids are links.
+**So:** post-verdict events now go in a "Decision" stage that is always open, and each id in a grouped ref is its own link. Deployed (`b2f15de`). On the live PR #3 run the stages read Setup (folded), Detonation, Agent (folded), Verdict, Decision, and all 15 cited ids are links.
 Tags: #fix
 
 ### 11:40 — Accessibility audit (WCAG 2.1 AA) and fixes
 **Tried:** axe-core 4.10 on every live page signed in (home, run page with stages expanded, self-test, login, user menu, account dialog), plus keyboard-only passes, contrast computed from the CSS variables, and a 320 px reflow check.
 **Result:** text contrast passed everywhere (lowest 5.0:1), and focus rings and the native dialog were fine. Six major failures: the file upload was unreachable by keyboard (`hidden` input inside a label that can't take focus); the runs table pushed a 320 px page out to 777 px; the package box had only a placeholder; nothing announced errors, status or verdict; `[E12]`-style links in the orange "risky" lines differed from their text by colour alone (1.52:1); and the avatar menu had `role="menu"` with plain buttons in it (axe: critical). Minor: Escape dropped focus to `<body>`, field borders were 1.2–1.5:1, there were no `<main>` landmarks and no `h1` on login, and evidence links didn't move focus.
-**So:** fixed all of them. The upload input is visually hidden but focusable, with a ring on the drop zone. The table scrolls inside its own box. The package box has a screen-reader label. Errors are `role="alert"`, and the status, verdict and self-test score are live regions. Ref links are underlined. The menu is a plain show/hide button with focus returned on Escape. Field borders use `--field-line` (#64809f, 3.8:1). Every page has `<main>`. Evidence links focus the row, and the dialog opens on Close. Deployed (`9aa1d05`). Live, axe reports zero violations on login, home, user menu, account dialog, self-test and the PR #3 run with every stage open (its 6 risky-line refs included). Not tested with a real screen reader.
+**So:** fixed all of them. The upload input is visually hidden but focusable, with a ring on the drop zone. The table scrolls inside its own box. The package box has a screen-reader label. Errors are `role="alert"`, and the status, verdict and self-test score are live regions. Ref links are underlined. The menu is a plain show/hide button with focus returned on Escape. Field borders use `--field-line` (#64809f, 3.8:1). Every page has `<main>`. Evidence links focus the row, and the dialog opens on Close. Deployed (`25be013`). Live, axe reports zero violations on login, home, user menu, account dialog, self-test and the PR #3 run with every stage open (its 6 risky-line refs included). Not tested with a real screen reader.
 Tags: #fix #a11y
 
 ### 12:20 — Judge-facing critique against the published rubric
@@ -771,14 +771,14 @@ Tags: #decision #demo
 Tags: #metric #decision #fail
 
 ### 13:22 — One run per core by default; GitHub reads retried; deployed
-**Tried:** `AIRLOCK_SLOTS` now defaults to `os.cpu_count()` (slow is fine for users, errors aren't). GitHub reads (PR, tarball, merge base, diff, permission) go through the same tenacity backoff as writes, with a unit test that replays the `RemoteProtocolError` from the load test. Docs that said "2 concurrent runs" now say one per core. Deployed `a54430e` with `scripts/deploy.sh`.
+**Tried:** `AIRLOCK_SLOTS` now defaults to `os.cpu_count()` (slow is fine for users, errors aren't). GitHub reads (PR, tarball, merge base, diff, permission) go through the same tenacity backoff as writes, with a unit test that replays the `RemoteProtocolError` from the load test. Docs that said "2 concurrent runs" now say one per core. Deployed `1eebecd` with `scripts/deploy.sh`.
 **Result:** 371 tests pass. Three services `active`, healthz 200, restart 13:21:28 UTC. With the service's env, the deployed code resolves 4 slots on the host (no `AIRLOCK_SLOTS` in `web.env`).
 **So:** live capacity is about 620 PR runs an hour, up from about 320. Retried reads have not been exercised live yet.
 Tags: #decision #fix
 
 ### 13:42 — The queue survives restarts and deploys; guests get back-pressure
-**Tried:** runs now store their real target (`runs.spec`). At startup, queued runs resume with the same id, and runs cut off mid-way fail with their evidence and are retried once (`recover`, `Runner.resume`). On stop, `Runner.drain` gives runs in progress 75 s. Guests get 429 past 5 unfinished runs or 10 queued per slot, the run page shows queue position, and a webhook PR posts `pending: Queued (N ahead)` before it gets a slot (`9590cc6`). Live test: inserted 6 queued fixture runs, restarted `airlock-web`, then restarted it again 10 s later while 4 were running.
-**Result:** resume worked (6, then the 2 still waiting), but the drain didn't: the second stop took 1 s, and the 4 running runs failed with `SandboxNotRunningError`. systemd's default `KillMode=control-group` sends SIGTERM to the microVMs as well as uvicorn. With `KillMode=mixed`, and a failure while draining left `running` for the retry (`6f25724`), the same test passed. The stop waited 11 s for the 4 runs to finish, and all 6 verdicts were correct (4 malicious, 2 benign).
+**Tried:** runs now store their real target (`runs.spec`). At startup, queued runs resume with the same id, and runs cut off mid-way fail with their evidence and are retried once (`recover`, `Runner.resume`). On stop, `Runner.drain` gives runs in progress 75 s. Guests get 429 past 5 unfinished runs or 10 queued per slot, the run page shows queue position, and a webhook PR posts `pending: Queued (N ahead)` before it gets a slot (`4c591eb`). Live test: inserted 6 queued fixture runs, restarted `airlock-web`, then restarted it again 10 s later while 4 were running.
+**Result:** resume worked (6, then the 2 still waiting), but the drain didn't: the second stop took 1 s, and the 4 running runs failed with `SandboxNotRunningError`. systemd's default `KillMode=control-group` sends SIGTERM to the microVMs as well as uvicorn. With `KillMode=mixed`, and a failure while draining left `running` for the retry (`f919e71`), the same test passed. The stop waited 11 s for the 4 runs to finish, and all 6 verdicts were correct (4 malicious, 2 benign).
 **So:** a deploy no longer loses or fails runs that finish within 75 s. The retry of a run still going after 75 s is only covered by unit tests. The 12 "queue test" runs stay in the owner's run list (not demo, so guests don't see them).
 Tags: #fail #fix #decision #demo
 
@@ -789,7 +789,7 @@ Tags: #fail #fix #decision #demo
 Tags: #decision #demo
 
 ### 14:10 — A quiet run reads "No malicious behaviour observed", with what it covered
-**Tried:** critique #3 ("quiet in your sandbox doesn't mean benign"). The stored verdict stays `benign`. The run page, run lists, self-test, PR comment, GitHub status and the timeline's verdict event now say "No malicious behaviour observed" (the pill says "none observed"). The run page and PR comment add "What this covers": the commands Airlock ran on the package with exit codes, how many commands the agent ran, what the watcher records, and what a run like this never exercises (`what_ran` in `airlock/prcomment.py`). The decision text no longer says the agent "found nothing harmful". Deployed `6c1102d` plus fixes.
+**Tried:** critique #3 ("quiet in your sandbox doesn't mean benign"). The stored verdict stays `benign`. The run page, run lists, self-test, PR comment, GitHub status and the timeline's verdict event now say "No malicious behaviour observed" (the pill says "none observed"). The run page and PR comment add "What this covers": the commands Airlock ran on the package with exit codes, how many commands the agent ran, what the watcher records, and what a run like this never exercises (`what_ran` in `airlock/prcomment.py`). The decision text no longer says the agent "found nothing harmful". Deployed `b72ac7c` plus fixes.
 **Result:** on the live benign tarball run the headline first clipped at 34 px, so it's now 22 px for that label. The page was also 1,105 px wide in a 1,024 px window. That came from a long unbroken evidence string and predates this change; evidence and coverage now wrap, and the page fits. 384 tests pass.
 **So:** Airlock never calls a run safe; it says what it saw and what it couldn't. Runs from before today keep "verdict: benign" in their timeline event text, since stored events aren't rewritten.
 Tags: #decision #demo #fix
@@ -1074,4 +1074,16 @@ Tags: #metric #demo
 **Tried:** the 63 packages whose verdict changed between the two full runs, 3 more runs each on the run-2 code (189 runs, 52 min, 218/hour: these are the slow ones). `evals/datadog_borderline.py` separates sandbox evidence from the AI's verdict.
 **Result:** what the sandbox saw (containment, captured requests, proof) changed for at most 2 of 63. Verdicts moved suspicious ↔ benign (38, packages that run nothing at install) or suspicious ↔ malicious (17); the most common verdict held in 3/5 runs for 42 packages and 4/5 for 21. Majority of 5: 50 of 63 malicious or suspicious; 1 never flagged.
 **So:** variation is the model's judgement on do-nothing packages, not the sandbox. Candidate fix, not built: re-run automatically on *suspicious* with zero containment and report the split. Written into README and TECHNICAL_REPORT.
+Tags: #metric #decision
+
+### 18:40 — History prepared for publication: three Codex reviews and push protection
+**Tried:** before making the repo public: a private backup of the full history, then `git filter-repo` to take the competitor notes out of every commit and drop other entries' names and comparisons. Three read-only Codex reviews, then GitHub's push protection on the public repo; each found something the pass before had missed.
+**Result:** removed or redacted in every commit: the notes file, early build-log entries that assessed named rivals' repos, comparisons with other entries in the docs and commit messages, a link to the private planning doc, and, in the Datadog results, credentials and identifiers quoted from malware samples (Telegram bot tokens and chat IDs, Discord webhooks, webhook.site tokens, a Twilio account SID, a hard-coded secret, company emails). Results stay valid JSON; the audit script now checks those patterns. 158 commits kept with their dates; no code or test changed.
+**So:** the public history shows the build as it happened, without notes on other teams or anyone's live credentials.
+Tags: #decision
+
+### 18:45 — Known exfiltration services: measured, not built
+**Tried:** the redaction work listed the services malware sent data to, so counted them in Datadog run 2.
+**Result:** 264 of 680 packages contacted one (OAST 147, IP lookups 64, webhook.site 33, Discord 23, ngrok 9, Telegram 8, others 23); the AI had called 261 of those malicious, so a fixed rule would change about one verdict on this set.
+**So:** worth building after the deadline for determinism and hijack resistance (a verdict floor and a SARIF rule), not for this score. In TECHNICAL_REPORT §14.4.
 Tags: #metric #decision

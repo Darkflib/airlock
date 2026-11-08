@@ -1,6 +1,6 @@
 # Authority fix recheck — 4 November 2026
 
-Independent recheck of `aba4d25`, particularly fix commit `aebf7ef`, against [the authority review](AUTH_REVIEW-2026-11-04.md). Application working tree was clean. No application changes, production requests, deployments, real GitHub writes or untrusted package execution.
+Independent recheck of `b7570e5`, particularly fix commit `82f0112`, against [the authority review](AUTH_REVIEW-2026-11-04.md). Application working tree was clean. No application changes, production requests, deployments, real GitHub writes or untrusted package execution.
 
 ## Main findings disposition
 
@@ -47,6 +47,6 @@ Regression tests in `tests/test_auth_review.py`: a signed-in guest whose only gr
 
 ## Independent closure recheck — 23:52 UTC
 
-Rechecked fix `19a0b96` through `c328dd5`. **150 tests passed in 5.90 s.** The independent reproduction still confirms outbound ordering `success, pending, pending`, then ends with `StopAsyncIteration` at the revoked-share step, before leaking the event it previously received. This is the expected failure of the historical bug reproduction, not a failing product test.
+Rechecked fix `0b3dd8b` through `75c685b`. **150 tests passed in 5.90 s.** The independent reproduction still confirms outbound ordering `success, pending, pending`, then ends with `StopAsyncIteration` at the revoked-share step, before leaking the event it previously received. This is the expected failure of the historical bug reproduction, not a failing product test.
 
 **B1 is closed for the reproduced case.** Run-level read authorization now uses fresh credentials at periodic checks, and the final payload forces a fresh check. Revocation remains bounded by the 15-second recheck interval; it is not an instantaneous disconnect guarantee. No remaining finding from this focused review was reproduced. Application code was not changed, and deployed state was not independently checked; the single-worker and shared-SHA policy constraints above still apply.

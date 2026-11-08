@@ -27,6 +27,12 @@ PATTERNS = {
     "share link": r"/s/[A-Za-z0-9_-]{30,}",
     "invite link": r"/auth/invite/[A-Za-z0-9_-]{20,}",
     "real canary token": r"AIRLOCKCANARY[0-9A-F]{16}",
+    "Telegram bot token": r"(?<!\d)\d{8,10}:AA[A-Za-z0-9_-]{33}",
+    "Discord webhook": r"discord(?:app)?\.com/api/webhooks/\d{6,}",
+    "webhook.site token": r"webhook\.site/(?:#!/)?[0-9a-f]{8}-",
+    "Twilio account SID": r"\bAC[0-9a-f]{32}\b",
+    "email address": r"[A-Za-z0-9._%+-]+@(?!airlock\.darkflib\.dev|airlock\.example\.com|example\.com|d11-web-components|anthropic\.com|users\.noreply\.github\.com)"
+                     r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b",
     "credentials in URL": r"https?://[^/\s:@]+:[^/\s@]{6,}@",
     "secret assignment": r"(?i)\b(api[_-]?key|client_secret|secret|password|passwd|_authToken)\b[\"']?\s*[:=]\s*[\"']"
                          r"(?!op://)[^\"'\s$<{]{16,}[\"']",
@@ -36,6 +42,8 @@ ALLOWED = re.compile(r"AIRLOCKCANARY(0{16}|1{16}|0123456789ABCDEF|DEADBEEF0{8})|
 # Canary tokens from finished lab runs (evals/results) and hand-written ones in tests: a canary token is a
 # fake credential, and PROVEN counts only the running run's own token, so an old one proves nothing.
 CANARY_OK_PATHS = ("evals/results/", "tests/")
+# The fake SSH key Airlock plants is built from this header at run time; these files hold the template, not a key.
+KEY_TEMPLATE_PATHS = ("airlock/sandbox.py", "tests/test_tokenmatch.py")
 
 
 def blobs(repo):
@@ -71,6 +79,8 @@ def audit(repo):
         for where, text in texts(repo, oid, path):
             for name, pattern in PATTERNS.items():
                 if name == "real canary token" and path.startswith(CANARY_OK_PATHS):
+                    continue
+                if name == "private key" and path in KEY_TEMPLATE_PATHS:
                     continue
                 for m in re.finditer(pattern, text):
                     if not ALLOWED.search(m.group(0)):

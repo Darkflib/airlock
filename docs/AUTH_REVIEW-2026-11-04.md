@@ -1,6 +1,6 @@
 # Authentication and authority review — 4 November 2026
 
-Reviewed commit `cd889d5` with a clean application working tree. Focus: who authenticates, whose authority is used, which run/PR/commit receives a decision, and disposition of the two earlier reviews. This is a code review with safe local reproductions, not a production penetration test. No application changes, deployment, live GitHub writes, real credentials, or untrusted package execution were involved.
+Reviewed commit `dd6b2c7` with a clean application working tree. Focus: who authenticates, whose authority is used, which run/PR/commit receives a decision, and disposition of the two earlier reviews. This is a code review with safe local reproductions, not a production penetration test. No application changes, deployment, live GitHub writes, real credentials, or untrusted package execution were involved.
 
 The earlier fixes materially improve the boundary, but approval concurrency and GitHub command targeting still allow decisions to apply beyond the reviewer's intended object. The demo visibility migration also has a remaining disclosure path.
 
@@ -37,7 +37,7 @@ References: `airlock/store.py:76–84`; `airlock/web/app.py:219–226`.
 
 `backfill_demo` infers public registry provenance from a display label: any label without `#` or a disqualifying slash and not ending in `.tgz` is treated as demo material. Before the demo column existed, the upload endpoint accepted any gzip filename, saved a `.tgz` on disk, but stored the **original filename** as the run target. A private upload named `acme-internal` or `acme-internal.tar.gz` therefore matches the migration's public-package heuristic. On upgrade/startup its owner-created analysis becomes readable to every allowlisted guest.
 
-Reproduced by seeding a completed legacy owner run named `acme-internal` with `demo=NULL` and private evidence, then constructing the app: startup set **demo=1**, and a guest GET returned **200** with the private evidence. The historical upload behavior was checked in commit `255a83d`. This is conditional on matching legacy data; production database contents were not inspected. Newly submitted uploads correctly have `demo=False`.
+Reproduced by seeding a completed legacy owner run named `acme-internal` with `demo=NULL` and private evidence, then constructing the app: startup set **demo=1**, and a guest GET returned **200** with the private evidence. The historical upload behavior was checked in commit `23bb068`. This is conditional on matching legacy data; production database contents were not inspected. Newly submitted uploads correctly have `demo=False`.
 
 Fix: default ambiguous legacy records to private. Use trusted provenance where available, or explicitly curate the old demo runs. A valid-looking npm label alone cannot distinguish a registry submission from an upload given the old filename rules. Also repair already-backfilled records: changing the NULL-only migration does not undo an incorrect `demo=1`.
 
