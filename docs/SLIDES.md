@@ -4,7 +4,7 @@ Draft, 4 Nov. Fourteen slides (slide 3 added 5 Nov; 11, 13 and 14 on 7 Nov) for 
 
 ## 1. Title
 
-**Airlock Sandbox: Catch Stolen Keys Before You Merge**
+**Airlock: Catch Stolen Keys Before You Merge**
 Every untrusted change gets its own disposable computer.
 Vultr Agent Rush, Challenge 1 "Blast Radius Zero" · airlock.darkflib.dev
 *Visual:* logo on navy; the cover image if it's ready.

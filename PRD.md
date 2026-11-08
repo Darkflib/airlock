@@ -1,4 +1,4 @@
-# Airlock Sandbox — Catch Stolen Keys Before You Merge (PRD)
+# Airlock — Catch Stolen Keys Before You Merge (PRD)
 
 Nov 3, 2026 · @Mike Preston · this file is the source of truth
 

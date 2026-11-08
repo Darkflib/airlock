@@ -1019,3 +1019,11 @@ Tags: #decision
 **Result:** Sonatype counted more than 454,600 new malicious packages in 2025, over 99% on npm. GitHub Octoverse 2025: Dependabot on 2.66M+ projects, 40M Dependabot PRs opened and 14M merged. Mordor Intelligence: supply-chain security platforms $5.53B (2025) → $10.10B (2030), 12.8% CAGR; other publishers range $2–6B for 2025, so the slide says so.
 **So:** a new slide 11 "Who pays, and why now" (later slides renumber to 12–14), a 22 s VO line after the numbers (video now about 4:35 of 5:00), a sources-table row per figure, TECHNICAL_REPORT §14.5 and the README judging table. Revenue model: per-repo subscription plus a self-hosted licence; no price quoted.
 Tags: #decision #demo
+
+## 8 November 2026
+
+### 12:20 — Title back to "Airlock: Catch Stolen Keys Before You Merge"
+**Tried:** another entry's team shares our 7 Nov display name.
+**Result:** in the gallery, two cards would read "Airlock Sandbox".
+**So:** the lablab title, the README and PRD headings and slide 1 go back to "Airlock: Catch Stolen Keys Before You Merge" (43 chars, checker passes). The narration, cover wordmark and bot keep "Airlock Sandbox"; the clash is on the gallery cards, not inside the video.
+Tags: #decision
