@@ -7,6 +7,7 @@ never open an upstream connection. Allowlisted registries pass through untouched
 (--ignore-hosts). Runs as the airlock-sinkhole systemd unit.
 """
 
+import base64
 import ipaddress
 import json
 import os
@@ -47,6 +48,8 @@ def request(flow: http.HTTPFlow) -> None:
         "ts": time.time(), "dest": flow.server_conn.address[0], "host": flow.request.pretty_host,
         "method": flow.request.method, "url": flow.request.pretty_url, "bytes": len(raw),
         "body": body[:MAX_BODY], "truncated": len(body) > MAX_BODY,
+        # the raw bytes too: get_text() mangles binary bodies (raw gzip, XOR), which proof matching needs
+        "raw_b64": base64.b64encode(raw[:MAX_BODY]).decode(),
         "user_agent": flow.request.headers.get("user-agent", ""),
     })
     flow.response = http.Response.make(200, b'{"ok":true}', {"content-type": "application/json"})

@@ -808,6 +808,18 @@ def create_app(store: Store | None = None, analyse: Analyse | None = None,
         headers = {"Content-Disposition": f'attachment; filename="airlock-{run_id}.receipts.json"'} if download else {}
         return JSONResponse(bundle, headers=headers)
 
+    @app.get("/api/runs/{run_id}/sarif")
+    async def sarif(run_id: str, request: Request, download: bool = False):
+        """The run's findings as SARIF 2.1.0, for GitHub code scanning (airlock/sarif.py)."""
+        from airlock.sarif import to_sarif
+        run = get_readable(run_id, request)
+        if not run.get("verdict"):
+            raise HTTPException(409, "this run has no verdict yet")
+        doc = to_sarif(run_id=run_id, target=run["target"], verdict=run["verdict"], evidence=run.get("evidence") or [],
+                       events=store.events(run_id), run_url=f"{public_url}/runs/{run_id}")
+        headers = {"Content-Disposition": f'attachment; filename="airlock-{run_id}.sarif"'} if download else {}
+        return JSONResponse(doc, headers=headers, media_type="application/sarif+json")
+
     @app.get("/api/runs/{run_id}/events")
     async def stream(run_id: str, request: Request):
         get_readable(run_id, request)

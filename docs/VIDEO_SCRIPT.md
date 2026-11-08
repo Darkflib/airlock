@@ -109,9 +109,9 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 
 ### 3:58–4:23 What's next
 
-**[SCREEN]** Slide 13 ("What's next"), the three items appearing one by one. From `docs/TECHNICAL_REPORT.md` section 14.
+**[SCREEN]** Slide 10, the Datadog row highlighted, for the first sentence; then slide 13 ("What's next"), the items appearing one by one. From `docs/TECHNICAL_REPORT.md` section 14.
 
-> "Where next? Split the control plane from a pool of Vultr workers, so more capacity is just more machines. Build a custom guest kernel with eBPF, so we trace every system call instead of polling. And test on a large set of real malware, so we can quote a true detection rate."
+> "We ran six hundred and eighty known malicious packages from Datadog's public dataset: Airlock called seventy-eight percent malicious. Where next? Run Python wheels too. Split the control plane from a pool of Vultr workers. And trace every system call with eBPF."
 
 ### 4:23–4:35 Close
 
@@ -139,6 +139,7 @@ Timings are targets. **[SCREEN]** is what's on camera; the quoted text is the vo
 | A push starts a run by itself | BUILD_LOG 4 Nov 14:55 (webhook) |
 | Proven theft is rejected automatically | BUILD_LOG 4 Nov (auto-reject) |
 | A fooled AI can't stop the rejection | `hijack-lab-20261105T234710Z`: reviewer forced to answer benign, still rejected 3/3 |
+| 680 known-malicious packages, 78% called malicious | `datadog-sample-20261108T142051Z` (run 2), with run 1 and the comparison beside it |
 | Over 454,600 new malicious packages in 2025, almost all on npm | Sonatype, State of the Software Supply Chain 2026, open-source malware chapter |
 | Supply-chain security market about $5.5B (2025) | Mordor Intelligence, Software Supply Chain Security Platforms Market ($5.53B 2025, $10.10B 2030, 12.8% CAGR); others range $2–6B |
 | 14 million Dependabot PRs merged in 2025 (slide only) | GitHub Octoverse 2025 |

@@ -240,7 +240,7 @@ def share_allows(share: dict, method: str, path: str) -> bool:
         return False
     allowed = set()
     for r in share.get("runs", []):
-        allowed |= {f"/runs/{r}", f"/api/runs/{r}", f"/api/runs/{r}/events", f"/api/runs/{r}/receipts"}
+        allowed |= {f"/runs/{r}", f"/api/runs/{r}", f"/api/runs/{r}/events", f"/api/runs/{r}/receipts", f"/api/runs/{r}/sarif"}
     if share.get("selftest"):
         allowed |= {f"/selftests/{share['selftest']}", f"/api/selftests/{share['selftest']}"}
     return path in allowed

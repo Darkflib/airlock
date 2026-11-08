@@ -42,7 +42,7 @@ The script's block timings don't match its narration. At 135–140 words a minut
 | 14b | 3:12–3:24 | 12 s | SLIDE | Slide 10 numbers | "Thirty-three out of thirty-three…" | — |
 | 15 | 3:24–3:46 | 22 s | SLIDE | Slide 11 "Who pays, and why now": malicious-package count, then market and cost per review | "Who pays?…" | — |
 | 16 | 3:46–3:58 | 12 s | SLIDE | Slide 12, first two bullets (limits) | "What it can't do…" | — |
-| 17 | 3:58–4:23 | 25 s | SLIDE | Slide 13 "What's next": scale out, eBPF guest kernel, real-malware test, appearing one by one | "Where next?…" | — |
+| 17 | 3:58–4:23 | 25 s | SLIDE | Slide 10 numbers (Datadog row) for the first sentence, then slide 13 "What's next": wheels, scale out, eBPF | "We ran six hundred and eighty…" | — |
 | 18 | 4:23–4:35 | 12 s | SLIDE | Slide 14 end card: logo, repo, `github.com/Darkflib`, `darkflib.com`, `mikepreston.org`. Hold 4 s after the line | "But every untrusted change…" | — |
 
 ## Capture order (morning)

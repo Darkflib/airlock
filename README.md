@@ -17,7 +17,7 @@ Built for the Vultr **Agent Rush** hackathon, Challenge 1, *Blast Radius Zero*.
 - **What it is.** Paste a pull request URL. Airlock installs and tests the change in a throwaway microVM that holds fake credentials, records what the change does, and has an agent give a verdict that links to the evidence. Proven theft is rejected automatically; anything else waits for a person, and nothing is ever approved automatically.
 - **Why it's Blast Radius Zero.** Containment *is* the product. Every run is Pattern A: sandboxed execution, with results fed back to the agent. The containment moment happens on its own: on demo PR #3 the sinkhole catches the stealer's POST carrying this run's canary token.
 - **Vultr.** A **VX1** Cloud Compute instance exposes `/dev/kvm`, so each run gets a microVM with its own kernel, not a container. **Every LLM call goes through Vultr Serverless Inference** (`mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models).
-- **Proof.** 33/33 correct (11 scenarios × 3) on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate for unseen malware. Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
+- **Proof.** 33/33 correct (11 scenarios × 3) on a small npm + PyPI fixture regression run through the real pipeline ([results](#results)); that's evidence it works, not a detection rate. **On 680 known-malicious packages from Datadog's public dataset, Airlock called 78% malicious and 85% malicious or suspicious** ([below](#what-we-measured-all-on-vultr)). Click **Run self-test** on the home page to re-run five known packages (npm + PyPI) yourself and see pass/fail live.
 - **Limits.** Sandbox-aware malware that stays quiet isn't caught; Pattern B (browser screenshots) was descoped, since the demo repo has no UI; npm and PyPI only. See [the security model](#security-model-and-limits).
 
 ## Judging criteria → where to check it
@@ -36,6 +36,25 @@ Every number in this README comes from the live VX1 host and Vultr Serverless In
 ## What we measured, all on Vultr
 
 Every number below comes from the live VX1 host and Vultr Serverless Inference. Times are UTC.
+
+- **8 Nov. 680 known-malicious packages from [Datadog's malicious-software-packages-dataset](https://github.com/DataDog/malicious-software-packages-dataset)** (500 npm, 180 PyPI source packages; one version per package, random with a fixed seed, so anyone can draw the same sample: `evals/datadog_prep.py`). Each ran through the real pipeline, 8 at once, about 425 an hour; median 40 s and 27,000 tokens a package. Run twice: run 2 added fake tokens in the install environment and a fake SSH key ([run 1](evals/results/datadog-sample-20261108T123757Z/datadog-summary.md), [run 2](evals/results/datadog-sample-20261108T142051Z/datadog-summary.md), [comparison](evals/results/datadog-sample-20261108T142051Z/compare-with-run1.md)).
+
+  | | npm | PyPI | All |
+  | --- | --- | --- | --- |
+  | **Called malicious** | 72% | 93% | **78%** (529/680) |
+  | Malicious or suspicious | 81% | 97% | 85% |
+  | Sent something to an attacker's server, captured, never delivered | 46% | 13% | 37% |
+  | Proven credential theft (this run's fake token captured) | 24 | 3 | **27** (6 in run 1) |
+  | Called benign: a miss | 16% | 2% | 12% (83) |
+  | Inconclusive (install failed) or error | | | 17 |
+
+  **What the statistics say, in plain terms.**
+  - **The new fake tokens work.** Proven theft went from 6 to 27: 21 packages were proven only with the tokens, none only without. The **p-value** is below 0.0001. It's the chance of a split that lopsided if the tokens made no difference, so the effect is real. *Called malicious* also rose, 76.2% → 77.8% (p = 0.02), because proven theft is malicious whatever the AI says.
+  - **The AI's verdict wobbles a little between runs.** 63 of 680 packages (9%) got a different verdict the second time, mostly borderline packages that do nothing at install moving between *suspicious* and *benign*. The **standard deviation (SD)** of that wobble is about ±0.6 percentage points for *called malicious* and ±0.9 for *benign*, so differences that small are noise (the benign change, 10.4% → 12.2%, has p = 0.08: not significant). Proof doesn't wobble: fixed rules decide it from the captured request.
+  - **The sandbox is steady; the AI wobbles.** We ran the 63 packages that changed verdict 3 more times, 5 runs each ([results](evals/results/datadog-borderline-20261108T160007Z/borderline-summary.md)). What the sandbox *saw* (blocked connections, captured requests, proof) changed for at most 2 of 63. The AI's verdict moved between neighbouring calls, mostly *suspicious* ↔ *benign* on packages that ran nothing at install (38 packages) and *suspicious* ↔ *malicious* (17). No package's majority verdict was reached by fewer than 3 of 5 runs. Taking the majority of 5, 50 of 63 are flagged malicious or suspicious. So a cheap fix for marginal packages is to re-run when the verdict is *suspicious* and nothing was contained, and show the split.
+  - **95% ranges:** 75–81% called malicious, 10–15% missed. Another sample of 680 from the same dataset would usually land inside them.
+
+  **Reading it fairly.** Every package here is malicious, so this measures what Airlock catches, not false alarms (the 24 real packages above cover that: none). Most of the dataset is dependency-confusion and recon packages that send hostname, user and IP to a webhook, so *captured request* is the usual evidence and *proven credential theft* is rarer. Datadog says the set leans towards what its GuardDog rules detect. PyPI does better because its malicious packages mostly act in `setup.py`; npm misses are mostly packages that do nothing at install or until called a specific way. 20 more sampled PyPI packages are wheel-only or broken and weren't run (see the limits).
 
 - **5 Nov, 14:23. Full regression 33/33** ([`product-20261105T142257Z`](evals/results/product-20261105T142257Z/summary.md)): 11 targets × 3 runs, 4 at once, including a new **runtime-only stealer** (`tinyconf`) that is silent through install and tests. The agent read the code, had Airlock **exercise** `load()` with `NODE_ENV=production`, and the theft was proven by payload on 3/3 runs. Exfil proven on all 18 malicious runs, 0 containment events on the 15 benign runs, 0 inconclusive, 0 forced verdicts, 0 invalid tool calls.
 - **4 Nov, 03:06. Full regression 30/30** (an earlier run, superseded by the 33/33 above) ([`product-20261104T030613Z`](evals/results/product-20261104T030613Z/summary.md)): 10 targets × 3 runs. Exfil proven by payload on 15/15 malicious runs (npm, shell, Python, PR #3, PR #4), 0 containment events on benign targets, 0 forced verdicts, 0 invalid tool calls. The base-vs-PR diff was identical on all 3 runs of each PR (under heavy load on 5 Nov, PR #3's count varied from 12 to 14 new; the theft was new and proven every time).
@@ -66,6 +85,8 @@ On the demo's malicious PR (#3, "feat: coloured startup log"), the PROVEN row ap
 - **A human gate that blocks merge.** From the moment the PR is fetched, `airlocksandbox[bot]` holds the `airlock` commit status at `pending`, and branch protection requires it to pass. When exfiltration is proven by a captured payload carrying the run's canary token, Airlock rejects the PR by itself (failure, with the evidence comment). Otherwise only a person's Approve (success) or Reject (failure) sets the final status, and only someone with write access to the repo on GitHub may give it. A failed run sets `error`. Each run keeps one comment on the PR, rewritten as it goes: testing, then the evidence and how to decide, then the decision. Set `AIRLOCK_AUTO_REJECT=0` to leave every decision to a person.
 
 - **A signed record.** When the verdict is in, Airlock seals the whole timeline (the captured request included), the verdict and what was analysed into a receipt signed with Ed25519; the decision gets a second receipt chained to the first. The PR comment cites its hash. **Verify** on the run page checks both in your browser with this server's public key, and **Change the verdict** shows what a forgery looks like: the hash and signature fail. `airlock verify <bundle> --key <key>` does the same offline.
+- **SARIF for code scanning.** Every run with a verdict exports its findings as SARIF 2.1.0 (the run page's SARIF link, or `airlock analyse --sarif`), so they can sit in GitHub code scanning next to a team's other scanners. One result per containment event plus one for the verdict, each with a GitHub security severity.
+- **Encoded theft still counts.** The token is matched however the stealer packs it: base64, hex, base32, URL-encoding, single-byte XOR, or any of these gzipped, in the body, the URL or a DNS name. A live test on 8 Nov: a package that gzipped and base64-encoded the credentials was PROVEN, and the agent also found the hex copy it hid in a DNS lookup.
 
 **The same PR without Airlock.** We ran PR #3 as a plain CI job would: a fresh VM with the same fake credential files, `npm ci` and `npm test`, nothing watching. A stand-in for the attacker's server listened under the stealer's address, since the real one deliberately doesn't exist ([`evals/without_airlock.py`](evals/without_airlock.py), [results](evals/results/without-airlock-20261105T215220Z/summary.md), 5 Nov, 3 runs):
 
@@ -228,7 +249,13 @@ The lab found two recording gaps, both fixed: a token in a request URL, and a to
 - **GitHub unreachable.** If GitHub rejects the `pending` write, Airlock can't revoke an earlier review's success on the same commit. The run page says the PR is not held, and the decision posts the status again.
 - **Abandoned VMs.** A VM doesn't outlive the server process that started it (checked with kill -9 mid-run). On restart the web service destroys the leftover sandboxes it labelled as its own and marks the run failed, keeping its partial evidence, then retries it once as a new run; runs still waiting in the queue resume with the same id. A stop (a deploy, say) first gives runs in progress up to 75 s to finish. CLI and regression VMs on the same host are left alone. A PR whose run can't be retried is released on GitHub as `error` (not left `pending` and unmergeable), and a decision recorded just before the restart is posted.
 - **Adoption is untested.** No team has used Airlock in its own workflow yet. We haven't measured review time saved, how often people must approve by hand, or how many real dependencies hit the binary-download limit.
-- **npm and PyPI only.** Python packages are installed from source with `pip install` so `setup.py` and build hooks run under the watcher; wheels-only releases have nothing to run at install and are reported as such. **Go isn't supported:** Go modules have no install or build hooks (`go get`/`go build` run no package-defined scripts), so there is no install-time code to detonate — the interesting behaviour would only show at `go test` or runtime, which Airlock doesn't drive for Go.
+- **What Airlock can't run, it doesn't judge.** Three kinds of package come back without a clean verdict, and none is ever approved:
+  - **Installs that download binaries** from anywhere but a registry (bcrypt, puppeteer): the download is blocked, because an allowed host is also a route out, so the install fails and the run is **inconclusive**. In the Datadog sample, 13 of 680 installs exited with an error this way or similar.
+  - **Wheel-only PyPI releases:** Airlock installs Python packages from source so `setup.py` and build hooks run under the watcher, and doesn't take wheels yet. A wheel's code still runs when it's imported, so a wheel-only package isn't safe, just untested. 17 of the 200 sampled Datadog PyPI packages were wheel-only and weren't run.
+  - **Broken packages** with no `package.json`, `setup.py` or `pyproject.toml`: 3 of those 200.
+
+  Running wheels, by installing and then importing them through the agent's `exercise`, is the next step for PyPI.
+- **npm and PyPI only.** Python packages are installed from source with `pip install`, so `setup.py` and build hooks run under the watcher (wheels: see above). **Go isn't supported:** Go modules have no install or build hooks (`go get`/`go build` run no package-defined scripts), so there is no install-time code to detonate — the interesting behaviour would only show at `go test` or runtime, which Airlock doesn't drive for Go.
 
 ## Try it
 
@@ -241,6 +268,8 @@ uv run airlock analyse left-pad@1.3.0
 uv run airlock analyse evals/fixtures/colorful-logs-shell-stealer.tgz
 uv run airlock analyse https://github.com/Darkflib/airlock-demo/pull/3 --json report.json
 ```
+
+**From a coding agent.** The CLI is built to be called by a script or an agent before it installs something: the exit code is the verdict (0 no malicious behaviour observed, 2 suspicious, 3 malicious, 1 inconclusive or error), `--json` writes the full report with every event, and `--sarif` writes the findings. An agent on the Airlock host, or one that can reach it over SSH, runs `airlock analyse <package>` and installs only on exit 0. It needs a KVM host, because the package runs in a microVM there, never on the agent's machine. There's no hosted API for agents yet: the web app signs people in with GitHub.
 
 **Run your own:** [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) goes from a blank KVM host to a protected branch in about an hour:
 1. Create the host from `infra/cloud-init.yaml`.

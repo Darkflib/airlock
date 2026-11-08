@@ -51,6 +51,9 @@ def diff_check(events: list[dict], expected: str) -> dict:
             "diff_risky": len(risky)}
 
 
+ROWS_JSONL: Path | None = None  # each finished row is appended here, so a crash loses nothing
+
+
 async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> dict:
     async with gate:
         t0, log = time.monotonic(), EventLog()
@@ -75,6 +78,9 @@ async def one(target: str, expected: str, rep: int, gate: asyncio.Semaphore) -> 
                    ok=row["verdict"] == expected and row.get("diff_ok", True) is not False)
         print(f"  {'PASS' if row['ok'] else 'FAIL'} {target[-48:]:48} {row['verdict']:10} {row['seconds']}s "
               f"{row.get('diff') or ''} {row.get('error') or ''}", flush=True)
+        if ROWS_JSONL:
+            with open(ROWS_JSONL, "a") as f:
+                f.write(json.dumps(row) + "\n")
         return row
 
 
@@ -113,6 +119,11 @@ async def main() -> None:
         targets = [tuple(line.split("\t")[:3]) for line in args.targets.read_text().splitlines()
                    if line.strip() and not line.startswith("#")]
     gate = asyncio.Semaphore(args.concurrency)
+    kind = args.targets.stem.replace("_", "-") if args.targets else "product"
+    out = HERE / "results" / (f"{kind}-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    out.mkdir(parents=True)
+    global ROWS_JSONL
+    ROWS_JSONL = out / "rows.jsonl"
     peak: dict = {}
     stop = asyncio.Event()
     sampler = asyncio.create_task(sample_host(peak, stop))
@@ -122,9 +133,6 @@ async def main() -> None:
     stop.set()
     await sampler
 
-    kind = args.targets.stem.replace("_", "-") if args.targets else "product"
-    out = HERE / "results" / (f"{kind}-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
-    out.mkdir(parents=True)
     (out / "runs.json").write_text(json.dumps(rows, indent=2))
     lines = [f"# Product regression — {out.name}", "",
              "| Target | Expected | Correct | Verdicts | Median turns | Forced | Containment (install or exercise) | Proven exfil | Exercised | New vs base (risky) | Median s |",

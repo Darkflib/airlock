@@ -4,11 +4,14 @@ The LLM explains events; it never decides what counts as one."""
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Callable
+
+from airlock import tokenmatch
 
 # Kinds that represent containment (shown highlighted on the timeline).
 CONTAINMENT = {"egress_blocked", "canary_read", "canary_exfil", "guard_flagged", "limit_hit", "dns_blocked"}
@@ -166,7 +169,7 @@ def events_from_trace(jsonl: str, allowed_hosts: tuple[str, ...]) -> list[tuple[
     return out
 
 
-CANARY_SUFFIXES = (".npmrc", "/.aws/credentials", "/.pypirc")
+CANARY_SUFFIXES = (".npmrc", "/.aws/credentials", "/.pypirc", "/.ssh/id_ed25519", "/.ssh/id_rsa")
 CANARY_MARK = "airlockcanary"  # every canary token starts with it (airlock/sandbox.py)
 NPM_MARKERS = ("npm-cli.js", "/bin/npm ", "npm install", "npm pack", "npm init")
 
@@ -199,8 +202,9 @@ class WatchTranslator:
     tried to reach a non-allowlisted destination.
     """
 
-    def __init__(self, allowed_hosts: tuple[str, ...]):
+    def __init__(self, allowed_hosts: tuple[str, ...], canary_token: str = ""):
         self.allowed_hosts = allowed_hosts
+        self.canary_token = canary_token
         self.read_canary: dict[int, str] = {}   # pid or parent pid -> canary path
         self.blocked: dict[int, str] = {}       # pid or parent pid -> destination
         self.exfil_reported: set[int] = set()
@@ -265,11 +269,13 @@ class WatchTranslator:
                     out.append(("file_read", f"{who} read {path}", {**base, "path": path}))
             elif ev == "dns":
                 name = rec.get("name", "")
-                if CANARY_MARK in name.lower():  # data smuggled in the name itself; resolvers may lowercase it
+                enc = "plain" if CANARY_MARK in name.lower() else tokenmatch.find_in_name(name, self.canary_token)
+                if enc:  # data smuggled in the name itself; resolvers may lowercase it
+                    how = "" if enc == "plain" else f" ({describe(enc)})"
                     where = ("forwarded to the registry's DNS, so it left the VM" if _allowed(name, self.allowed_hosts)
                              else "answered by Airlock inside the VM, never left it")
-                    out.append(("canary_exfil", f"{who} put the canary token in a DNS lookup of {name[:120]}: {where}",
-                                {**base, "host": name, "via": "dns", "payload": name}))
+                    out.append(("canary_exfil", f"{who} put the canary token{how} in a DNS lookup of {name[:120]}: {where}",
+                                {**base, "host": name, "via": "dns", "payload": name, "encoding": enc}))
                 if _allowed(name, self.allowed_hosts):
                     continue
                 for k in (pid, rec.get("ppid")):
@@ -311,19 +317,38 @@ class WatchTranslator:
         return out
 
 
+def describe(encoding: str) -> str:
+    """'gzip+base64+hex' -> 'gzipped, base64-encoded, hex-encoded'; plain -> 'as plain text'."""
+    words = {"plain": "as plain text", "url": "URL-encoded", "gzip": "compressed", "base64": "base64-encoded",
+             "base64url": "base64url-encoded", "hex": "hex-encoded", "base32": "base32-encoded", "xor": "XOR-obfuscated"}
+    parts = [words.get(p, p) for p in encoding.split("+") if p != "plain"] or [words["plain"]]
+    return ", ".join(parts)
+
+
+def _raw(rec: dict) -> bytes:
+    try:
+        return base64.b64decode(rec.get("raw_b64") or "")
+    except ValueError:
+        return b""
+
+
 def events_from_sinkhole(records: list[dict], canary_token: str) -> list[tuple[str, str, dict]]:
-    """Requests the host sinkhole answered for this run. A body carrying the run's
-    canary token is proven credential exfiltration, with the payload as evidence."""
+    """Requests the host sinkhole answered for this run. A request carrying the run's
+    canary token, in its body or URL, plain or encoded (airlock/tokenmatch.py), is proven
+    credential exfiltration, with the payload as evidence."""
     out: list[tuple[str, str, dict]] = []
     for rec in records:
         body, host, url = rec.get("body", ""), rec.get("host", "?"), rec.get("url", "?")
         data = {"host": host, "url": url, "method": rec.get("method"), "bytes": rec.get("bytes", 0),
                 "payload": body[:2000], "user_agent": rec.get("user_agent", ""), "source_kind": "sinkhole"}
-        if canary_token in body:
+        enc = (tokenmatch.find(body, canary_token) or tokenmatch.find(url, canary_token)
+               or tokenmatch.find(_raw(rec), canary_token))
+        if enc:
+            how = "" if enc == "plain" else f" ({describe(enc)})"
             out.append(("canary_exfil",
-                        f"{rec.get('method')} {url} carried the canary credentials: captured by Airlock's sinkhole, "
+                        f"{rec.get('method')} {url} carried the canary credentials{how}: captured by Airlock's sinkhole, "
                         "never reached the internet",
-                        {**data, "proven": True, "this_run": True}))
+                        {**data, "proven": True, "this_run": True, "encoding": enc}))
         elif "AIRLOCKCANARY" in body:  # a canary, but not this run's: suspicious, never proof
             out.append(("canary_exfil",
                         f"{rec.get('method')} {url} carried a canary token that isn't this run's (not counted as proof): "

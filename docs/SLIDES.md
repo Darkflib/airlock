@@ -74,6 +74,7 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 
 | | |
 |---|---|
+| 680 known-malicious packages (Datadog dataset, 500 npm + 180 PyPI) | **78%** called malicious, 85% with suspicious; theft proven 27, up from 6 with fake env tokens (p < 0.0001) |
 | Regression (11 npm/PyPI scenarios × 3) | **33/33** correct |
 | Malicious runs with exfil proven by payload | **18/18** |
 | Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
@@ -107,7 +108,7 @@ Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive"
 From `docs/TECHNICAL_REPORT.md` section 14. Three items, appearing one by one:
 - **Scale out:** a control plane separate from a pool of KVM workers on Vultr, so capacity is more instances; warm VM pools; Postgres and per-tenant isolation.
 - **See deeper:** a custom guest kernel with eBPF (kprobes, tracepoints, BTF) for syscall-level tracing instead of polling `/proc`; plus anti-evasion (realistic hosts, a fake clock).
-- **Prove it at scale:** a corpus of known-malicious packages and popular benign ones, for a real detection and false-positive rate.
+- **Cover what we can't run yet:** wheel-only PyPI releases (imported through `exercise`), and a false-alarm rate on a large set of popular benign packages to sit next to the 680-package malware result.
 
 ## 14. End card
 

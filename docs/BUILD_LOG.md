@@ -1027,3 +1027,51 @@ Tags: #decision #demo
 **Result:** in the gallery, two cards would read "Airlock Sandbox".
 **So:** the lablab title, the README and PRD headings and slide 1 go back to "Airlock: Catch Stolen Keys Before You Merge" (43 chars, checker passes). The narration, cover wordmark and bot keep "Airlock Sandbox"; the clash is on the gallery cards, not inside the video.
 Tags: #decision
+
+### 12:30 — Encoded theft counts as proof
+**Tried:** proof matched only the plain token in a captured body. Added `airlock/tokenmatch.py`: encode the token every common way (base64/base64url at all three alignments, hex, base32, URL, single-byte XOR) and search, plus inflate gzip/zlib bodies and base64 blobs that hold one. The sinkhole addon now also logs the raw bytes (`raw_b64`), because `get_text()` mangled binary bodies. Applied to bodies, URLs, DnsGuard names and the watcher's DNS names.
+**Result:** 55 new tests (every encoding at five offsets, no false proof on random 8 KB or another run's token); 490 pass. Live on the host, the new `packed-telemetry` fixture (gzip + base64 POST, hex in DNS labels) was PROVEN: "carried the canary credentials (compressed, base64-encoded)".
+**So:** a stealer can't dodge proof by encoding. Deployed.
+Tags: #win #demo
+
+### 12:55 — SARIF export
+**Tried:** security dashboards and GitHub code scanning take SARIF. Added `airlock/sarif.py`: one result per containment event from detonate or exercise (proven exfil, observed exfil, credential read, blocked egress, injection, limits) plus the verdict, with GitHub `security-severity` and stable fingerprints, at the manifest.
+**Result:** `GET /api/runs/{id}/sarif` (share links included), a SARIF link on the run page, `airlock analyse --sarif`. 0 errors against the official SARIF 2.1.0 schema; 495 tests pass.
+**So:** findings can go into GitHub code scanning. Held the deploy until the Datadog run ends, because a deploy restarts the sinkhole.
+Tags: #win
+
+### 13:20 — Fake tokens in the environment, and a fake SSH key
+**Tried:** the first Datadog numbers showed 0 proven theft among packages called malicious: most of the set is recon that sends hostname, user and IP, and stealers that dump `process.env` never touched our file canaries.
+**Result:** detonation (the package's own install and tests, never the agent's commands) now gets `NPM_TOKEN`, `NODE_AUTH_TOKEN`, `GITHUB_TOKEN`, AWS and PyPI variables carrying the run token, and the home gets `~/.ssh/id_ed25519`: an OpenSSH-shaped key with the token inside its base64 body, placed at characters 72–111 so a 70-character PEM line never splits it. The matcher also retries with whitespace and literal `\n` stripped, for key files sent as-is or JSON-encoded. 497 tests pass.
+**So:** deploy after the Datadog run and run the same 680 again, for a before-and-after on proof.
+Tags: #decision
+
+### 14:15 — Datadog sample, run 1: 76% malicious, 87% with suspicious
+**Tried:** 680 known-malicious packages from Datadog's malicious-software-packages-dataset (500 npm, 180 PyPI sdists; `malicious_intent`, one version per package, seed 20261108), once each through the real pipeline, 8 at once ([results](../evals/results/datadog-sample-20261108T123757Z/datadog-summary.md)). 20 more PyPI samples are wheel-only or broken and weren't run.
+**Result:** called malicious 518/680 (76%: npm 70%, PyPI 93%); with suspicious 593 (87%); called benign 71 (10%, all listed); inconclusive 14; errors 2. 246 sent something to an attacker's server and had it captured at the sinkhole; proven credential theft only 6, because most of the set is recon (hostname, user, IP to a webhook) and env dumps that never touched our file canaries. 96 min wall, 425 runs/hour, median 42 s and 25.7k tokens a package.
+**So:** deployed the env tokens, SSH key and SARIF (1Password was locked, so rsync plus a service restart instead of `deploy.sh`; code only). A new `envdump-beacon` fixture, which only posts `process.env`, is now PROVEN live. Run 2 on the same 680 started 14:20.
+Tags: #metric #demo
+
+### 14:35 — Limits: wheels, broken packages and binary downloads together
+**Tried:** the Datadog run made the untested cases concrete.
+**Result:** 17 of 200 sampled PyPI packages were wheel-only and 3 had no package root, so 20 weren't run; 13 of 680 ended inconclusive because the install failed.
+**So:** one README limits bullet and one TECHNICAL_REPORT weakness for all three, with the numbers. It also replaces "wheels-only releases have nothing to run at install", which undersold the risk: a wheel's code runs on import. Running wheels through `exercise` is the stated next step.
+Tags: #decision
+
+### 14:45 — The CLI as the agent interface
+**Tried:** coding agents need a way to check a package before installing it.
+**Result:** `airlock analyse` already fits that caller: the exit code is the verdict (0 / 2 / 3, 1 for inconclusive), plus `--json` and now `--sarif`. It needs a KVM host, and the web app has no token API for agents.
+**So:** a README "From a coding agent" paragraph says exactly that, including the missing hosted API; the competitor review notes it as the counter.
+Tags: #decision
+
+### 16:15 — Datadog sample, run 2: proof up from 6 to 27
+**Tried:** the same 680 packages again with fake env tokens and a fake SSH key ([results](../evals/results/datadog-sample-20261108T142051Z/datadog-summary.md), [comparison](../evals/results/datadog-sample-20261108T142051Z/compare-with-run1.md)); `evals/datadog_compare.py` pairs the runs package by package (McNemar exact test, run-to-run SD, Wilson 95% ranges) and explains each number in plain terms.
+**Result:** called malicious 529/680 (78%: npm 72%, PyPI 93%); with suspicious 85%; called benign 83 (12%); proven credential theft 27 against 6 (21 vs 0 discordant, p < 0.0001); called malicious up 76.2% → 77.8% (p = 0.02, the proof override). 63 verdicts (9%) changed between runs, all 26 new benign calls were suspicious before with zero containment in both runs: reviewer noise on do-nothing packages (benign change p = 0.08). 96 min, 425 runs/hour.
+**So:** the README, long description (replacing the 33/33 sentence), numbers slide, technical report and the unrecorded "Where next" line now carry it. Next steps change from "test on real malware" to wheels and a large benign set for false alarms.
+Tags: #metric #demo
+
+### 16:55 — Borderline packages, 5 runs each: steady sandbox, wobbly reviewer
+**Tried:** the 63 packages whose verdict changed between the two full runs, 3 more runs each on the run-2 code (189 runs, 52 min, 218/hour: these are the slow ones). `evals/datadog_borderline.py` separates sandbox evidence from the AI's verdict.
+**Result:** what the sandbox saw (containment, captured requests, proof) changed for at most 2 of 63. Verdicts moved suspicious ↔ benign (38, packages that run nothing at install) or suspicious ↔ malicious (17); the most common verdict held in 3/5 runs for 42 packages and 4/5 for 21. Majority of 5: 50 of 63 malicious or suspicious; 1 never flagged.
+**So:** variation is the model's judgement on do-nothing packages, not the sandbox. Candidate fix, not built: re-run automatically on *suspicious* with zero containment and report the split. Written into README and TECHNICAL_REPORT.
+Tags: #metric #decision

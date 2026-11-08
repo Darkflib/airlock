@@ -599,10 +599,13 @@ const Airlock = (() => {
       if (!rec) { box.hidden = true; return; }
       const v = el('a', '', 'Verify'); v.href = `/verify?run=${encodeURIComponent(id)}`;
       const d = el('a', '', 'Download'); d.href = `/api/runs/${encodeURIComponent(id)}/receipts?download=1`;
+      const s = el('a', '', 'SARIF'); s.href = `/api/runs/${encodeURIComponent(id)}/sarif?download=1`;
+      s.title = 'Findings as SARIF 2.1.0, for GitHub code scanning';
       const hash = el('code', '', `sha256:${rec.sha256.slice(0, 16)}…`); hash.title = rec.sha256;
       box.replaceChildren(el('span', 'receipt-tag', 'Signed'), document.createTextNode(
         ` ${rec.count === 1 ? 'verdict receipt' : `${rec.count} receipts, latest the ${rec.type}`} `),
-        hash, document.createTextNode(' · '), v, document.createTextNode(' · '), d);
+        hash, document.createTextNode(' · '), v, document.createTextNode(' · '), d,
+        document.createTextNode(' · '), s);
       box.hidden = false;
     }
 

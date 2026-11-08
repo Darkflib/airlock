@@ -8,6 +8,7 @@ import asyncio
 import base64
 import json
 import sys
+import time
 from dataclasses import asdict
 
 from .events import Event, EventLog
@@ -44,6 +45,12 @@ async def _main(args: argparse.Namespace) -> int:
             json.dump({**{k: v for k, v in asdict(report).items() if k != "agent"},
                        "agent": asdict(report.agent)}, f, indent=2)
         print(f"report: {args.json}")
+    if args.sarif:
+        from .sarif import to_sarif
+        with open(args.sarif, "w") as f:
+            json.dump(to_sarif(run_id=f"cli-{int(time.time())}", target=report.target, verdict=report.verdict,
+                               evidence=report.evidence, events=report.events), f, indent=2)
+        print(f"sarif: {args.sarif}")
     return {"benign": 0, "suspicious": 2, "malicious": 3}.get(report.verdict, 1)
 
 
@@ -75,6 +82,7 @@ def main() -> None:
     a.add_argument("--model", help="override roles.toml agent model")
     a.add_argument("--max-turns", type=int, default=12)
     a.add_argument("--json", help="write the full report here")
+    a.add_argument("--sarif", help="write the findings here as SARIF 2.1.0, for GitHub code scanning")
     v = sub.add_parser("verify", help="check a run's signed receipts offline")
     v.add_argument("bundle", help="a .receipts.json file from a run page")
     who = v.add_mutually_exclusive_group(required=True)

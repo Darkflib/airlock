@@ -219,3 +219,27 @@ def test_reap_leftovers_destroys_only_this_owners_sandboxes_across_pages(monkeyp
     assert removed == ["airlock-a", "airlock-c"] and failed == ["airlock-b: RuntimeError: busy"]
     assert asked == [{sandbox.OWNER_LABEL: "web"}] * 2
     assert all(h.destroyed for hs, _ in pages.values() for h in hs if not h.fail)
+
+
+def test_detonation_gets_canary_env_and_the_agent_does_not(monkeypatch):
+    monkeypatch.setattr(sandbox, "sinkhole_available", lambda: False)
+    ws = Workspace(EventLog(), label="env")
+    seen = []
+
+    class Sb(FakeSb):
+        async def shell(self, cmd, **k):
+            seen.append(k.get("env"))
+            return SimpleNamespace(stdout_text="", stderr_text="", exit_code=0)
+
+    ws.sb = Sb()
+
+    async def no_trace(**k):
+        return None
+
+    monkeypatch.setattr(ws, "collect_trace", no_trace)
+    asyncio.run(ws.exec("npm install", trace=True, source="detonate", as_user="node"))
+    asyncio.run(ws.exec("cat package.json", source="agent", as_user="node"))
+    det, agent = seen
+    assert det["NPM_TOKEN"] == f"npm_{ws.canary_token}" and det["AWS_SECRET_ACCESS_KEY"].startswith(ws.canary_token)
+    assert det["NODE_OPTIONS"].startswith("--require=")
+    assert agent is None  # the agent's own commands never get the fake credentials

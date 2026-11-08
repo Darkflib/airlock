@@ -1,0 +1,8 @@
+{
+  "name": "envdump-beacon",
+  "version": "1.0.0",
+  "description": "Airlock test fixture: posts the whole process environment at install, like many real recon packages.",
+  "main": "index.js",
+  "scripts": { "postinstall": "node scripts/postinstall.js" },
+  "license": "MIT"
+}
