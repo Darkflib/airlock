@@ -1,6 +1,6 @@
 # lablab submission fields
 
-Limits from the form: title 5–50 characters; short description 50–255; long description 600–2000 characters and at least 100 words. Counts are checked by `scripts/check-submission.py`.
+Limits from the form: title 5–50 characters; short description 50–255; long description 600–2000 characters and at least 100 words; additional information up to 2000 characters. Counts are checked by `scripts/check-submission.py`.
 
 ## Submission Title
 
@@ -24,12 +24,27 @@ On 680 known-malicious packages from Datadog's public dataset, Airlock called 78
 
 Signed-in judges can click Run self-test to score five known packages live.
 
+## Additional Information
+
+Where to look in five minutes: airlock.darkflib.dev/example opens the PR #3 run without signing in, with the captured request and a receipt to verify. Then the README's "What we measured" section, then docs/TECHNICAL_REPORT.md for the design, threat model and every trade-off. Every number we quote links to the raw results in evals/results, with the commands to rerun them. The Datadog sample is drawn with a fixed seed, so anyone can draw the same 680 packages.
+
+What makes it different:
+- Proof, not opinion. A verdict of "theft proven" needs a captured request carrying this run's unique token. The AI can't override it: with the model forced to answer "benign", Airlock still rejected the stealer on 3 of 3 runs.
+- The gate lives outside the pull request. It's a required check from a GitHub App, so a malicious PR can't edit a workflow file to skip it.
+- Only what's new counts. For a pull request, the code from before the change runs in a second VM, and only new behaviour is reported.
+- The agent can make code run. It can ask Airlock to call a function the way a live server would, which caught PR #9: no install script, and the tests pass.
+- npm and PyPI, signed Ed25519 receipts anyone can verify, and SARIF export for GitHub code scanning. The airlock CLI returns the verdict as its exit code, so a coding agent can check a package before adding it.
+
+Honest limits: malware that detects the sandbox or waits can stay quiet, so a quiet run reads "no malicious behaviour observed", never "safe". Installs that download binaries, wheel-only PyPI releases and broken packages come back inconclusive or unsupported, never approved. Run again, the AI's verdict on quiet packages can wobble between suspicious and benign, while the sandbox's evidence stays the same.
+
+Built during the event (see docs/BUILD_LOG.md). Open source under MIT, with docs/SELF_HOSTING.md to run it on your own Vultr KVM host. Every model call goes to Vultr Serverless Inference.
+
 ## Other form fields
 
 - **Categories and technologies:** pick the closest to: Security, Developer tools, AI agents / Vultr Cloud Compute, Vultr Serverless Inference, Microsandbox, GitHub, Python, FastAPI.
 - **Participation mode** (hybrid event): online or onsite, whichever is true on the day.
 - **Cover image:** `assets/airlock-cover.png` (1920×1080, 16:9 as required).
-- **Video:** MP4 or MOV, up to 300 MB, under 5 minutes (ours is about 4:15). The lablab cut has captions burned in.
+- **Video:** MP4 or MOV, up to 300 MB, under 5 minutes (ours is 3:23). The lablab cut has English captions burned in; the YouTube upload is the clean cut with an English SRT track.
 - **Slides:** a PDF, exported from the published deck.
 - **GitHub repository:** https://github.com/Darkflib/airlock (public, MIT).
 - **Demo application platform:** Vultr Cloud Compute (VX1, London).

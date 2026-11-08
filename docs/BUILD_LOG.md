@@ -1087,3 +1087,9 @@ Tags: #decision
 **Result:** 264 of 680 packages contacted one (OAST 147, IP lookups 64, webhook.site 33, Discord 23, ngrok 9, Telegram 8, others 23); the AI had called 261 of those malicious, so a fixed rule would change about one verdict on this set.
 **So:** worth building after the deadline for determinism and hijack resistance (a verdict floor and a SARIF rule), not for this score. In TECHNICAL_REPORT §14.4.
 Tags: #metric #decision
+
+### 21:45 — Captions burned in, submission sent
+**Tried:** captioned the final 3:23 cut. whisper.cpp (small.en) gave word times; 48 captions follow what was said, with names spelled right, and two unclear phrases were re-checked on short clips. This ffmpeg build has no subtitle filter, so the captions are rendered as images and overlaid from a timed concat list.
+**Result:** a burned-in cut for lablab (x264, CRF 18) and an English SRT for the clean YouTube cut; every caption is at most two lines and about 20 characters a second. Submitted on lablab with the deck, the video and a 1,961-character "additional information" field (now in `docs/SUBMISSION.md`).
+**So:** `docs/SLIDES.md` now matches the deck as submitted (PR #9 in place of PR #4, the who-pays, limits and end slides), and the checker covers the new field.
+Tags: #demo

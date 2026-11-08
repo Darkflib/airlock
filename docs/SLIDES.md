@@ -1,123 +1,120 @@
 # Slide outline
 
-Draft, 4 Nov. Fourteen slides (slide 3 added 5 Nov; 11, 13 and 14 on 7 Nov) for the lablab submission and the "under the hood" beat of the video. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange.
+The deck as submitted on 8 Nov: fourteen slides, exported to PDF for the lablab form. One idea per slide; every number points to a dated run (see the sources table in `docs/VIDEO_SCRIPT.md`). Colours from the logo: navy, cyan, hazard orange; IBM Plex Sans and JetBrains Mono. Speaker notes are summarised under each slide.
 
-## 1. Title
+## 1. Cover
 
-**Airlock: Catch Stolen Keys Before You Merge**
-Every untrusted change gets its own disposable computer.
-Vultr Agent Rush, Challenge 1 "Blast Radius Zero" · airlock.darkflib.dev
-*Visual:* logo on navy; the cover image if it's ready.
+**Airlock: Catch stolen keys before you merge**
+Every untrusted code change runs in its own disposable computer. See what it tried to steal.
+We test new pull requests and new npm and PyPI packages in a throwaway virtual machine, before they reach your project.
+Vultr Agent Rush · Blast Radius Zero · airlock.darkflib.dev · github.com/Darkflib/airlock
+*Visual:* logo and the cover terminal card (PR #3: VM started, fake keys, canary read, request captured, MALICIOUS).
 
 ## 2. The problem
 
-A green test run doesn't tell you what the install script did.
-- Postinstall scripts and test hooks run in CI with real tokens and open network access.
-- Nobody reads the diff of a lockfile bump or a vendored tarball.
-- Static review catches the obvious payload, not the one that reads like a routine bump.
-*Visual:* PR #3 on GitHub with the green `npm test` check.
+Passing tests do not show what the install script did.
+- **Real secrets at risk:** install scripts in CI run with real passwords, real tokens and full internet access.
+- **Nobody reads it:** reviewers rarely read a lockfile change or the files inside a packaged dependency.
+- **Easy to hide:** reading the code finds obvious attacks, and can miss one that looks like a normal update.
+*Notes:* PR #3 adds a coloured logger and its tests pass. Would you merge it?
 
 ## 3. The same PR without Airlock
 
-PR #3 run as a plain CI job: a fresh machine with the same fake credential files, `npm ci`, `npm test`, nothing watching.
-- `npm ci` ✓ `npm test` ✓: the check is green.
-- One POST delivered the npm token and the AWS secret to the attacker. 3 runs out of 3, about 3.2 s each.
+The check is green. Both keys went to the attacker.
+- PR #3 as a plain CI job: `npm ci` ✓, `npm test` ✓, the same fake credential files, nothing watching. 3 runs out of 3, about 3.2 s each.
+- "Attacker's server received:" the POST with the npm token and AWS secret highlighted.
 - Through Airlock, the same PR: MALICIOUS, the request captured with nothing sent, merge held, rejected automatically.
-*Visual:* left, the two green steps; right, "Attacker's server received:" with the POST body, token and secret highlighted. Caption: "Recorded 5 Nov (`evals/without_airlock.py`). The stealer's real address doesn't exist, so our stand-in played the attacker's server."
+*Footer:* recorded 5 Nov (`evals/without_airlock.py`). The stealer's real address doesn't exist, so our stand-in played the attacker's server.
 
 ## 4. What Airlock does
 
-A push to a PR starts it by itself (or paste an npm or PyPI package, or upload a tarball) → it runs in a fresh microVM with fake credentials → you see what it tried to steal → the PR stays blocked until a human approves.
-Scanners such as Socket read a package's code for risky patterns. Airlock runs the change and keeps what it actually sent, tied to this run's token, compared with the code before the change, and enforced as a merge check.
-*Visual:* four-step strip: Start → Run → Explain → Decide.
+Run it safely. Watch what it does. A person decides.
+1. **Start:** a push to a pull request starts a run by itself, or paste an npm or PyPI package name, or upload a package file.
+2. **Run:** a new VM with fake passwords and no internet except the registries; install and tests run as a normal user; for a PR, the code from before the change runs alongside, so only what's new stands out.
+3. **Explain:** an AI agent on Vultr Serverless Inference reads the evidence and writes a verdict; each claim links to an event.
+4. **Decide:** proven theft is rejected automatically; anything else can't merge until a person approves or rejects it.
 
-## 5. The money shot: proven exfiltration
+## 5. Proven theft: PR #3 (colorful-logs)
 
-The captured POST from PR #3, with the run's canary token highlighted.
-- Every destination outside the registries is answered by Airlock on the host, never forwarded.
-- So exfiltration is **proven by the payload**, not inferred from a connection attempt.
-- It was a shell script: detection doesn't depend on the language.
-*Visual:* screenshot of the expanded PROVEN row.
+We capture the stolen data, so the theft is proven.
+- Fake passwords and keys, with a token unique to this run.
+- Anything outside the registries reaches a fake server Airlock controls. Nothing gets out.
+- The request carries this run's token, so it's proven, not guessed.
+- It was a shell script: proof doesn't depend on the language.
+*Visual:* screenshot of the run page, proven event E10, run `20261106-164620-b13d8d`.
 
-## 6. Where the agent earns its place: PR #9
+## 6. Where the agent earns its place: PR #9 (tinyconf)
 
-A config library with no install script; its tests pass. Install and tests alone **didn't expose it**.
-- The agent reads the code: it only sends data when `NODE_ENV=production`.
-- It asks Airlock to **exercise** it that way. Airlock runs it from a clean copy with its own harness, so what's caught counts as proof.
-- POST to `cfg-metrics.tinyconf.invalid` with this run's token: **PROVEN**, rejected automatically.
-"The agent found it. Airlock proved it."
-*Visual:* Detonation "✓ nothing suspicious" above Agent investigation "4 contained", with the exercise row and the PROVEN POST.
+Install and tests were silent. The agent found it. Airlock proved it.
+The agent reads the code: it only sends data when `NODE_ENV=production`. It asks Airlock to call it that way, from a clean copy, so what's caught counts as proof.
+*Visual:* screenshot of run `20261108-162701-117993` (started by a push, rejected automatically): the exercise event E55 and the proven POST E57.
 
-## 7. The gate
+## 7. The merge gate
 
-- A push starts a run (App webhook); the GitHub App holds the PR at a pending `airlock` status; branch protection requires it.
-- Proven theft (a captured payload with this run's token) is rejected automatically: red check and evidence comment, no click. Everything else waits for a human Approve or Reject, from someone with write access to the repo on GitHub: on the run page, or with an `/airlock approve` comment on the PR.
-- The AI explains; it never merges.
-*Visual:* greyed-out merge button beside the bot's evidence comment.
+Proof blocks it. A person approves it.
+- **Waiting:** a push starts a run and Airlock sets its GitHub check to "pending"; the repository requires it, so Merge is disabled.
+- **#9, rejected by itself:** the theft is proven, so the check turns red and the evidence is posted on the PR.
+- **#1, approved:** nothing new, nothing blocked; a person comments `/airlock approve`, the check turns green, and it can merge.
+*Footer:* only people with write access on GitHub can decide, on the PR or in Airlock. Automatic rejection uses the captured proof, never the AI's verdict; nothing is approved automatically; only the App can set the check, admins included.
 
-## 8. Architecture
+## 8. Three layers of protection
 
-Three containment layers, evidence the guest can't forge:
-1. **Default-deny egress** (microsandbox policy): registries only.
-2. **Fake DNS + sinkhole** on a per-run /24, plus a host-side DNS guard: answers every non-registry request itself, records it, forwards none.
-3. **In-guest watcher** as root (fanotify, DNS, connections); the package runs as an unprivileged user and can't touch it.
-Fail closed: no watcher, no run; a blind spot turns "benign" into "inconclusive".
+1. **Blocked network:** the machine reaches the npm and PyPI registries only.
+2. **Fake internet:** other addresses and DNS names are answered by Airlock on the host, recorded, never forwarded.
+3. **A watcher inside the machine:** every program, file read and connection; the package runs as a normal user and can't stop it.
+Safe by default: no working watcher, no run; if Airlock might have missed something, the result is "inconclusive", never "safe".
 *Visual:* `docs/architecture.png`.
 
 ## 9. Built on Vultr
 
-- **VX1 with KVM:** a separate guest kernel per run (guest 6.12, host 6.8), boot in 0.69 s. "Isn't this just Docker?" No.
-- **Serverless Inference:** triage agent `mimo-v2.6-flash`, chosen by benchmarking all 13 catalogue models.
-- **Rebuildable:** the host comes back from `infra/cloud-init.yaml` in about 10 minutes.
+- **0.69 s:** VM start on a VX1 with KVM; each run has its own Linux kernel.
+- **13:** every Serverless Inference model tested; `mimo-v2.6-flash` scored best and was the cheapest and fastest (15/15 on the final round).
+- **~10 min:** the whole server rebuilds from one cloud-init file. London region.
 
-## 10. Numbers
+## 10. Results from real runs on Vultr
 
-| | |
-|---|---|
-| 680 known-malicious packages (Datadog dataset, 500 npm + 180 PyPI) | **78%** called malicious, 85% with suspicious; theft proven 27, up from 6 with fake env tokens (p < 0.0001) |
-| Regression (11 npm/PyPI scenarios × 3) | **33/33** correct |
-| Malicious runs with exfil proven by payload | **18/18** |
-| Runtime-only stealer, silent in install and tests | **proven 3/3** via the agent's exercise |
-| Reviewer forced to answer "benign" (hijack lab) | **still rejected 3/3**: the captured proof decides, not the AI |
-| Containment events on benign runs | **0** |
-| 24 real npm/PyPI packages × 2 | **0 false alarms**, 42 clean, 6 inconclusive (binary downloads blocked, or no compiler) |
-| Median run, end to end | **17–35 s** fixtures, **46 s** real packages |
-| Inference per review (median) | **≈ $0.003** fixtures, **≈ $0.025** real packages |
-| One VX1 host ($113/month), 8 at once | **≈ 700 PR runs/hour**, ≈ 455 real-package reviews/hour |
-| Whole build to 5 Nov, inference + compute | **$8.26** |
-"11 scenarios × 3 runs" is a regression on fixtures we wrote plus real packages, not a detection rate. Recheck the 33/33 on the frozen commit and the spend on Sat before exporting.
+- **78%** of 680 known-malicious packages (Datadog's dataset) called malicious; 85% with suspicious.
+- **27** of them with theft proven by the captured payload, up from 6 with fake env tokens (p < 0.0001).
+- **33/33** regression correct: 11 npm and PyPI scenarios × 3; 18/18 stealers proven.
+- **0** false alarms on 24 real npm and PyPI packages, run twice each.
+- **3/3** still rejected with the AI forced to say "benign": the proof decides, not the model.
+- **≈3¢** of AI per real review; one $113/month host runs about 700 PR reviews an hour.
+*Footer:* `evals/results`: datadog-sample-20261108T142051Z, product-20261105T142257Z, real-packages-20261105T164727Z, hijack-lab-20261105T234710Z. The 33 runs are a regression on fixtures plus real packages, not a detection rate.
 
 ## 11. Who pays, and why now
 
-- **Buyer:** platform and security teams in companies with many repos and automated dependency updates. Also open-source foundations and package registries.
-- **Why now:** more than **454,600 new malicious packages** in 2025, over 99% of them on npm (Sonatype).
-- **The workload:** Dependabot runs on **2.66 million+** GitHub projects; **40 million** Dependabot PRs were opened and **14 million** merged in 2025 (GitHub Octoverse). Each is a dependency change somebody approves.
-- **Market:** software supply-chain security platforms, about **$5.5B in 2025, $10.1B by 2030**, 12.8% a year (Mordor Intelligence). Other publishers put 2025 at $2–6B.
-- **Revenue:** a subscription per repository, plus a self-hosted licence for teams that must keep evidence in their own region. A review costs about **3 cents** of inference, and one $113/month host runs about 700 PR reviews an hour, so the margin is wide.
-- **Why it needs AI:** the agent finds code that only misbehaves when called, and turns it into proof (PR #9).
+Platform and security teams that approve dependency changes every day.
+- **454,600** new malicious packages in 2025, over 99% on npm (Sonatype).
+- **14M** Dependabot PRs merged on GitHub in a year, each one a change somebody approved (GitHub Octoverse).
+- **$5.5B** supply-chain security platforms in 2025, $10.1B by 2030 (Mordor Intelligence; other estimates $2–6B).
+- **≈3¢** of AI per review, so pricing per repository leaves a wide margin.
+**Revenue:** a subscription per repository, plus a self-hosted licence for teams that keep evidence in their own region. **Why AI:** the agent finds code that only misbehaves when called, and turns it into proof.
+*Footer:* sources read 7 Nov 2026.
 
-*Footer:* Sources: Sonatype, State of the Software Supply Chain 2026 (open-source malware chapter); GitHub Octoverse 2025 (Sep 2024–Aug 2025); Mordor Intelligence, Software Supply Chain Security Platforms Market. All read 7 Nov 2026.
+## 12. Honest limits
 
-## 12. Limits
-
-- Not caught: malware that detects the sandbox and stays quiet, or waits. So a quiet run reads "No malicious behaviour observed", with what ran, and never "safe".
-- npm and PyPI only; installs that download binaries come back inconclusive, never approved; browser-level behaviour (Pattern B) descoped.
+- **Malware that waits:** code that notices the sandbox and stays quiet; a quiet run reads "No malicious behaviour observed", never "safe".
+- **What it can't run:** installs that download binaries, wheel-only PyPI releases and broken packages come back inconclusive or unsupported, never approved.
+- **npm and PyPI only:** other ecosystems and browser-level behaviour are out of scope for now.
+- **The AI wobbles on quiet packages:** re-run, a do-nothing package can move between suspicious and benign; what the sandbox saw stays the same.
+*Notes:* in the Datadog sample 13 of 680 installs failed (inconclusive) and 20 of 200 sampled PyPI packages were wheel-only or broken; over five runs the sandbox's evidence changed for at most 2 of 63 borderline packages.
 
 ## 13. What's next
 
-From `docs/TECHNICAL_REPORT.md` section 14. Three items, appearing one by one:
-- **Scale out:** a control plane separate from a pool of KVM workers on Vultr, so capacity is more instances; warm VM pools; Postgres and per-tenant isolation.
-- **See deeper:** a custom guest kernel with eBPF (kprobes, tracepoints, BTF) for syscall-level tracing instead of polling `/proc`; plus anti-evasion (realistic hosts, a fake clock).
-- **Cover what we can't run yet:** wheel-only PyPI releases (imported through `exercise`), and a false-alarm rate on a large set of popular benign packages to sit next to the 680-package malware result.
+Run more, see deeper, scale out (`docs/TECHNICAL_REPORT.md` section 14).
+- **Cover what we can't run yet:** wheel-only PyPI releases through the agent's exercise; a false-alarm rate on a large set of popular benign packages.
+- **See deeper:** a custom guest kernel with eBPF to trace every system call instead of polling; known exfiltration services as a fixed rule (264 of the 680 contacted one).
+- **Scale out:** a control plane separate from a pool of Vultr KVM workers; warm VM pools, Postgres, per-tenant isolation.
 
 ## 14. End card
 
-Airlock Sandbox logo on navy. No live-site URL: the demo host won't stay up long after judging, and the video will.
-github.com/Darkflib/airlock (MIT)
+Airlock logo on navy. "Every untrusted change runs in its own disposable computer. See what it tried to steal."
+github.com/Darkflib/airlock · Open source, MIT licence
 Mike Preston · Team OwlSuperb · github.com/Darkflib · darkflib.com · mikepreston.org
+No live-site URL: the demo host won't stay up long after judging, and the video will.
 
-## Notes for building the deck
+## Notes
 
-- Screenshots come from the Sat recording session, so they match the video.
+- Screenshots were taken from the live site with headless Chrome, so they match the runs named in each footer.
 - Don't put share-link or invite URLs on a slide; they're bearer tokens and the deck is public.
 - `Darkflib/airlock-demo` is public (6 Nov), so slides can link its PRs.

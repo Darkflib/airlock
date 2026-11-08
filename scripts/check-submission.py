@@ -5,7 +5,7 @@ from pathlib import Path
 
 text = Path(__file__).resolve().parents[1].joinpath("docs/SUBMISSION.md").read_text()
 fields = dict(re.findall(r"^## (.+?)\n\n(.*?)(?=\n## |\Z)", text, re.S | re.M))
-limits = {"Submission Title": (5, 50, 0), "Short Description": (50, 255, 0), "Long Description": (600, 2000, 100)}
+limits = {"Submission Title": (5, 50, 0), "Short Description": (50, 255, 0), "Long Description": (600, 2000, 100), "Additional Information": (0, 2000, 0)}
 ok = True
 for name, (lo, hi, words) in limits.items():
     body = fields[name].strip()
